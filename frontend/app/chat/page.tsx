@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AudioLines, Bot, Brain, Brush, Clapperboard, Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Swords, Telescope } from "lucide-react";
+import { Bot, Brain, Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Swords, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -556,44 +556,36 @@ export default function ChatPage() {
     />
   );
 
-  const chips = [
-    // 🎨🎬 in-chat creation: type it, get it — never leave the conversation
-    { Icon: ImageIcon, label: "Create image", onClick: () => setDraft({ text: "create an image of ", nonce: Date.now() }) },
-    { Icon: Clapperboard, label: "Create video", onClick: () => setDraft({ text: "create a video of ", nonce: Date.now() }) },
-    { Icon: Brush, label: "Create design", onClick: () => router.push("/design") },
-    { Icon: AudioLines, label: "Voice", onClick: () => router.push("/voice") },
-    { Icon: Telescope, label: "Deep research", onClick: () => setDeepMode(true) },
-  ] as const;
-
-  const suggestionCards = [
+  const homeActions = [
     {
       icon: Sparkles,
-      title: "Write & refine",
-      text: "Draft a crisp product announcement for softmoodtv, then make it friendlier.",
-      draft: "Draft a crisp product announcement for softmoodtv, then make it friendlier.",
+      label: "Write or brainstorm",
+      onClick: () => setDraft({ text: "Help me write ", nonce: Date.now() }),
     },
     {
       icon: Telescope,
-      title: "Research",
-      text: "Research the best launch plan for a Ghana-focused creator app and cite sources.",
-      draft: "Research the best launch plan for a Ghana-focused creator app and cite sources.",
+      label: "Research a topic",
+      onClick: () => setDeepMode(true),
     },
     {
       icon: ImageIcon,
-      title: "Create image",
-      text: "Create an image of a cozy cream-colored puppy floating on a pastel cloud.",
-      draft: "create an image of a cozy cream-colored puppy floating on a pastel cloud",
-    },
-    {
-      icon: Clapperboard,
-      title: "Create video",
-      text: "Create a cinematic video of sunrise over Cape Coast castle with no text overlays.",
-      draft: "create a cinematic video of sunrise over Cape Coast castle with no text overlays",
+      label: "Create an image",
+      onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
     },
   ] as const;
 
+  const chatTabs = (
+    <div className="flex items-center justify-center gap-7 h-full">
+      <span className="relative py-1 text-sm font-semibold text-white after:absolute after:inset-x-0 after:-bottom-2 after:h-0.5 after:rounded-full after:bg-white">Ask</span>
+      <button onClick={() => router.push("/images")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Imagine</button>
+    </div>
+  );
+
   return (
-    <AppShell title={activeTitle || "Mood Chat"}>
+    <AppShell title={activeTitle || "Mood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
+      {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
+      {!emptyHome && (
+        <>
       {/* conversation toolbar — cleaner and closer to ChatGPT, with live workspace status */}
       <div className="border-b border-white/5 px-3 sm:px-4 py-3 shrink-0 compact-v bg-[#0f1011]/88 backdrop-blur space-y-2.5">
         <div className="flex items-center gap-2 sm:gap-3">
@@ -668,6 +660,8 @@ export default function ChatPage() {
           )}
         </div>
       </div>
+        </>
+      )}
       {showTeam && wsId && (
         <div className="border-b border-line bg-panel px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">
           <p className="text-[11px] text-gray-500 mb-1.5">Shared with the team — anyone in this workspace can read &amp; continue these</p>
@@ -719,48 +713,21 @@ export default function ChatPage() {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
         <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
-            <div className="min-h-[calc(100dvh-12rem)] md:min-h-[calc(100dvh-9rem)] flex flex-col items-center justify-center gap-6 py-6">
-              <div className="select-none flex flex-col items-center gap-3 text-center max-w-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/icon.png"
-                  alt="Mood AI"
-                  className="w-16 sm:w-20 rounded-[1.25rem] ring-1 ring-white/10 shadow-[0_0_90px_-18px_rgb(var(--mood-accent)/0.55)]"
-                />
-                <div className="space-y-1.5">
-                  <h2 className="text-[clamp(2rem,4vw,2.8rem)] font-semibold tracking-tight text-white">How can I help?</h2>
-                  <p className="text-sm sm:text-base text-gray-500">
-                    Chat, research, create images, direct videos and refine ideas from one workspace.
-                  </p>
-                </div>
-              </div>
-              <div className="w-full max-w-3xl">{composerEl(true)}</div>
-              <div className="w-full max-w-3xl grid sm:grid-cols-2 gap-2.5">
-                {suggestionCards.map(({ icon: Icon, title, text, draft }) => (
-                  <button
-                    key={title}
-                    onClick={() => setDraft({ text: draft, nonce: Date.now() })}
-                    className="text-left rounded-2xl border border-white/8 bg-[#141415] px-4 py-3.5 hover:border-white/15 hover:bg-white/[0.045] transition shadow-[0_10px_28px_rgb(0_0_0/0.18)]"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
-                      <Icon size={15} className="text-accent" /> {title}
-                    </div>
-                    <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{text}</p>
-                  </button>
-                ))}
-              </div>
-              <div className="w-full max-w-3xl flex flex-wrap items-center justify-center gap-2">
-                {chips.map(({ Icon, label, onClick }) => (
+            <div className="flex min-h-[calc(100dvh-10rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
+              <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
+              <div className="w-full max-w-xl">{composerEl(true)}</div>
+              <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Start with an action">
+                {homeActions.map(({ icon: Icon, label, onClick }) => (
                   <button
                     key={label}
                     onClick={onClick}
-                    className="touch-manipulation flex items-center gap-1.5 rounded-full bg-white/5 border border-white/8 px-3.5 py-2 text-xs text-gray-400 hover:border-accent/35 hover:text-white transition whitespace-nowrap"
+                    className="touch-manipulation flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-[#141415] px-3 py-3 text-xs text-gray-400 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
                   >
-                    <Icon size={13} className="text-gray-500" /> {label}
+                    <Icon size={14} className="text-accent" />
+                    {label}
                   </button>
                 ))}
               </div>
-              {pickerEl(true)}
             </div>
           )}
           {msgs.map((m, i) => (
