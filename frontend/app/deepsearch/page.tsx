@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
+import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch, token } from "@/lib/api";
 import { LAST_CONV_KEY } from "@/lib/conversations";
 
@@ -14,20 +15,57 @@ function fmtDate(iso: string | null): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+function sinceLabel(ts: number | null): string {
+  if (!ts) return "waiting for first sync";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 10) return "synced just now";
+  if (seconds < 60) return `synced ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `synced ${minutes}m ago`;
+  return `synced ${Math.floor(minutes / 60)}h ago`;
+}
+
 export default function ResearchPage() {
   const router = useRouter();
   const [items, setItems] = useState<ResearchItem[] | null>(null);
   const [error, setError] = useState("");
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [liveRefresh, setLiveRefresh] = useState(true);
+  const [syncTick, setSyncTick] = useState(0);
+
+  async function refreshNow() {
+    try {
+      const d = await apiFetch<{ items: ResearchItem[] }>("/deepsearch/research");
+      setItems(d.items);
+      setLastSyncAt(Date.now());
+      setError("");
+    } catch (e: any) {
+      setError(e?.message || "Could not load research");
+    }
+  }
 
   useEffect(() => {
     if (!token.get()) {
       router.replace("/login");
       return;
     }
-    apiFetch<{ items: ResearchItem[] }>("/deepsearch/research")
-      .then((d) => setItems(d.items))
-      .catch((e) => setError(e?.message || "Could not load research"));
-  }, [router]);
+    let dead = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const loop = async () => {
+      await refreshNow();
+      if (!dead && liveRefresh) timer = setTimeout(loop, 15000);
+    };
+    void loop();
+    return () => {
+      dead = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [liveRefresh, router]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSyncTick(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
 
   function openReport(id: string) {
     localStorage.setItem(LAST_CONV_KEY, id);
@@ -39,27 +77,38 @@ export default function ResearchPage() {
     router.push("/chat");
   }
 
+  const lastSyncLabel = sinceLabel(lastSyncAt);
+  void syncTick;
+
   return (
     <AppShell title="Research">
       <div className="mx-auto w-full max-w-3xl p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">
-            🔭 Research library
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Every DeepSearch run lands here — re-open a report any time, sources included.
-          </p>
+        <StudioHero
+          title="Research library"
+          subtitle="Every DeepSearch run lands here — re-open a report any time with sources included."
+          actions={
+            <>
+              <StudioActionButton onClick={() => void refreshNow()} tone="accent">↻ Refresh now</StudioActionButton>
+              <StudioActionButton onClick={() => setLiveRefresh((v) => !v)} tone={liveRefresh ? "success" : "default"}>
+                {liveRefresh ? "⏸ Pause live refresh" : "▶ Resume live refresh"}
+              </StudioActionButton>
+              <StudioActionButton onClick={fresh}>＋ New research</StudioActionButton>
+              <StudioActionLink href="/chat">💬 Open chat</StudioActionLink>
+            </>
+          }
+          stats={[
+            { label: "Reports", value: items?.length ?? 0 },
+            { label: "Latest ready", value: items?.[0]?.updated_at ? fmtDate(items[0].updated_at) : "—" },
+          ]}
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <StudioStatusPill label="Library sync" value={lastSyncLabel} tone="accent" pulse={liveRefresh} />
+          <StudioStatusPill label="Live refresh" value={liveRefresh ? "every 15s" : "paused"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+          <StudioStatusPill label="Reports" value={items?.length ?? "…"} tone={items && items.length > 0 ? "success" : "default"} pulse={Boolean(items && items.length > 0)} />
         </div>
-
-        <button
-          onClick={fresh}
-          className="rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-black hover:brightness-110 transition"
-        >
-          ＋ New research
-        </button>
-        <p className="text-[11px] text-gray-600 -mt-4">
+        <StudioNotice>
           Opens a fresh chat — switch on <span className="text-accent">🔭 Deep</span> before sending.
-        </p>
+        </StudioNotice>
 
         {error && <p className="text-sm text-red-400">{error}</p>}
 

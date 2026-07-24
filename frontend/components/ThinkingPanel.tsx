@@ -40,7 +40,7 @@ export default function ThinkingPanel({ state, replayEvents }: { state: ThinkSta
             <Timer size={11} /> {seconds}s
           </span>
         )}
-        {live && <span className="text-gray-500 font-normal">thinking…</span>}
+        {live && <span className="text-gray-500 font-normal">thinking through the answer…</span>}
         {hasTrace && (open ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
       </button>
       {summary && (

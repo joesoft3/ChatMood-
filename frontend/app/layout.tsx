@@ -3,7 +3,7 @@ import "./globals.css";
 import { ConversationsProvider } from "@/lib/conversations";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://moodai-app.vercel.app"),
   title: {
     default: "Mood AI — chat, arena, deep research & AI films with sound",
     template: "%s · Mood AI",
@@ -42,8 +42,7 @@ export const viewport: Viewport = {
 
 const themeInit = `try {
   var t = localStorage.getItem("mood_theme");
-  if (!t) t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  document.documentElement.dataset.theme = t;
+  document.documentElement.dataset.theme = t || "dark";
 } catch (e) { document.documentElement.dataset.theme = "dark"; }`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

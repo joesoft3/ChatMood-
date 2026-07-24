@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Download, FileAudio, FileText, FileVideo, Image as ImageIcon, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
 
 interface FileRec {
@@ -23,6 +24,16 @@ function fmtSize(n: number): string {
   return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
+function sinceLabel(ts: number | null): string {
+  if (!ts) return "waiting for first sync";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 10) return "synced just now";
+  if (seconds < 60) return `synced ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `synced ${minutes}m ago`;
+  return `synced ${Math.floor(minutes / 60)}h ago`;
+}
+
 function kindOf(mime: string): { label: string; icon: React.ReactNode } {
   if (mime.startsWith("image/")) return { label: "image", icon: <ImageIcon size={15} /> };
   if (mime.startsWith("audio/")) return { label: "audio", icon: <FileAudio size={15} /> };
@@ -36,19 +47,41 @@ export default function FilesPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Record<string, Analysis>>({});
   const [openId, setOpenId] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [liveRefresh, setLiveRefresh] = useState(true);
+  const [syncTick, setSyncTick] = useState(0);
 
-  async function load() {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
     try {
       const j = await apiFetch<FileRec[]>("/files");
       setFiles(j);
+      setLastSyncAt(Date.now());
     } catch {
       setFiles(null);
+    } finally {
+      setRefreshing(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
-    load();
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSyncTick(Date.now()), 15000);
+    return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!liveRefresh) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void load({ silent: true });
+    }, 12000);
+    return () => window.clearInterval(id);
+  }, [liveRefresh, load]);
 
   async function download(f: FileRec) {
     try {
@@ -86,11 +119,46 @@ export default function FilesPage() {
   }
 
   const canAnalyze = (f: FileRec) => f.mime.startsWith("audio/") || f.mime.startsWith("video/");
+  const indexedCount = (files ?? []).filter((f) => f.extracted).length;
+  const mediaCount = (files ?? []).filter((f) => canAnalyze(f)).length;
+  const totalBytes = (files ?? []).reduce((sum, f) => sum + f.size_bytes, 0);
+  const lastSyncLabel = sinceLabel(lastSyncAt);
+  void syncTick;
 
   return (
     <AppShell title="Files">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-6 compact-v">
         <div className="max-w-4xl 2xl:max-w-5xl mx-auto space-y-4">
+          <StudioHero
+            icon={<FileText size={20} />}
+            title="Files library"
+            subtitle="Every upload is ready for chat context, search indexing and media re-analysis from one live workspace."
+            actions={
+              <>
+                <StudioActionButton onClick={() => void load()} tone="accent">
+                  {refreshing ? <span className="inline-flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Refreshing…</span> : <span className="inline-flex items-center gap-1"><RefreshCw size={12} /> Refresh now</span>}
+                </StudioActionButton>
+                <StudioActionLink href="/chat">💬 Chat</StudioActionLink>
+                <StudioActionLink href="/voice">🎙 Voice</StudioActionLink>
+              </>
+            }
+            stats={[
+              { label: "Files", value: files?.length ?? "…" },
+              { label: "Indexed", value: indexedCount },
+              { label: "Media", value: mediaCount },
+              { label: "Storage", value: files ? fmtSize(totalBytes) : "…" },
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <StudioStatusPill label="Library sync" value={lastSyncLabel} tone="accent" pulse={refreshing || liveRefresh} />
+            <StudioStatusPill label="Live refresh" value={liveRefresh ? "every 12s" : "paused"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+            <StudioStatusPill label="Media queue" value={busyId ? "analysis running" : "idle"} tone={busyId ? "success" : "default"} pulse={Boolean(busyId)} />
+            <div className="ml-auto">
+              <StudioActionButton onClick={() => setLiveRefresh((v) => !v)} tone={liveRefresh ? "success" : "default"}>
+                {liveRefresh ? "⏸ Pause live refresh" : "▶ Resume live refresh"}
+              </StudioActionButton>
+            </div>
+          </div>
           <div className="text-xs text-gray-500 space-y-1">
             <p>
               Everything you&apos;ve uploaded — documents feed the chat context + search index (📚), audio/video
@@ -101,9 +169,17 @@ export default function FilesPage() {
           {!files ? (
             <p className="text-sm text-gray-600">Loading…</p>
           ) : files.length === 0 ? (
-            <div className="rounded-2xl border border-line bg-panel p-8 text-center text-sm text-gray-500">
-              No files yet — attach documents in chat, or drop audio/video on the Voice page to analyze it.
-            </div>
+            <StudioEmptyState
+              emoji="🗂️"
+              title="No files yet"
+              description="Attach documents in chat, or drop audio and video on the Voice page to analyze them here later."
+              actions={
+                <>
+                  <StudioActionLink href="/chat">Attach in chat</StudioActionLink>
+                  <StudioActionLink href="/voice">Analyze on Voice page</StudioActionLink>
+                </>
+              }
+            />
           ) : (
             <ul className="space-y-2">
               {files.map((f) => {
@@ -186,12 +262,9 @@ export default function FilesPage() {
               })}
             </ul>
           )}
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 text-xs rounded-lg bg-white/5 border border-line px-3 py-1.5 text-gray-300 hover:bg-white/10 transition"
-          >
-            <RefreshCw size={12} /> Refresh
-          </button>
+          <StudioNotice>
+            Files refresh automatically every few seconds while you work here, so completed re-analysis and new uploads appear without a hard reload.
+          </StudioNotice>
         </div>
       </div>
     </AppShell>

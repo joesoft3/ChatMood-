@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Hand, Link2, Loader2, Puzzle, ShieldCheck, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Hand, Link2, Loader2, Puzzle, RefreshCw, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
 
 interface PluginStatus {
@@ -55,14 +56,29 @@ function argPreview(args: Record<string, any>): string {
   return parts.slice(0, 3).join(" · ");
 }
 
+function sinceLabel(ts: number | null): string {
+  if (!ts) return "waiting for first sync";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 10) return "synced just now";
+  if (seconds < 60) return `synced ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `synced ${minutes}m ago`;
+  return `synced ${Math.floor(minutes / 60)}h ago`;
+}
+
 export default function PluginsPage() {
   const router = useRouter();
   const [plugins, setPlugins] = useState<PluginStatus[] | null>(null);
   const [pending, setPending] = useState<PendingAction[] | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState<string | null>(null); // provider or action id being acted on
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [liveRefresh, setLiveRefresh] = useState(true);
+  const [syncTick, setSyncTick] = useState(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
     try {
       const [p, a] = await Promise.all([
         apiFetch<{ plugins: PluginStatus[] }>("/plugins"),
@@ -70,18 +86,35 @@ export default function PluginsPage() {
       ]);
       setPlugins(p.plugins);
       setPending(a.actions);
+      setLastSyncAt(Date.now());
     } catch (e: any) {
       if ((e.message ?? "").includes("401")) router.push("/login");
+    } finally {
+      setRefreshing(false);
     }
   }, [router]);
 
   useEffect(() => {
-    load();
+    void load();
     // OAuth round trips land back here with ?plugin=connected|error
     const qp = new URLSearchParams(window.location.search).get("plugin");
     if (qp === "connected") setMsg("✅ Connected — turn on 🧩 in chat to let Mood use it.");
     if (qp === "error") setMsg("⚠️ Connection failed — please try again.");
   }, [load]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSyncTick(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (!liveRefresh) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void load({ silent: true });
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, [liveRefresh, load]);
 
   async function connect(provider: string) {
     setMsg("");
@@ -128,23 +161,50 @@ export default function PluginsPage() {
     }
   }
 
+  const connectedCount = (plugins ?? []).filter((p) => p.connected).length;
+  const configuredCount = (plugins ?? []).filter((p) => p.configured).length;
+  const pendingCount = pending?.length ?? 0;
+  const lastSyncLabel = sinceLabel(lastSyncAt);
+  void syncTick;
+
   return (
     <AppShell title="Plugin Store">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
-          <header className="flex items-start gap-3">
-            <span className="rounded-xl bg-accent/15 border border-accent/30 p-2.5 text-accent">
-              <Puzzle size={20} />
-            </span>
-            <div>
-              <h1 className="text-lg font-semibold">Plugin Store</h1>
-              <p className="text-xs text-gray-500">
-                Connect your accounts — Mood reads on demand and always asks before writing. Turn on 🧩 in chat to use them.
-              </p>
-            </div>
-          </header>
+          <StudioHero
+            icon={<Puzzle size={20} />}
+            title="Plugin Store"
+            subtitle="Connect your accounts so Mood can read on demand and always ask before writing. Turn on 🧩 in chat to use them."
+            actions={
+              <>
+                <StudioActionButton onClick={() => void load()} tone="accent">
+                  {refreshing ? <span className="inline-flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Refreshing…</span> : <span className="inline-flex items-center gap-1"><RefreshCw size={12} /> Refresh now</span>}
+                </StudioActionButton>
+                <StudioActionLink href="/chat">💬 Back to chat</StudioActionLink>
+                <StudioActionLink href="/settings">⚙️ Settings</StudioActionLink>
+              </>
+            }
+            stats={[
+              { label: "Connected", value: connectedCount },
+              { label: "Available", value: configuredCount },
+              { label: "Waiting approval", value: pendingCount },
+              { label: "All plugins", value: plugins?.length ?? 0 },
+            ]}
+          />
 
-          {msg && <p className="text-xs rounded-lg bg-white/5 border border-line px-3 py-2">{msg}</p>}
+          <div className="flex flex-wrap items-center gap-2">
+            <StudioStatusPill label="Store sync" value={lastSyncLabel} tone="accent" pulse={refreshing || liveRefresh} />
+            <StudioStatusPill label="Connected" value={connectedCount} tone={connectedCount > 0 ? "success" : "default"} pulse={connectedCount > 0} />
+            <StudioStatusPill label="Approval queue" value={pendingCount > 0 ? `${pendingCount} waiting` : "clear"} tone={pendingCount > 0 ? "warn" : "success"} pulse={pendingCount > 0} />
+            <StudioStatusPill label="Live refresh" value={liveRefresh ? "every 15s" : "paused"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+            <div className="ml-auto">
+              <StudioActionButton onClick={() => setLiveRefresh((v) => !v)} tone={liveRefresh ? "success" : "default"}>
+                {liveRefresh ? "⏸ Pause live refresh" : "▶ Resume live refresh"}
+              </StudioActionButton>
+            </div>
+          </div>
+
+          {msg && <StudioNotice tone="accent">{msg}</StudioNotice>}
 
           {/* ✋ Approval inbox — staged write actions from chat */}
           <section className="space-y-2">
@@ -159,9 +219,11 @@ export default function PluginsPage() {
             {!pending ? (
               <p className="text-xs text-gray-600">Loading…</p>
             ) : pending.length === 0 ? (
-              <p className="text-xs text-gray-600 rounded-xl bg-panel border border-line px-3 py-2.5">
-                Nothing pending. Write actions staged in chat (send email, create event, file issue) land here and in the chat thread.
-              </p>
+              <StudioEmptyState
+                emoji="✋"
+                title="Nothing pending"
+                description="Write actions staged in chat — like sending email, creating events or filing issues — will land here for approval."
+              />
             ) : (
               <div className="space-y-2">
                 {pending.map((a) => (

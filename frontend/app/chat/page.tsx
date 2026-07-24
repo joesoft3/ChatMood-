@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AudioLines, Brush, Clapperboard, Download, Image as ImageIcon, Link2Off, Share2, Telescope } from "lucide-react";
+import { AudioLines, Bot, Brain, Brush, Clapperboard, Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Swords, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -467,6 +467,20 @@ export default function ChatPage() {
   }
 
   const activeTitle = convs.find((c) => c.id === activeId)?.title;
+  const modeMeta = useMemo(() => {
+    if (arenaMode) return { label: "Arena", tone: "accent", icon: <Swords size={12} /> };
+    if (deepMode) return { label: "Deep research", tone: "accent", icon: <Telescope size={12} /> };
+    if (agentMode) return { label: "Agent", tone: "accent", icon: <Bot size={12} /> };
+    if (thinkOn) return { label: "Thinking", tone: "purple", icon: <Brain size={12} /> };
+    return { label: "Chat", tone: "default", icon: <Sparkles size={12} /> };
+  }, [agentMode, arenaMode, deepMode, thinkOn]);
+  const modelLabel = useMemo(() => {
+    if (model === "grok-4") return "S1 Mood-4";
+    if (model === "grok-4-fast") return "S1 Mood-4-Fast";
+    if (model === "grok-code-fast-1") return "Code";
+    if (model === "grok-3-mini") return "Mini";
+    return "Auto";
+  }, [model]);
 
   async function shareChat() {
     if (!activeId) return;
@@ -551,59 +565,108 @@ export default function ChatPage() {
     { Icon: Telescope, label: "Deep research", onClick: () => setDeepMode(true) },
   ] as const;
 
+  const suggestionCards = [
+    {
+      icon: Sparkles,
+      title: "Write & refine",
+      text: "Draft a crisp product announcement for softmoodtv, then make it friendlier.",
+      draft: "Draft a crisp product announcement for softmoodtv, then make it friendlier.",
+    },
+    {
+      icon: Telescope,
+      title: "Research",
+      text: "Research the best launch plan for a Ghana-focused creator app and cite sources.",
+      draft: "Research the best launch plan for a Ghana-focused creator app and cite sources.",
+    },
+    {
+      icon: ImageIcon,
+      title: "Create image",
+      text: "Create an image of a cozy cream-colored puppy floating on a pastel cloud.",
+      draft: "create an image of a cozy cream-colored puppy floating on a pastel cloud",
+    },
+    {
+      icon: Clapperboard,
+      title: "Create video",
+      text: "Create a cinematic video of sunrise over Cape Coast castle with no text overlays.",
+      draft: "create a cinematic video of sunrise over Cape Coast castle with no text overlays",
+    },
+  ] as const;
+
   return (
     <AppShell title={activeTitle || "Mood Chat"}>
-      {/* conversation toolbar — always visible; Share/Export need a live conversation */}
-      <div className="border-b border-line px-3 sm:px-4 py-2 flex items-center gap-3 text-xs text-gray-500 shrink-0 compact-v">
-        {/* 🏠 Ask | Imagine tab pair (Grok-mirror; Imagine → image studio) */}
-        <div className="flex items-center gap-4 shrink-0 pr-1">
-          <span className="flex flex-col items-center" aria-current="page">
-            <span className="text-sm font-semibold text-white leading-tight">Ask</span>
-            <span className="h-0.5 w-5 rounded bg-white mt-0.5" />
-          </span>
-          <button onClick={() => router.push("/images")} className="flex flex-col items-center group">
-            <span className="text-sm font-medium text-gray-500 group-hover:text-gray-300 leading-tight transition">Imagine</span>
-            <span className="h-0.5 w-5 rounded bg-transparent mt-0.5" />
-          </button>
-        </div>
-        <span className="flex-1 truncate">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "")}</span>
-        {wsId && (
-          <button
-            onClick={() => {
-              const next = !showTeam;
-              setShowTeam(next);
-              if (next)
-                apiFetch<{ conversations: any[] }>(`/workspaces/${wsId}/conversations`)
-                  .then((c) => setTeamConvs(c.conversations))
-                  .catch(() => {});
-            }}
-            className="text-accent flex items-center gap-1 shrink-0"
-            title="Team workspace conversations"
-          >
-            👥 {wsName || "team"} {showTeam ? "▴" : "▾"}
-          </button>
-        )}
-        {(agentMode || deepMode || arenaMode) && (
-          <span className="text-accent">
-            {agentMode ? "🤖 agent mode" : deepMode ? "🔭 deep search" : "⚔️ arena"}
-          </span>
-        )}
-        {shareMsg && <span className="text-green-400">{shareMsg}</span>}
-        {msgs.length > 0 && (
-          <>
-            <button onClick={shareChat} className="flex items-center gap-1 hover:text-gray-300 transition" title="Create a public read-only link">
-              <Share2 size={13} /> Share
+      {/* conversation toolbar — cleaner and closer to ChatGPT, with live workspace status */}
+      <div className="border-b border-white/5 px-3 sm:px-4 py-3 shrink-0 compact-v bg-[#0f1011]/88 backdrop-blur space-y-2.5">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] p-1 shrink-0 shadow-[0_10px_24px_rgb(0_0_0/0.18)]">
+            <span className="rounded-full bg-white text-black px-3 py-1.5 text-xs font-semibold">Ask</span>
+            <button onClick={() => router.push("/images")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
+              Imagine
             </button>
-            {shared && (
-              <button onClick={revokeShare} className="flex items-center gap-1 hover:text-red-400 transition" title="Revoke the public link">
-                <Link2Off size={13} /> Revoke
+          </div>
+          <div className="min-w-0 flex-1 hidden sm:block">
+            <p className="truncate text-sm font-medium text-gray-200">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "New chat")}</p>
+            <p className="truncate text-[11px] text-gray-500">Auto-saved conversation · premium live workspace shell</p>
+          </div>
+          {msgs.length > 0 && (
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+              <button onClick={shareChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition" title="Create a public read-only link">
+                <Share2 size={13} /> <span className="hidden sm:inline">Share</span>
               </button>
-            )}
-            <button onClick={exportChat} className="flex items-center gap-1 hover:text-gray-300 transition">
-              <Download size={13} /> Export
+              {shared && (
+                <button onClick={revokeShare} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-red-400 transition" title="Revoke the public link">
+                  <Link2Off size={13} /> <span className="hidden sm:inline">Revoke</span>
+                </button>
+              )}
+              <button onClick={exportChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition">
+                <Download size={13} /> <span className="hidden sm:inline">Export</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="sm:hidden flex items-center gap-2 min-w-0">
+          <span className="truncate text-sm text-gray-300 flex-1">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "New chat")}</span>
+          {wsId && (
+            <button
+              onClick={() => {
+                const next = !showTeam;
+                setShowTeam(next);
+                if (next)
+                  apiFetch<{ conversations: any[] }>(`/workspaces/${wsId}/conversations`)
+                    .then((c) => setTeamConvs(c.conversations))
+                    .catch(() => {});
+              }}
+              className="rounded-full border border-white/8 bg-[#141415] px-2.5 py-1 text-[10px] text-gray-400 hover:text-white transition shrink-0"
+              title="Team workspace conversations"
+            >
+              👥 Team
             </button>
-          </>
-        )}
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] text-accent">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> Live
+          </span>
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${
+            modeMeta.tone === "purple"
+              ? "border-purple-400/25 bg-purple-400/10 text-purple-300"
+              : modeMeta.tone === "accent"
+                ? "border-accent/25 bg-accent/10 text-accent"
+                : "border-white/8 bg-white/5 text-gray-400"
+          }`}>
+            {modeMeta.icon} {modeMeta.label}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
+            🤖 {modelLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
+            💬 {msgs.length} message{msgs.length === 1 ? "" : "s"}
+          </span>
+          {wsId && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
+              👥 {wsName || "Team workspace"}
+            </span>
+          )}
+        </div>
       </div>
       {showTeam && wsId && (
         <div className="border-b border-line bg-panel px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">
@@ -653,30 +716,45 @@ export default function ChatPage() {
           </button>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-6 compact-v">
-        <div className="max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
+        <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
-            <div className="min-h-[calc(100dvh-12rem)] md:min-h-[calc(100dvh-9rem)] flex flex-col items-center justify-center gap-5 py-6">
-              {/* 🏠 Grok homepage: official mark + wordmark, then the pill composer CENTERED */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/icon.png"
-                alt="Mood AI"
-                className="select-none w-20 sm:w-24 rounded-[1.4rem] ring-1 ring-white/10 shadow-[0_0_90px_-18px_rgb(var(--mood-accent)/0.65)]"
-              />
-              <div className="select-none flex flex-col items-center gap-1.5 -mt-1 mb-1">
-                <span className="text-xl font-semibold tracking-tight">Mood AI</span>
-                <span className="text-[9px] sm:text-[10px] tracking-[0.38em] text-gray-500 uppercase">
-                  Understand · Adapt · Elevate
-                </span>
+            <div className="min-h-[calc(100dvh-12rem)] md:min-h-[calc(100dvh-9rem)] flex flex-col items-center justify-center gap-6 py-6">
+              <div className="select-none flex flex-col items-center gap-3 text-center max-w-2xl">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/icon.png"
+                  alt="Mood AI"
+                  className="w-16 sm:w-20 rounded-[1.25rem] ring-1 ring-white/10 shadow-[0_0_90px_-18px_rgb(var(--mood-accent)/0.55)]"
+                />
+                <div className="space-y-1.5">
+                  <h2 className="text-[clamp(2rem,4vw,2.8rem)] font-semibold tracking-tight text-white">How can I help?</h2>
+                  <p className="text-sm sm:text-base text-gray-500">
+                    Chat, research, create images, direct videos and refine ideas from one workspace.
+                  </p>
+                </div>
               </div>
-              <div className="w-full max-w-2xl">{composerEl(true)}</div>
-              <div className="w-full max-w-2xl flex flex-wrap items-center justify-center gap-2">
+              <div className="w-full max-w-3xl">{composerEl(true)}</div>
+              <div className="w-full max-w-3xl grid sm:grid-cols-2 gap-2.5">
+                {suggestionCards.map(({ icon: Icon, title, text, draft }) => (
+                  <button
+                    key={title}
+                    onClick={() => setDraft({ text: draft, nonce: Date.now() })}
+                    className="text-left rounded-2xl border border-white/8 bg-[#141415] px-4 py-3.5 hover:border-white/15 hover:bg-white/[0.045] transition shadow-[0_10px_28px_rgb(0_0_0/0.18)]"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
+                      <Icon size={15} className="text-accent" /> {title}
+                    </div>
+                    <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{text}</p>
+                  </button>
+                ))}
+              </div>
+              <div className="w-full max-w-3xl flex flex-wrap items-center justify-center gap-2">
                 {chips.map(({ Icon, label, onClick }) => (
                   <button
                     key={label}
                     onClick={onClick}
-                    className="touch-manipulation flex items-center gap-1.5 rounded-full bg-white/5 border border-line px-3.5 py-2 text-xs text-gray-400 hover:border-accent/50 hover:text-white transition whitespace-nowrap"
+                    className="touch-manipulation flex items-center gap-1.5 rounded-full bg-white/5 border border-white/8 px-3.5 py-2 text-xs text-gray-400 hover:border-accent/35 hover:text-white transition whitespace-nowrap"
                   >
                     <Icon size={13} className="text-gray-500" /> {label}
                   </button>
@@ -689,6 +767,7 @@ export default function ChatPage() {
             <MessageBubble
               key={i}
               msg={m}
+              isStreaming={busy && i === msgs.length - 1 && m.role === "assistant"}
               onRegenerate={
                 !busy && i === msgs.length - 1 && m.role === "assistant" && msgs.length >= 2
                   ? regenerate

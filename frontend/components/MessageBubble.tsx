@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Check, Copy, Download, RotateCcw, Square, Volume2 } from "lucide-react";
+import { Brain, Check, Clapperboard, Copy, Download, RotateCcw, Search, Sparkles, Square, Swords, Volume2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import ArenaPanel from "./ArenaPanel";
 import ThinkingPanel from "./ThinkingPanel";
@@ -38,13 +38,13 @@ export interface ArenaState {
   scores?: Record<string, { accuracy?: number; clarity?: number }>;
   winner?: string;
   usage?: Record<string, { in: number; out: number }>;
-  events: any[]; // live event log (replayed for persisted messages)
+  events: any[];
 }
 
 export interface ThinkState {
   provider: string;
-  traces: string[]; // streaming trace deltas
-  summary?: string; // final server summary (if the model produced one)
+  traces: string[];
+  summary?: string;
   elapsedMs: number;
   usage?: Record<string, { in: number; out: number }>;
   events: any[];
@@ -58,14 +58,13 @@ export interface ConfirmAction {
   note?: string;
 }
 
-/** 🎨🎬 In-chat creation (v1.9.7): image/video generated inline from the chat box. */
 export interface ChatMedia {
   kind: "image" | "video";
   url?: string;
   prompt?: string;
   stored?: string;
-  pending?: boolean; // media_start received, still generating
-  stage?: string;    // scenes | compositing (video pipeline)
+  pending?: boolean;
+  stage?: string;
   done?: number;
   total?: number;
 }
@@ -73,25 +72,24 @@ export interface ChatMedia {
 export interface ChatMsg {
   role: "user" | "assistant" | "system";
   content: string;
-  author?: string; // team chats: who wrote this user message
+  author?: string;
   citations?: string[];
   steps?: AgentStep[];
   research?: ResearchProgress;
   model?: string;
   tools?: { name: string; ok: boolean }[];
   actions?: ConfirmAction[];
-  arena?: ArenaState; // ⚔️ multi-model debate
-  think?: ThinkState; // 🧠 extended reasoning trace
-  media?: ChatMedia[]; // 🎨🎬 in-chat creations
+  arena?: ArenaState;
+  think?: ThinkState;
+  media?: ChatMedia[];
 }
 
 const AGENT_ICON: Record<string, string> = { researcher: "🔍", coder: "⌨️", writer: "✍️", critic: "🧐" };
 
-/** 🎨🎬 In-chat creation card: shimmer while generating → image frame or video player. */
 function MediaBlock({ m }: { m: ChatMedia }) {
   const label =
     m.kind === "image"
-      ? "Painting your image…"
+      ? "Generating your image…"
       : m.stage === "storyboard"
         ? "Storyboarding your reel…"
         : m.stage === "compositing"
@@ -101,19 +99,21 @@ function MediaBlock({ m }: { m: ChatMedia }) {
             : m.stage === "scenes" && m.total
               ? `Directing scenes (${m.done ?? 0}/${m.total})…`
               : "Directing your reel…";
+
   if (m.pending || !m.url) {
     return (
-      <div className="mb-3 overflow-hidden rounded-2xl border border-line bg-base/60">
+      <div className="mb-3 overflow-hidden rounded-3xl border border-white/10 bg-[#171718] shadow-[0_14px_32px_rgb(0_0_0/0.22)]">
         <div className="aspect-video w-full animate-pulse bg-gradient-to-br from-white/5 via-white/10 to-white/5" />
-        <p className="px-3.5 py-2.5 text-xs text-gray-400 flex items-center gap-2">
+        <p className="px-4 py-3 text-xs text-gray-400 flex items-center gap-2">
           <span className="inline-block h-3 w-3 animate-spin rounded-full border border-accent border-t-transparent" />
           {m.kind === "image" ? "🎨" : "🎬"} {label}
         </p>
       </div>
     );
   }
+
   return (
-    <div className="mb-3 overflow-hidden rounded-2xl border border-line bg-base/60">
+    <div className="mb-3 overflow-hidden rounded-3xl border border-white/10 bg-[#171718] shadow-[0_14px_32px_rgb(0_0_0/0.22)]">
       {m.kind === "image" ? (
         <a href={m.url} target="_blank" rel="noreferrer" title="Open full-size">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -122,7 +122,7 @@ function MediaBlock({ m }: { m: ChatMedia }) {
       ) : (
         <video src={m.url} controls playsInline preload="metadata" className="block w-full max-w-lg bg-black" />
       )}
-      <div className="flex items-center gap-2 px-3.5 py-2 text-[11px] text-gray-500">
+      <div className="flex items-center gap-2 px-4 py-2.5 text-[11px] text-gray-500">
         <span className="truncate flex-1">
           {m.kind === "image" ? "🎨" : "🎬"} {m.prompt}
         </span>
@@ -157,6 +157,68 @@ function ToolPills({ tools }: { tools: { name: string; ok: boolean }[] }) {
           🧩 {t.name} {t.ok ? "✓" : "✗"}
         </span>
       ))}
+    </div>
+  );
+}
+
+function PendingAssistantState({ msg }: { msg: ChatMsg }) {
+  let icon = <Brain size={14} className="text-accent" />;
+  let title = "Thinking through the answer…";
+  let detail = "Mood is working on your response.";
+  let activity = ["understanding", "reasoning", "drafting"];
+
+  const pendingMedia = msg.media?.find((m) => m.pending);
+  if (pendingMedia) {
+    icon = pendingMedia.kind === "image" ? <Sparkles size={14} className="text-accent" /> : <Clapperboard size={14} className="text-accent" />;
+    title = pendingMedia.kind === "image" ? "Generating your image…" : "Generating your video…";
+    detail = pendingMedia.stage
+      ? `Stage: ${pendingMedia.stage}${pendingMedia.total ? ` · ${pendingMedia.done ?? 0}/${pendingMedia.total}` : ""}`
+      : "Preparing the media pipeline.";
+    activity = pendingMedia.kind === "image"
+      ? ["interpreting prompt", "composing scene", "rendering image"]
+      : ["planning shots", "directing scenes", "rendering video"];
+  } else if (msg.research) {
+    icon = <Search size={14} className="text-accent" />;
+    title = "Searching and comparing sources…";
+    detail = msg.research.log[msg.research.log.length - 1]?.text ?? "Building a grounded answer with live sources.";
+    activity = ["searching web", "comparing evidence", "writing report"];
+  } else if (msg.arena && !msg.arena.winner) {
+    icon = <Swords size={14} className="text-accent" />;
+    title = "Drafting across multiple models…";
+    detail = "The arena is collecting drafts, votes and the judge verdict.";
+    activity = ["collecting drafts", "scoring arguments", "judging winner"];
+  } else if (msg.think && msg.think.traces.length > 0) {
+    icon = <Brain size={14} className="text-accent" />;
+    title = "Reasoning through the answer…";
+    detail = "Live reasoning is in progress before the final response is written.";
+    activity = ["mapping context", "testing ideas", "forming answer"];
+  } else if (msg.steps?.length) {
+    icon = <Sparkles size={14} className="text-accent" />;
+    title = "Working through the task…";
+    detail = "Specialist workers are planning, researching or writing.";
+    activity = ["planning", "delegating", "assembling result"];
+  }
+
+  return (
+    <div className="rounded-3xl border border-white/8 bg-[#171718] px-4 py-3.5 shadow-[0_12px_28px_rgb(0_0_0/0.14)]">
+      <div className="flex items-center gap-2 text-sm text-gray-200">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent/10">{icon}</span>
+        <span className="font-medium">{title}</span>
+        <span className="ml-auto inline-block h-2 w-2 animate-pulse rounded-full bg-accent/80" />
+      </div>
+      <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{detail}</p>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        {activity.map((item, i) => (
+          <span
+            key={item}
+            className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400"
+            style={{ animationDelay: `${i * 120}ms` }}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent/80 animate-pulse" />
+            {item}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -210,23 +272,31 @@ function AgentSteps({ steps }: { steps: AgentStep[] }) {
   );
 }
 
-/** Code block with a hover copy button (pro touch). */
+/** Code block with a proper header + copy button (ChatGPT-style polish). */
 function CodePre(props: any) {
   const ref = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  const child = Array.isArray(props.children) ? props.children[0] : props.children;
+  const cls = child?.props?.className ?? "";
+  const lang = ((cls.match(/language-([A-Za-z0-9_+-]+)/)?.[1] ?? "code") as string)
+    .replace(/[-_]/g, " ")
+    .trim();
   return (
-    <div className="relative group/code">
-      <pre ref={ref} {...props} />
-      <button
-        onClick={async () => {
-          await navigator.clipboard.writeText(ref.current?.innerText ?? "");
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-        className="absolute top-2 right-2 text-[10px] bg-white/10 hover:bg-white/20 border border-line rounded-md px-2 py-1 opacity-0 group-hover/code:opacity-100 transition"
-      >
-        {copied ? "Copied ✓" : "Copy"}
-      </button>
+    <div className="group/code overflow-hidden rounded-2xl border border-white/8 bg-[#0f1012] shadow-[0_14px_32px_rgb(0_0_0/0.2)] my-3">
+      <div className="flex items-center justify-between gap-3 border-b border-white/6 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-gray-500">
+        <span>{lang}</span>
+        <button
+          onClick={async () => {
+            await navigator.clipboard.writeText(ref.current?.innerText ?? "");
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          className="rounded-lg border border-white/8 bg-white/5 px-2 py-1 tracking-normal text-gray-400 hover:bg-white/10 hover:text-white transition"
+        >
+          {copied ? "Copied ✓" : "Copy code"}
+        </button>
+      </div>
+      <pre ref={ref} {...props} className={`${props.className ?? ""} !m-0 !border-0 !bg-transparent !p-4`} />
     </div>
   );
 }
@@ -235,11 +305,12 @@ export default function MessageBubble({
   msg,
   onRegenerate,
   onRematch,
+  isStreaming = false,
 }: {
   msg: ChatMsg;
   onRegenerate?: () => void;
-  /** ⚔️ arena messages: rerun the debate — drafters try to beat this winner. */
   onRematch?: () => void;
+  isStreaming?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [reading, setReading] = useState(false);
@@ -277,87 +348,138 @@ export default function MessageBubble({
 
   if (msg.role === "user") {
     return (
-      <div className="flex flex-col items-end gap-0.5">
-        {msg.author && <span className="text-[10px] text-gray-500 pr-1">🧑 {msg.author}</span>}
-        <div className="bg-accent/20 border border-accent/30 rounded-2xl px-4 py-3 max-w-[85%] whitespace-pre-wrap [overflow-wrap:anywhere] text-sm">
-          {msg.content}
+      <div className="flex justify-end mood-fade-up">
+        <div className="flex max-w-[min(88%,42rem)] flex-col items-end gap-1">
+          {msg.author && <span className="text-[10px] text-gray-500 pr-1">🧑 {msg.author}</span>}
+          <div className="rounded-[1.55rem] border border-accent/20 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_12px_28px_rgb(0_0_0/0.14)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+            {msg.content}
+          </div>
         </div>
       </div>
     );
   }
 
+  const hasBody = msg.content.trim().length > 0;
+  const hasPendingMedia = Boolean(msg.media?.some((m) => m.pending));
+  const showPendingState = !hasBody && !hasPendingMedia;
+  const headerLabel = msg.research
+    ? "Searching"
+    : msg.arena && !msg.arena.winner
+      ? "Arena"
+      : msg.think && (isStreaming || msg.think.traces.length > 0)
+        ? "Reasoning"
+        : hasPendingMedia
+          ? (msg.media?.[0]?.kind === "image" ? "Image studio" : "Video studio")
+          : isStreaming
+            ? "Working"
+            : "Mood";
+  const assistantIcon = msg.research
+    ? <Search size={13} />
+    : msg.arena && !msg.arena.winner
+      ? <Swords size={13} />
+      : msg.think && (isStreaming || msg.think.traces.length > 0)
+        ? <Brain size={13} />
+        : hasPendingMedia
+          ? (msg.media?.[0]?.kind === "image" ? <Sparkles size={13} /> : <Clapperboard size={13} />)
+          : <Sparkles size={13} />;
+
   return (
-    <div className="msg text-gray-200 leading-relaxed text-[15px]">
-      {msg.research && <ResearchPanel r={msg.research} />}
-      {msg.steps && msg.steps.length > 0 && <AgentSteps steps={msg.steps} />}
-      {msg.think && <ThinkingPanel state={msg.think} replayEvents={msg.think.events} />}
-      {msg.arena && <ArenaPanel state={msg.arena} replayEvents={msg.arena.events} />}
-      {msg.tools && msg.tools.length > 0 && <ToolPills tools={msg.tools} />}
-      {msg.media && msg.media.length > 0 && (
-        <div className="space-y-3">
-          {msg.media.map((m, i) => (
-            <MediaBlock key={i} m={m} />
-          ))}
+    <div className="group flex items-start gap-3 sm:gap-4 mood-fade-up">
+      <div className="hidden sm:inline-flex mt-1 h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_8px_20px_rgb(0_0_0/0.16)]">
+        {assistantIcon}
+      </div>
+      <div className="min-w-0 flex-1 max-w-full">
+        <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+          <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
+            {assistantIcon}
+          </span>
+          <span className="font-medium text-gray-300">Mood</span>
+          <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
+          {isStreaming && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent/80" />}
         </div>
-      )}
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodePre as any }}>
-        {msg.content || "…"}
-      </ReactMarkdown>
-
-      {(() => {
-        const cites =
-          msg.citations && msg.citations.length > 0 ? msg.citations : extractCitationUrls(msg.content);
-        if (cites.length === 0) return null;
-        return (
-          <div className="mt-3 pt-2 border-t border-line">
-            <p className="text-xs text-gray-500 font-medium mb-1.5">📚 Sources · {cites.length}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {cites.map((c, i) => {
-                let host = c;
-                try {
-                  host = new URL(c).hostname.replace(/^www\./, "");
-                } catch { /* keep the raw url */ }
-                return (
-                  <a
-                    key={i}
-                    href={c}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={c}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-base/60 px-2.5 py-1 text-[11px] text-accent hover:border-accent/50 hover:bg-accent/10 transition"
-                  >
-                    <span className="grid h-4 w-4 place-items-center rounded-full bg-accent/15 text-[10px] font-bold">{i + 1}</span>
-                    {host}
-                  </a>
-                );
-              })}
+        <div className="msg rounded-[1.55rem] sm:rounded-[1.8rem] border border-white/6 bg-[#141415]/96 px-4 sm:px-5 py-3.5 sm:py-4 text-gray-200 leading-relaxed text-[15px] shadow-[0_12px_28px_rgb(0_0_0/0.16)]">
+          {msg.research && <ResearchPanel r={msg.research} />}
+          {msg.steps && msg.steps.length > 0 && <AgentSteps steps={msg.steps} />}
+          {msg.think && <ThinkingPanel state={msg.think} replayEvents={msg.think.events} />}
+          {msg.arena && <ArenaPanel state={msg.arena} replayEvents={msg.arena.events} />}
+          {msg.tools && msg.tools.length > 0 && <ToolPills tools={msg.tools} />}
+          {msg.media && msg.media.length > 0 && (
+            <div className="space-y-3">
+              {msg.media.map((m, i) => (
+                <MediaBlock key={i} m={m} />
+              ))}
             </div>
-          </div>
-        );
-      })()}
+          )}
+          {showPendingState ? (
+            <PendingAssistantState msg={msg} />
+          ) : (
+            <>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: CodePre as any }}>
+                {msg.content}
+              </ReactMarkdown>
+              {isStreaming && hasBody && !hasPendingMedia && (
+                <div className="mt-1 inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-500">
+                  <span className="typing-cursor inline-block h-3 w-[2px] rounded-full bg-accent/80" />
+                  streaming response…
+                </div>
+              )}
+            </>
+          )}
 
-      {/* action bar */}
-      {msg.content.length > 0 && (
-        <div className="mt-2 flex items-center gap-3 text-gray-600">
-          <button onClick={copyMessage} title="Copy answer" className="hover:text-gray-300 transition">
-            {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-          </button>
-          <button onClick={readAloud} title={reading ? "Stop reading" : "Read aloud"} className="hover:text-gray-300 transition">
-            {reading ? <Square size={12} className="text-accent" /> : <Volume2 size={13} />}
-          </button>
-          {onRegenerate && (
-            <button onClick={onRegenerate} title="Regenerate response" className="hover:text-gray-300 transition">
-              <RotateCcw size={13} />
-            </button>
+          {(() => {
+            const cites = msg.citations && msg.citations.length > 0 ? msg.citations : extractCitationUrls(msg.content);
+            if (cites.length === 0) return null;
+            return (
+              <div className="mt-3 border-t border-line pt-2">
+                <p className="mb-1.5 text-xs font-medium text-gray-500">📚 Sources · {cites.length}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {cites.map((c, i) => {
+                    let host = c;
+                    try {
+                      host = new URL(c).hostname.replace(/^www\./, "");
+                    } catch {}
+                    return (
+                      <a
+                        key={i}
+                        href={c}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={c}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-base/60 px-2.5 py-1 text-[11px] text-accent hover:border-accent/50 hover:bg-accent/10 transition"
+                      >
+                        <span className="grid h-4 w-4 place-items-center rounded-full bg-accent/15 text-[10px] font-bold">{i + 1}</span>
+                        {host}
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {msg.content.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 text-gray-600 flex-wrap">
+              <button onClick={copyMessage} title="Copy answer" className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition">
+                {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+              </button>
+              <button onClick={readAloud} title={reading ? "Stop reading" : "Read aloud"} className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition">
+                {reading ? <Square size={12} className="text-accent" /> : <Volume2 size={13} />}
+              </button>
+              {onRegenerate && (
+                <button onClick={onRegenerate} title="Regenerate response" className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition">
+                  <RotateCcw size={13} />
+                </button>
+              )}
+              {onRematch && (
+                <button onClick={onRematch} title="⚔️ Rematch — providers try to beat this answer" className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition text-[12px]">
+                  ⚔️
+                </button>
+              )}
+              {msg.model && <span className="text-[10px] ml-auto rounded-full border border-white/5 bg-white/5 px-2 py-0.5">{msg.model}</span>}
+            </div>
           )}
-          {onRematch && (
-            <button onClick={onRematch} title="⚔️ Rematch — providers try to beat this answer" className="hover:text-gray-300 transition text-[12px]">
-              ⚔️
-            </button>
-          )}
-          {msg.model && <span className="text-[10px] ml-auto">{msg.model}</span>}
         </div>
-      )}
+      </div>
     </div>
   );
 }

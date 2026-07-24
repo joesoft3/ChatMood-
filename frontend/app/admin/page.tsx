@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Activity, BarChart3, Bell, KeyRound, Puzzle, RefreshCw, Search, Send, ShieldCheck, Smartphone, Trash2, UserCog, Users } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import { StudioActionButton, StudioActionLink, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
 
 interface Overview {
@@ -18,6 +19,49 @@ interface Overview {
   };
   recent_users: AdminUser[];
   capabilities: Record<string, boolean | string>;
+  providers?: {
+    cloudflare_dns: boolean;
+    vercel_attach: boolean;
+    platform_cname: string;
+    platform_ip: string;
+    pollinations_image: boolean;
+    pollinations_video: boolean;
+    image_fallback_provider: string;
+    video_provider_chain: string[];
+  };
+  brains?: {
+    text: {
+      primary: { provider: string; model: string; configured: boolean };
+      fast: { provider: string; model: string };
+      rescue_chain: { provider: string; model: string }[];
+      fast_rescue_chain: { provider: string; model: string }[];
+      fallbacks: Record<string, boolean>;
+      ready: boolean;
+    };
+    image: {
+      mode: string;
+      primary: { provider: string; model: string };
+      xai_configured: boolean;
+      fallback_provider: string | null;
+      pollinations: { enabled: boolean; model: string; url: string };
+      persist: boolean;
+      ready: boolean;
+    };
+    video: {
+      chain: string[];
+      providers: { provider: string; ready: boolean; reason: string }[];
+      ffmpeg: boolean;
+      reel_enabled: boolean;
+      storyboard: boolean;
+      narration: {
+        enabled: boolean;
+        extra_brain_tts: boolean;
+        cloudflare_aura: boolean;
+        openai_soundtrack: boolean;
+      };
+      ready: boolean;
+    };
+  };
 }
 
 interface AdminUser {
@@ -80,6 +124,17 @@ function fmt(n: number): string {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
 }
 
+function sinceLabel(ts: number | null): string {
+  if (!ts) return "waiting for first sync";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 10) return "synced just now";
+  if (seconds < 60) return `synced ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `synced ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `synced ${hours}h ago`;
+}
+
 /** Tiny SVG bar series (no chart lib — keeps the bundle lean). */
 function Bars({ data, color }: { data: { day: string; count: number }[]; color: string }) {
   const max = Math.max(1, ...data.map((d) => d.count));
@@ -130,8 +185,13 @@ export default function AdminPage() {
   const [pushBusy, setPushBusy] = useState(false);
   const [q, setQ] = useState("");
   const [userMsg, setUserMsg] = useState("");
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [liveRefresh, setLiveRefresh] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncTick, setSyncTick] = useState(0);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
     try {
       const [o, g, u, a, d, en] = await Promise.all([
         apiFetch<Overview>("/admin/overview"),
@@ -148,8 +208,11 @@ export default function AdminPage() {
       setDevices(d);
       setEngagement(en);
       setDenied(false);
+      setLastSyncAt(Date.now());
     } catch (e: any) {
       if ((e.message ?? "").includes("Admin only")) setDenied(true);
+    } finally {
+      setRefreshing(false);
     }
   }, [q]);
 
@@ -170,9 +233,22 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadAll();
+  }, [loadAll]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSyncTick(Date.now()), 15000);
+    return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!liveRefresh) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void loadAll({ silent: true });
+    }, 30000);
+    return () => window.clearInterval(id);
+  }, [liveRefresh, loadAll]);
 
   async function saveGate(patch: { signup_open?: boolean; app_password?: string }) {
     setGateMsg("");
@@ -207,6 +283,15 @@ export default function AdminPage() {
     setUserMsg(`✅ Password reset for ${u.email}.`);
   }
 
+  const lastSyncLabel = sinceLabel(lastSyncAt);
+  const providerReady = overview?.providers
+    ? overview.providers.cloudflare_dns || overview.providers.vercel_attach || overview.providers.pollinations_image || overview.providers.pollinations_video
+    : false;
+  const brainsReady = overview?.brains
+    ? overview.brains.text.ready && overview.brains.image.ready && overview.brains.video.ready
+    : false;
+  void syncTick;
+
   if (denied) {
     return (
       <AppShell title="Owner panel">
@@ -220,7 +305,44 @@ export default function AdminPage() {
   return (
     <AppShell title="Owner panel">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-6 compact-v">
-        <div className="max-w-5xl 2xl:max-w-6xl mx-auto grid gap-4 md:grid-cols-2">
+        <div className="max-w-5xl 2xl:max-w-6xl mx-auto space-y-4">
+          <StudioHero
+            icon={<ShieldCheck size={20} />}
+            title="Owner panel"
+            subtitle="Platform operations, provider readiness, growth analytics and user administration in one control surface."
+            actions={
+              <>
+                <StudioActionButton onClick={() => void loadAll()} tone="accent">
+                  {refreshing ? <span className="inline-flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Refreshing…</span> : <span className="inline-flex items-center gap-1"><RefreshCw size={12} /> Refresh now</span>}
+                </StudioActionButton>
+                <StudioActionLink href="/settings">⚙️ Runtime settings</StudioActionLink>
+                <StudioActionLink href="/files">🗂 Files</StudioActionLink>
+                <StudioActionLink href="/chat">💬 Back to chat</StudioActionLink>
+              </>
+            }
+            stats={[
+              { label: "Users", value: overview?.stats.users ?? "…" },
+              { label: "Teams", value: overview?.stats.workspaces ?? "…" },
+              { label: "Domains", value: overview?.stats.domains_active ?? "…" },
+              { label: "Tokens / month", value: overview ? fmt(overview.stats.tokens_month) : "…" },
+            ]}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <StudioStatusPill label="Ops sync" value={lastSyncLabel} tone="accent" pulse={refreshing || liveRefresh} />
+            <StudioStatusPill label="Providers" value={providerReady ? "live" : "needs setup"} tone={providerReady ? "success" : "warn"} pulse={providerReady} />
+            <StudioStatusPill label="Brains" value={brainsReady ? "all ready" : "partial"} tone={brainsReady ? "success" : "default"} pulse={brainsReady} />
+            <StudioStatusPill label="Live refresh" value={liveRefresh ? "every 30s" : "paused"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+            <div className="ml-auto flex flex-wrap gap-2">
+              <StudioActionButton onClick={() => setLiveRefresh((v) => !v)} tone={liveRefresh ? "success" : "default"}>
+                {liveRefresh ? "⏸ Pause live refresh" : "▶ Resume live refresh"}
+              </StudioActionButton>
+            </div>
+          </div>
+          <StudioNotice tone="accent">
+            Owner telemetry now auto-refreshes while this tab is open, so provider readiness, analytics, devices and user activity feel like a live operations console instead of a static admin mock.
+          </StudioNotice>
+          {(gateMsg || userMsg || pushMsg) && <StudioNotice tone="accent">{gateMsg || userMsg || pushMsg}</StudioNotice>}
+          <div className="grid gap-4 md:grid-cols-2">
           {/* Overview */}
           <div className="md:col-span-2">
             <Card icon={<Activity size={16} />} title="Platform overview">
@@ -228,6 +350,11 @@ export default function AdminPage() {
                 <p className="text-sm text-gray-600">Loading…</p>
               ) : (
                 <>
+                  <div className="flex flex-wrap gap-2">
+                    <StudioStatusPill label="Heartbeat" value={lastSyncLabel} tone="default" />
+                    <StudioStatusPill label="Weekly actives" value={fmt(overview.stats.active_users_week)} tone="success" pulse={overview.stats.active_users_week > 0} />
+                    <StudioStatusPill label="Monthly tokens" value={fmt(overview.stats.tokens_month)} tone="accent" />
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center">
                     {(
                       [
@@ -263,6 +390,105 @@ export default function AdminPage() {
               )}
             </Card>
           </div>
+
+          {/* Provider readiness */}
+          <Card icon={<Puzzle size={16} />} title="Provider readiness — Cloudflare · Vercel · Pollinations">
+            {!overview?.providers ? (
+              <p className="text-sm text-gray-600">Loading…</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-2 text-center">
+                  {(
+                    [
+                      ["☁️ Cloudflare DNS", overview.providers.cloudflare_dns ? "ready" : "off"],
+                      ["▲ Vercel attach", overview.providers.vercel_attach ? "ready" : "off"],
+                      ["🖼 Pollinations image", overview.providers.pollinations_image ? "on" : (overview.providers.image_fallback_provider || "off")],
+                      ["🎬 Pollinations video", overview.providers.pollinations_video ? "ready" : "key missing"],
+                    ] as [string, string][]
+                  ).map(([label, v]) => (
+                    <div key={label} className="rounded-xl bg-base border border-line px-2 py-3">
+                      <p className="text-base font-semibold text-gray-100">{v}</p>
+                      <p className="text-[10px] text-gray-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3 text-[11px]">
+                  <div className="rounded-xl bg-base border border-line p-3 space-y-1.5">
+                    <p className="text-gray-500">Domain automation</p>
+                    <p className="text-gray-300 break-all">Traffic target: {overview.providers.platform_cname || overview.providers.platform_ip || "not configured"}</p>
+                    <p className="text-gray-600">When Cloudflare is ready, Settings → Domains can create TXT + traffic records in one tap during connect.</p>
+                  </div>
+                  <div className="rounded-xl bg-base border border-line p-3 space-y-1.5">
+                    <p className="text-gray-500">Video provider chain</p>
+                    <p className="text-gray-300">{overview.providers.video_provider_chain.join(" → ") || "—"}</p>
+                    <p className="text-gray-600">Pollinations sits in the active render chain only when listed here; image fallback is controlled separately.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Brain routing */}
+          <Card icon={<Puzzle size={16} />} title="Brain routing — text · image · video">
+            {!overview?.brains ? (
+              <p className="text-sm text-gray-600">Loading…</p>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid md:grid-cols-3 gap-3 text-[11px]">
+                  <div className="rounded-xl bg-base border border-line p-3 space-y-2">
+                    <p className="text-gray-500">💬 Text brain</p>
+                    <p className="text-gray-200">
+                      Primary: <span className="text-accent">{overview.brains.text.primary.provider}</span> · {overview.brains.text.primary.model}
+                    </p>
+                    <p className="text-gray-400">
+                      Fast lane: {overview.brains.text.fast.provider} · {overview.brains.text.fast.model}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {Object.entries(overview.brains.text.fallbacks).map(([k, v]) => (
+                        <span key={k} className={`rounded-full border px-2 py-0.5 ${v ? "text-green-400 border-green-400/30 bg-green-400/10" : "text-gray-500 border-line"}`}>
+                          {k}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-gray-600">
+                      Rescue: {overview.brains.text.rescue_chain.length ? overview.brains.text.rescue_chain.map((r) => `${r.provider}/${r.model}`).join(" → ") : "none"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-base border border-line p-3 space-y-2">
+                    <p className="text-gray-500">🖼 Image brain</p>
+                    <p className="text-gray-200">
+                      Mode: <span className="text-accent">{overview.brains.image.mode}</span> · {overview.brains.image.primary.model}
+                    </p>
+                    <p className="text-gray-400">
+                      xAI image key: {overview.brains.image.xai_configured ? "ready" : "missing"}
+                    </p>
+                    <p className="text-gray-400">
+                      Pollinations: {overview.brains.image.pollinations.enabled ? `on (${overview.brains.image.pollinations.model})` : (overview.brains.image.fallback_provider || "off")}
+                    </p>
+                    <p className="text-gray-600">
+                      Persistence: {overview.brains.image.persist ? "archive generated images to storage" : "serve provider links only"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-base border border-line p-3 space-y-2">
+                    <p className="text-gray-500">🎬 Video brain</p>
+                    <p className="text-gray-200">
+                      Chain: <span className="text-accent">{overview.brains.video.chain.join(" → ") || "—"}</span>
+                    </p>
+                    <div className="space-y-1">
+                      {overview.brains.video.providers.map((p) => (
+                        <p key={p.provider} className="text-gray-400">
+                          {p.provider}: {p.ready ? "ready" : "not ready"} · <span className="text-gray-600">{p.reason}</span>
+                        </p>
+                      ))}
+                    </div>
+                    <p className="text-gray-600">
+                      Narration: {overview.brains.video.narration.enabled ? "enabled" : "off"} · extra-brain TTS {overview.brains.video.narration.extra_brain_tts ? "✓" : "—"} · Cloudflare aura {overview.brains.video.narration.cloudflare_aura ? "✓" : "—"} · OpenAI soundtrack {overview.brains.video.narration.openai_soundtrack ? "✓" : "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Card>
 
           {/* 📊 Analytics: growth, activity, usage mix, arena, revenue */}
           <Card icon={<BarChart3 size={16} />} title="Analytics — growth · usage · revenue">
@@ -658,13 +884,15 @@ export default function AdminPage() {
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && loadAll()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void loadAll();
+                    }}
                     placeholder="Search by email or name…"
                     className="w-full rounded-xl bg-base border border-line pl-8 pr-3 py-2 text-sm outline-none focus:border-accent/60 placeholder-gray-600"
                   />
                 </div>
                 <button
-                  onClick={loadAll}
+                  onClick={() => void loadAll()}
                   className="rounded-xl bg-white/5 border border-line px-3 py-2 text-gray-300 hover:bg-white/10 transition shrink-0"
                   title="Refresh"
                 >
@@ -742,6 +970,7 @@ export default function AdminPage() {
             </Card>
           </div>
         </div>
+      </div>
       </div>
     </AppShell>
   );
