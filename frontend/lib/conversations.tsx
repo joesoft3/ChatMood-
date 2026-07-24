@@ -71,6 +71,15 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return () => window.removeEventListener("mood:conversations-changed", h);
   }, [refresh]);
 
+  // Keep chat history feeling live while the app is open.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void refresh();
+    }, 20000);
+    return () => window.clearInterval(id);
+  }, [refresh]);
+
   const remove = useCallback(async (id: string) => {
     setConvs((c) => c.filter((x) => x.id !== id));
     setActiveIdState((curr) => {

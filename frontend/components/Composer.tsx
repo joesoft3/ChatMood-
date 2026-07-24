@@ -125,14 +125,14 @@ export default function Composer({
   }
 
   return (
-    <div className={bare ? "w-full" : "border-t border-line bg-panel/80 backdrop-blur px-2 sm:px-3 py-2 sm:py-3 compact-v"}>
-      <div className="max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto space-y-2">
+    <div className={bare ? "w-full" : "border-t border-white/5 bg-[#0f0f10]/90 backdrop-blur px-2 sm:px-3 py-2.5 sm:py-3 compact-v"}>
+      <div className="max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto space-y-2.5">
         {files.length > 0 && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 px-1">
             {files.map((f) => (
               <span
                 key={f.id}
-                className="flex items-center gap-1.5 text-xs bg-white/5 border border-line rounded-full px-3 py-1.5 text-gray-300 max-w-full"
+                className="flex items-center gap-1.5 text-xs bg-white/5 border border-white/5 rounded-full px-3 py-1.5 text-gray-300 max-w-full"
               >
                 <span className="truncate max-w-[180px]">{f.filename}</span>
                 <button onClick={() => onRemoveFile(f.id)} className="text-gray-500 hover:text-red-400" aria-label="Remove file">
@@ -142,7 +142,7 @@ export default function Composer({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-0.5 sm:gap-1 rounded-[1.6rem] border border-line bg-white/5 px-2 sm:px-3 py-1.5 shadow-[0_8px_30px_rgb(0_0_0/0.5)] focus-within:border-accent/60 focus-within:shadow-[0_8px_36px_-6px_rgb(var(--mood-accent)/0.35)] transition">
+        <div className="flex items-end gap-0.5 sm:gap-1 rounded-[1.8rem] border border-white/10 bg-[#171718] px-2 sm:px-3 py-2 shadow-[0_18px_40px_rgb(0_0_0/0.38)] focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition">
           <input
             ref={fileRef}
             type="file"
@@ -163,7 +163,7 @@ export default function Composer({
           <button
             onClick={() => fileRef.current?.click()}
             title="Attach file"
-            className="composer-btn text-gray-400 hover:text-white transition"
+            className="composer-btn rounded-xl text-gray-400 hover:bg-white/5 hover:text-white transition"
           >
             <Paperclip size={18} />
           </button>
@@ -192,47 +192,47 @@ export default function Composer({
                         ? "Ask something worth deep reasoning (grok-4 🧠)…"
                         : "Ask Mood…"
             }
-            className="flex-1 min-w-0 bg-transparent resize-none outline-none text-sm py-2.5 px-1 placeholder-gray-600 max-h-40"
+            className="flex-1 min-w-0 bg-transparent resize-none outline-none text-sm py-2.5 px-1 placeholder-gray-600 max-h-40 leading-6"
           />
           <button
             onClick={() => setSearchOn(!searchOn)}
             title="Toggle live web search"
-            className={`composer-btn transition ${searchOn ? "text-accent" : "text-gray-600 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition ${searchOn ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
           >
             <Globe size={18} />
           </button>
           <button
             onClick={() => setAgentMode(!agentMode)}
             title="Agent mode — planner, researcher, coder & writer agents team up on your goal"
-            className={`composer-btn transition ${agentMode ? "text-accent" : "text-gray-600 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${agentMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
           >
             <Bot size={18} />
           </button>
           <button
             onClick={() => setDeepMode(!deepMode)}
             title="Deep search — multi-round agentic web research with full citations"
-            className={`composer-btn transition max-[560px]:hidden ${deepMode ? "text-accent" : "text-gray-600 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${deepMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
           >
             <Telescope size={18} />
           </button>
           <button
             onClick={() => setPluginMode(!pluginMode)}
             title="Plugins — act on your connected apps (Gmail, Calendar, GitHub). Connect them in Settings."
-            className={`composer-btn transition max-[560px]:hidden ${pluginMode ? "text-accent" : "text-gray-600 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${pluginMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
           >
             <Puzzle size={18} />
           </button>
           <button
             onClick={() => setVoiceMode(!voiceMode)}
             title="Voice mode (talk & hear replies)"
-            className={`composer-btn transition max-[560px]:hidden ${voiceMode ? "text-accent" : "text-gray-600 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${voiceMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
           >
             <Headphones size={18} />
           </button>
           <button
             onClick={toggleMic}
             title={recording ? "Stop recording" : voiceMode ? "Talk" : "Dictate"}
-            className={`composer-btn transition ${recording ? "text-red-400 animate-pulse" : "text-gray-400 hover:text-white"}`}
+            className={`composer-btn rounded-xl transition ${recording ? "text-red-400 bg-red-400/10 animate-pulse" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
           >
             {recording ? <Square size={18} /> : <Mic size={18} />}
           </button>
@@ -240,7 +240,7 @@ export default function Composer({
             <button
               onClick={onStop}
               title="Stop generating"
-              className="composer-btn rounded-xl bg-red-400/90 text-black hover:bg-red-400 transition"
+              className="composer-btn rounded-2xl bg-red-400/90 text-black hover:bg-red-400 transition shadow-[0_8px_24px_rgb(248_113_113/0.35)]"
               aria-label="Stop generating"
             >
               <Square size={16} />
@@ -249,12 +249,50 @@ export default function Composer({
             <button
               onClick={submit}
               disabled={!canSend}
-              className="composer-btn rounded-xl bg-accent text-black disabled:opacity-30 hover:brightness-110 transition"
+              className="composer-btn rounded-2xl bg-accent text-black disabled:opacity-30 hover:brightness-110 transition shadow-[0_8px_24px_rgb(var(--mood-accent)/0.35)]"
               aria-label="Send"
             >
               <SendHorizontal size={18} />
             </button>
           )}
+        </div>
+        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
+          {[
+            { label: "Agent", active: agentMode, icon: <Bot size={12} />, onClick: () => setAgentMode(!agentMode) },
+            { label: "Deep", active: deepMode, icon: <Telescope size={12} />, onClick: () => setDeepMode(!deepMode) },
+            { label: "Plugins", active: pluginMode, icon: <Puzzle size={12} />, onClick: () => setPluginMode(!pluginMode) },
+            { label: "Voice", active: voiceMode, icon: <Headphones size={12} />, onClick: () => setVoiceMode(!voiceMode) },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={item.onClick}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] transition ${
+                item.active
+                  ? "border-accent/30 bg-accent/10 text-accent"
+                  : "border-white/8 bg-white/5 text-gray-400"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center justify-center gap-1.5 px-1">
+          {[
+            searchOn ? "🌐 search live" : "🌐 search off",
+            agentMode ? "🤖 agents active" : null,
+            deepMode ? "🔭 deep research" : null,
+            pluginMode ? "🧩 plugins armed" : null,
+            voiceMode ? "🎧 voice mode" : null,
+            thinkOn && !arenaMode ? "🧠 reasoning on" : null,
+            arenaMode ? "⚔️ arena mode" : null,
+          ]
+            .filter((label): label is string => Boolean(label))
+            .map((label) => (
+              <span key={label} className="rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[10px] text-gray-400">
+                {label}
+              </span>
+            ))}
         </div>
         <p className="text-[11px] text-gray-600 text-center hidden sm:block">
           {arenaMode

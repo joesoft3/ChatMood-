@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { MessageSquare, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { MessageSquare, Plus, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useConversations } from "@/lib/conversations";
@@ -14,6 +14,13 @@ export default function ConversationList({ onNavigate }: { onNavigate?: () => vo
   const { convs, activeId, setActiveId, remove, refresh } = useConversations();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return convs;
+    return convs.filter((c) => (c.title || "New chat").toLowerCase().includes(q));
+  }, [convs, query]);
 
   function go(fn: () => void) {
     fn();
@@ -40,22 +47,41 @@ export default function ConversationList({ onNavigate }: { onNavigate?: () => vo
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="p-3">
+      <div className="p-3 space-y-3">
+        <div className="flex items-center justify-between px-1 text-[11px] text-gray-600">
+          <span className="uppercase tracking-[0.18em]">Live history</span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+            {convs.length} chats
+          </span>
+        </div>
         <button
           onClick={() => go(() => setActiveId(null))}
-          className="w-full flex items-center gap-2 rounded-xl bg-accent/15 hover:bg-accent/25 border border-accent/30 px-4 py-2.5 text-sm font-medium transition"
+          className="w-full flex items-center justify-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-line px-4 py-3 text-sm font-medium text-gray-100 transition shadow-[0_8px_24px_rgb(0_0_0/0.22)]"
         >
-          <Plus size={16} /> New chat
+          <Plus size={16} className="text-accent" /> New chat
         </button>
+        <div className="relative">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search chats"
+            className="w-full rounded-xl border border-white/8 bg-[#141415] pl-8 pr-3 py-2 text-xs text-gray-300 outline-none focus:border-accent/40 placeholder-gray-600"
+          />
+        </div>
+        <div className="px-1 text-[11px] uppercase tracking-[0.18em] text-gray-600">Recent</div>
       </div>
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-2 pb-2 space-y-1">
-        {convs.map((c) => (
+      <div className="flex-1 overflow-y-auto scrollbar-thin px-2 pb-3 space-y-1">
+        {filtered.map((c) => (
           <div
             key={c.id}
             onClick={() => editingId !== c.id && go(() => setActiveId(c.id))}
             onDoubleClick={() => startRename(c)}
-            className={`group flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer ${
-              activeId === c.id ? "bg-accent/15 text-white" : "text-gray-400 hover:bg-white/5"
+            className={`group flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm cursor-pointer border transition ${
+              activeId === c.id
+                ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
+                : "border-transparent text-gray-400 hover:bg-white/5 hover:border-white/5"
             }`}
           >
             <MessageSquare size={14} className="shrink-0 opacity-60" />
@@ -90,6 +116,7 @@ export default function ConversationList({ onNavigate }: { onNavigate?: () => vo
           </div>
         ))}
         {convs.length === 0 && <p className="text-xs text-gray-600 px-3 py-4">No conversations yet.</p>}
+        {convs.length > 0 && filtered.length === 0 && <p className="text-xs text-gray-600 px-3 py-4">No chats matched your search.</p>}
       </div>
     </div>
   );

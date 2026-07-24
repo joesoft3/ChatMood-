@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, Brain, Copy, CreditCard, Dices, Eye, EyeOff, Globe, KeyRound, LogOut, Puzzle, RefreshCw, SearchCheck, SlidersHorizontal, Trash2, User, Users, X } from "lucide-react";
 import { generatePassword, passwordStrength } from "@/lib/password";
 import AppShell from "@/components/AppShell";
+import { StudioActionButton, StudioActionLink, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch, token } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 
@@ -84,6 +85,14 @@ interface DomainProviders {
   registrar_env: string;
   stripe: boolean;
   platform_cname: string;
+  platform_ip: string;
+  cloudflare_dns: boolean;
+  vercel_attach?: boolean;
+  image_fallback_provider?: string;
+  pollinations_image?: boolean;
+  pollinations_video?: boolean;
+  video_provider_chain?: string[];
+  video_pollinations_enabled?: boolean;
   markup_pct: number;
 }
 
@@ -101,7 +110,7 @@ interface DomainRec {
   expires_at: string | null;
   accent: string | null;
   has_logo: boolean;
-  dns?: { txt_name: string; txt_value: string; cname_target: string } | null;
+  dns?: { txt_name: string; txt_value: string; cname_target: string; a_record_ip?: string | null } | null;
   arena?: DomainArena;
 }
 
@@ -168,6 +177,17 @@ function CopyBtn({ text }: { text: string }) {
 
 function fmt(n: number): string {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+}
+
+function sinceLabel(ts: number | null): string {
+  if (!ts) return "waiting for first sync";
+  const seconds = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  if (seconds < 10) return "synced just now";
+  if (seconds < 60) return `synced ${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `synced ${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `synced ${hours}h ago`;
 }
 
 /** Registrar renewal/expiry badge for purchased domains. */
@@ -272,6 +292,10 @@ export default function SettingsPage() {
   const [domMsg, setDomMsg] = useState("");
   const [connectForm, setConnectForm] = useState({ domain: "", brand: "" });
   const [domBusy, setDomBusy] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [liveRefresh, setLiveRefresh] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [syncTick, setSyncTick] = useState(0);
   // ☠️ danger zone
   const [confirmDel, setConfirmDel] = useState(false);
   const [delPw, setDelPw] = useState("");
@@ -309,27 +333,48 @@ export default function SettingsPage() {
   const [wsInvites, setWsInvites] = useState<InviteRec[] | null>(null);
   const [wsEmails, setWsEmails] = useState("");
 
+  const refreshDashboard = useCallback(async (options?: { silent?: boolean; hydrateInstructions?: boolean }) => {
+    if (!options?.silent) setRefreshing(true);
+    const [meRes, billingRes, usageRes, pluginsRes, workspacesRes, domainsRes, providersRes] = await Promise.allSettled([
+      apiFetch<Me>("/auth/me"),
+      apiFetch<any>("/billing/status"),
+      apiFetch<UsageSummary>("/usage/summary"),
+      apiFetch<{ plugins: PluginStatus[] }>("/plugins"),
+      apiFetch<{ workspaces: Workspace[] }>("/workspaces"),
+      apiFetch<{ domains: DomainRec[] }>("/domains"),
+      apiFetch<DomainProviders>("/domains/providers"),
+    ]);
+
+    if (meRes.status === "fulfilled") {
+      setMe(meRes.value);
+      if (options?.hydrateInstructions) setInstructions(meRes.value.custom_instructions ?? "");
+    }
+    if (billingRes.status === "fulfilled") setBilling({ status: billingRes.value.subscription ?? "none", period: billingRes.value.current_period_end });
+    else setBilling(null);
+    if (usageRes.status === "fulfilled") setUsage(usageRes.value);
+    else setUsage(null);
+    if (pluginsRes.status === "fulfilled") setPlugins(pluginsRes.value.plugins);
+    else setPlugins(null);
+    if (workspacesRes.status === "fulfilled") setWorkspaces(workspacesRes.value.workspaces);
+    else setWorkspaces(null);
+    if (domainsRes.status === "fulfilled") setDomains(domainsRes.value.domains);
+    else setDomains(null);
+    if (providersRes.status === "fulfilled") setDomProviders(providersRes.value);
+
+    setLastSyncAt(Date.now());
+    setRefreshing(false);
+  }, []);
+
   useEffect(() => {
     // OAuth callback lands here as /settings?plugin=connected|error (no Suspense needed)
     const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plugin") : null;
     if (q === "connected") setPluginMsg("✅ App connected — Mood can now act on it in chat (🧩 toggle).");
     if (q === "error") setPluginMsg("⚠️ Connection failed — please try again.");
     if (q) window.history.replaceState({}, "", window.location.pathname);
-    apiFetch<Me>("/auth/me")
-      .then((m) => {
-        setMe(m);
-        setInstructions(m.custom_instructions ?? "");
-      })
-      .catch(() => {});
-    apiFetch<any>("/billing/status")
-      .then((s) => setBilling({ status: s.subscription ?? "none", period: s.current_period_end }))
-      .catch(() => setBilling(null));
+
     loadMemories();
-    apiFetch<UsageSummary>("/usage/summary").then(setUsage).catch(() => setUsage(null));
-    loadPlugins();
-    loadWorkspaces();
-    loadDomains();
-    apiFetch<DomainProviders>("/domains/providers").then(setDomProviders).catch(() => {});
+    void refreshDashboard({ silent: true, hydrateInstructions: true });
+
     const dp = new URLSearchParams(window.location.search).get("domain_purchase");
     if (dp === "success") setDomMsg("✅ Payment received — your domain is being registered & connected (this takes ~30s).");
     if (dp === "cancelled") setDomMsg("Purchase cancelled — nothing was charged.");
@@ -338,12 +383,27 @@ export default function SettingsPage() {
     if (dr === "success") setDomMsg("✅ Payment received — your registration is being extended at the registrar. Hit Sync in a minute.");
     if (dr === "cancelled") setDomMsg("Renewal cancelled — nothing was charged.");
     if (dr) window.history.replaceState({}, "", window.location.pathname);
+  }, [refreshDashboard]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setSyncTick(Date.now()), 15000);
+    return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!liveRefresh) return;
+    const id = window.setInterval(() => {
+      if (document.hidden) return;
+      void refreshDashboard({ silent: true });
+    }, 45000);
+    return () => window.clearInterval(id);
+  }, [liveRefresh, refreshDashboard]);
 
   async function loadDomains() {
     try {
       const j = await apiFetch<{ domains: DomainRec[] }>("/domains");
       setDomains(j.domains);
+      setLastSyncAt(Date.now());
     } catch {
       setDomains(null);
     }
@@ -354,13 +414,25 @@ export default function SettingsPage() {
     setDomBusy(true);
     setDomMsg("");
     try {
-      await apiFetch("/domains/connect", {
+      const d = await apiFetch<DomainRec & { cloudflare?: { zone?: string } | null; cloudflare_error?: string | null }>("/domains/connect", {
         method: "POST",
-        body: JSON.stringify({ domain: connectForm.domain.trim(), brand_name: connectForm.brand.trim() || null }),
+        body: JSON.stringify({
+          domain: connectForm.domain.trim(),
+          brand_name: connectForm.brand.trim() || null,
+          auto_cloudflare: Boolean(domProviders?.cloudflare_dns),
+        }),
       });
       setConnectForm({ domain: "", brand: "" });
       await loadDomains();
-      setDomMsg("✅ Domain added — finish the DNS setup below, then hit Verify.");
+      if (d.status === "active") {
+        setDomMsg(`✅ Domain connected${d.cloudflare?.zone ? ` via Cloudflare (${d.cloudflare.zone})` : ""} and already live.`);
+      } else if (d.cloudflare?.zone) {
+        setDomMsg(`✅ Domain added and Cloudflare DNS records were created on ${d.cloudflare.zone}. Give DNS a minute, then hit Verify if it doesn't go live automatically.`);
+      } else if (d.cloudflare_error) {
+        setDomMsg(`✅ Domain added. Auto-setup in Cloudflare couldn't finish: ${d.cloudflare_error}`);
+      } else {
+        setDomMsg("✅ Domain added — finish the DNS setup below, then hit Verify.");
+      }
     } catch (e: any) {
       setDomMsg("⚠️ " + (e.message ?? "Connect failed"));
     } finally {
@@ -377,6 +449,24 @@ export default function SettingsPage() {
       await loadDomains();
     } catch (e: any) {
       setDomMsg("⚠️ " + (e.message ?? "Verify failed"));
+    }
+  }
+
+  async function setupCloudflareDomain(id: string) {
+    setDomBusy(true);
+    setDomMsg("");
+    try {
+      const d = await apiFetch<DomainRec & { cloudflare?: { zone?: string; record_type?: string } }>(`/domains/${id}/cloudflare/setup`, { method: "POST" });
+      if (d.status === "active") {
+        setDomMsg(`✅ Cloudflare DNS set up and verified${d.cloudflare?.zone ? ` on zone ${d.cloudflare.zone}` : ""} — ${d.domain} is live.`);
+      } else {
+        setDomMsg(`✅ Cloudflare DNS records created${d.cloudflare?.zone ? ` on zone ${d.cloudflare.zone}` : ""}. DNS can take a minute to propagate — hit Verify again shortly.`);
+      }
+      await loadDomains();
+    } catch (e: any) {
+      setDomMsg("⚠️ " + (e.message ?? "Cloudflare setup failed"));
+    } finally {
+      setDomBusy(false);
     }
   }
 
@@ -806,19 +896,72 @@ export default function SettingsPage() {
     }
   }
 
+  const connectedPlugins = (plugins ?? []).filter((p) => p.connected).length;
+  const ownedWorkspaces = (workspaces ?? []).filter((w) => w.owner).length;
+  const activeDomains = (domains ?? []).filter((d) => d.status === "active").length;
+  const pluginReady = (plugins ?? []).filter((p) => p.configured).length;
+  const lastSyncLabel = sinceLabel(lastSyncAt);
+  void syncTick;
+
   return (
     <AppShell title="Settings">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-6 compact-v">
-        <div className="max-w-4xl 2xl:max-w-6xl mx-auto grid gap-4 md:grid-cols-2">
+        <div className="max-w-4xl 2xl:max-w-6xl mx-auto space-y-4">
+          <StudioHero
+            icon={<User size={20} />}
+            title="Workspace settings"
+            subtitle="A production-grade control surface for your account, usage, team access, connected apps, white-label domains and long-term memory."
+            actions={
+              <>
+                <StudioActionLink href="/chat">💬 Chat</StudioActionLink>
+                <StudioActionLink href="/plugins">🧩 Plugins</StudioActionLink>
+                <StudioActionLink href="/files">🗂 Files</StudioActionLink>
+              </>
+            }
+            stats={[
+              { label: "Plan", value: me?.plan?.toUpperCase() ?? "…" },
+              { label: "Connected apps", value: connectedPlugins },
+              { label: "Owned teams", value: ownedWorkspaces },
+              { label: "Active domains", value: activeDomains },
+            ]}
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <StudioStatusPill label="Sync" value={lastSyncLabel} tone="accent" pulse={refreshing || liveRefresh} />
+            <StudioStatusPill label="Apps" value={`${connectedPlugins}/${pluginReady} connected`} tone={connectedPlugins > 0 ? "success" : "default"} pulse={connectedPlugins > 0} />
+            <StudioStatusPill label="Domains" value={activeDomains > 0 ? `${activeDomains} live` : "none live yet"} tone={activeDomains > 0 ? "success" : "warn"} pulse={activeDomains > 0} />
+            <StudioStatusPill label="Live refresh" value={liveRefresh ? "every 45s" : "paused"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+            <div className="ml-auto flex flex-wrap gap-2">
+              <StudioActionButton onClick={() => setLiveRefresh((v) => !v)} tone={liveRefresh ? "success" : "default"}>
+                {liveRefresh ? "⏸ Pause live refresh" : "▶ Resume live refresh"}
+              </StudioActionButton>
+              <StudioActionButton onClick={() => void refreshDashboard()} tone="accent">
+                {refreshing ? <span className="inline-flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Refreshing…</span> : <span className="inline-flex items-center gap-1"><RefreshCw size={12} /> Refresh now</span>}
+              </StudioActionButton>
+            </div>
+          </div>
+
+          <StudioNotice tone="accent">
+            This screen now stays live while the tab is open — usage, billing, domains, plugins and workspace counts refresh automatically so it feels operational, not demo-only.
+          </StudioNotice>
+
+          <div className="grid gap-4 md:grid-cols-2">
           {/* Account */}
           <Card icon={<User size={16} />} title="Account">
             {me ? (
-              <div className="space-y-2 text-sm">
-                <p className="text-gray-300">{me.display_name || "Mood user"}</p>
-                <p className="text-gray-500 break-all">{me.email}</p>
-                <span className="inline-block text-xs rounded-full bg-accent/15 border border-accent/30 text-accent px-2.5 py-1 uppercase tracking-wide">
-                  {me.plan} plan
-                </span>
+              <div className="space-y-4 text-sm">
+                <div className="space-y-1">
+                  <p className="text-gray-200 font-medium">{me.display_name || "Mood user"}</p>
+                  <p className="text-gray-500 break-all">{me.email}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <StudioStatusPill label="Plan" value={`${me.plan} account`} tone="accent" />
+                  <StudioStatusPill label="Session" value="active now" tone="success" pulse />
+                  {billing?.period && <StudioStatusPill label="Billing cycle" value={billing.period.slice(0, 10)} tone="default" />}
+                </div>
+                <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
+                  Your identity, plan access and connected workspace services stay in sync with the live control surface above.
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-600">Loading…</p>
@@ -892,16 +1035,24 @@ export default function SettingsPage() {
 
           {/* Billing */}
           <Card icon={<CreditCard size={16} />} title="Subscription">
-
-            <p className="text-sm text-gray-400">
-              Status: <span className="text-gray-200 font-medium">{billing?.status ?? "unavailable"}</span>
-            </p>
+            <div className="flex flex-wrap gap-2">
+              <StudioStatusPill
+                label="Status"
+                value={billing?.status ?? "unavailable"}
+                tone={billing?.status === "active" || billing?.status === "pro" ? "success" : "default"}
+                pulse={billing?.status === "active" || billing?.status === "pro"}
+              />
+              {billing?.period && <StudioStatusPill label="Renews / ends" value={billing.period.slice(0, 10)} tone="default" />}
+            </div>
             <ul className="text-xs text-gray-400 space-y-1 leading-relaxed">
               <li>⚔️ Arena — <span className="text-gray-200">100 debates/day</span> (free: 3)</li>
               <li>🔢 5M tokens/mo · 🔭 200 deep searches/day · 🎬 60 videos/day</li>
               <li>📎 50 MB uploads (vs 25) · 🧠 365-day memory (vs 30)</li>
               <li>⏫ 4× rate-limit throughput</li>
             </ul>
+            <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
+              Upgrade instantly to unlock higher daily quotas, faster throughput and premium creation workflows.
+            </div>
             <button
               onClick={upgrade}
               className="rounded-xl bg-accent text-black text-sm font-semibold px-4 py-2 hover:brightness-110 transition"
@@ -926,6 +1077,10 @@ export default function SettingsPage() {
               </button>
             }
           >
+            <div className="flex flex-wrap gap-2">
+              <StudioStatusPill label="Feed" value={liveRefresh ? "live usage stream" : "manual refresh"} tone={liveRefresh ? "success" : "default"} pulse={liveRefresh} />
+              <StudioStatusPill label="Updated" value={lastSyncLabel} tone="default" />
+            </div>
             {usage ? (
               <>
                 <MeterBar label="Tokens this month" m={usage.tokens_month} period="/ mo" />
@@ -962,6 +1117,10 @@ export default function SettingsPage() {
               Let Mood read &amp; act in your apps. In chat, turn on the 🧩 toggle and ask —
               e.g. <i>“Check my unread emails”</i> or <i>“Create a GitHub issue for the login bug.”</i>
             </p>
+            <div className="flex flex-wrap gap-2">
+              <StudioStatusPill label="Live connections" value={`${connectedPlugins} active`} tone={connectedPlugins > 0 ? "success" : "default"} pulse={connectedPlugins > 0} />
+              <StudioStatusPill label="Available providers" value={pluginReady} tone="accent" />
+            </div>
             {pluginMsg && <p className="text-xs text-yellow-500">{pluginMsg}</p>}
             {!plugins && <p className="text-sm text-gray-600">Loading…</p>}
             {plugins && (
@@ -1005,6 +1164,11 @@ export default function SettingsPage() {
                 Create a workspace, add teammates, and chat together — conversations in a workspace
                 are shared with all members (each message shows its author). Owners see per-seat usage.
               </p>
+              <div className="flex flex-wrap gap-2">
+                <StudioStatusPill label="Owned" value={ownedWorkspaces} tone={ownedWorkspaces > 0 ? "success" : "default"} pulse={ownedWorkspaces > 0} />
+                <StudioStatusPill label="Total workspaces" value={workspaces?.length ?? "…"} tone="accent" />
+                {wsDetail && <StudioStatusPill label="Open workspace" value={wsDetail.name} tone="default" />}
+              </div>
               <div className="flex gap-2">
                 <input
                   value={wsName}
@@ -1171,6 +1335,30 @@ export default function SettingsPage() {
                   <span className="text-yellow-500/90"> Registrar is in SANDBOX mode (no real registration/charge).</span>
                 )}
               </p>
+              <div className="flex flex-wrap gap-2">
+                <StudioStatusPill label="Live domains" value={activeDomains} tone={activeDomains > 0 ? "success" : "warn"} pulse={activeDomains > 0} />
+                <StudioStatusPill label="Last check" value={lastSyncLabel} tone="default" />
+                {domProviders?.platform_cname && <StudioStatusPill label="Platform target" value={domProviders.platform_cname} tone="accent" />}
+              </div>
+              {domProviders && (
+                <div className="flex flex-wrap gap-1.5 text-[11px]">
+                  <span className={`rounded-full border px-2.5 py-1 ${domProviders.cloudflare_dns ? "text-green-400 border-green-400/30 bg-green-400/10" : "text-gray-500 border-line"}`}>
+                    ☁️ Cloudflare DNS {domProviders.cloudflare_dns ? "ready" : "off"}
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-1 ${domProviders.vercel_attach ? "text-green-400 border-green-400/30 bg-green-400/10" : "text-gray-500 border-line"}`}>
+                    ▲ Vercel attach {domProviders.vercel_attach ? "ready" : "off"}
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-1 ${domProviders.pollinations_image ? "text-green-400 border-green-400/30 bg-green-400/10" : "text-gray-500 border-line"}`}>
+                    🖼 Pollinations image {domProviders.pollinations_image ? "on" : (domProviders.image_fallback_provider || "off")}
+                  </span>
+                  <span className={`rounded-full border px-2.5 py-1 ${domProviders.pollinations_video ? "text-green-400 border-green-400/30 bg-green-400/10" : "text-gray-500 border-line"}`}>
+                    🎬 Pollinations video {domProviders.pollinations_video ? "ready" : "key missing"}
+                  </span>
+                  <span className="rounded-full border border-line px-2.5 py-1 text-gray-400">
+                    chain: {(domProviders.video_provider_chain ?? []).join(" → ") || "—"}
+                  </span>
+                </div>
+              )}
               {domMsg && <p className="text-xs text-yellow-500">{domMsg}</p>}
               <div className="flex gap-2 text-xs">
                 {(
@@ -1215,8 +1403,9 @@ export default function SettingsPage() {
                     </button>
                   </div>
                   <p className="text-[11px] text-gray-600">
-                    You&apos;ll get a TXT record (ownership) + a CNAME (traffic). Visitors on an active domain see
-                    your brand name; HTTPS is issued automatically on first visit (Caddy on-demand TLS).
+                    You&apos;ll get a TXT record (ownership) + a traffic record (usually CNAME; apex can use A).
+                    Visitors on an active domain see your brand name; HTTPS is issued automatically on first visit
+                    (Caddy on-demand TLS). {domProviders?.cloudflare_dns ? "Because Cloudflare DNS is connected, Connect now also tries one-tap record creation automatically when the zone exists in this account." : ""}
                   </p>
                 </div>
               ) : (
@@ -1397,6 +1586,16 @@ export default function SettingsPage() {
                             🔁 Renew now
                           </button>
                         )}
+                        {d.kind === "connected" && d.status === "pending_dns" && domProviders?.cloudflare_dns && (
+                          <button
+                            onClick={() => setupCloudflareDomain(d.id)}
+                            disabled={domBusy}
+                            title="If this zone is in your connected Cloudflare account, create the TXT + traffic records automatically"
+                            className="rounded-lg bg-accent/10 border border-accent/30 px-2.5 py-1 text-accent hover:bg-accent/20 transition disabled:opacity-40"
+                          >
+                            ☁️ Cloudflare setup
+                          </button>
+                        )}
                         {d.kind === "connected" && d.status === "pending_dns" && (
                           <button onClick={() => verifyDomain(d.id)} className="rounded-lg bg-white/10 px-2.5 py-1 text-gray-200 hover:bg-white/20 transition">
                             Verify
@@ -1413,8 +1612,15 @@ export default function SettingsPage() {
                             <CopyBtn text={d.dns.txt_value} />
                           </div>
                           <div className="flex items-center gap-1.5 rounded-lg bg-panel border border-line px-2 py-1.5 min-w-0">
-                            <span className="truncate">CNAME {d.domain} → {d.dns.cname_target || "(see docs)"}</span>
+                            <span className="truncate">
+                              {d.dns.cname_target
+                                ? `CNAME ${d.domain} → ${d.dns.cname_target}`
+                                : d.dns.a_record_ip
+                                  ? `A ${d.domain} → ${d.dns.a_record_ip}`
+                                  : `Traffic record ${d.domain} → (see docs)`}
+                            </span>
                             {d.dns.cname_target && <CopyBtn text={d.dns.cname_target} />}
+                            {!d.dns.cname_target && d.dns.a_record_ip && <CopyBtn text={d.dns.a_record_ip} />}
                           </div>
                         </div>
                       )}
@@ -1792,6 +1998,7 @@ export default function SettingsPage() {
                 )}
               </div>
             </Card>
+          </div>
           </div>
         </div>
       </div>

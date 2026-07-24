@@ -155,23 +155,29 @@ export default function AppShell({
   }, [router]);
 
   const sideNav = (
-    <div className="flex flex-col h-full">
-      <div className="px-5 py-4 flex items-center gap-2 border-b border-line shrink-0">
-        <BrandMark brand={brand} />
+    <div className="flex flex-col h-full bg-[#0b0b0c]">
+      <div className="px-4 py-4 flex items-center gap-3 border-b border-white/5 shrink-0">
+        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/5 border border-white/5 shrink-0">
+          <BrandMark brand={brand} />
+        </div>
         <div className="min-w-0">
-          <span className="font-bold tracking-tight block truncate">{brand?.brand_name ?? "Mood AI"}</span>
+          <span className="font-semibold tracking-tight block truncate text-gray-100">{brand?.brand_name ?? "Mood AI"}</span>
+          <span className="text-[10px] text-gray-600 block mt-0.5">AI workspace</span>
           {brand && <span className="text-[10px] text-gray-500 block -mt-0.5">powered by Mood AI</span>}
         </div>
       </div>
       <ConversationList onNavigate={() => setDrawerOpen(false)} />
-      <div className="border-t border-line p-2 space-y-1 shrink-0">
+      <div className="border-t border-white/5 p-2.5 space-y-1.5 shrink-0">
+        <div className="px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-600">Workspace</div>
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}
             onClick={() => setDrawerOpen(false)}
-            className={`touch-manipulation flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-              pathname === href ? "bg-accent/15 text-white" : "text-gray-400 hover:bg-white/5"
+            className={`touch-manipulation flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border transition ${
+              pathname === href
+                ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
+                : "border-transparent text-gray-400 hover:bg-white/5 hover:border-white/5"
             }`}
           >
             <Icon size={16} /> {label}
@@ -181,17 +187,19 @@ export default function AppShell({
           <Link
             href="/admin"
             onClick={() => setDrawerOpen(false)}
-            className={`touch-manipulation flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
-              pathname === "/admin" ? "bg-accent/15 text-white" : "text-gray-400 hover:bg-white/5"
+            className={`touch-manipulation flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border transition ${
+              pathname === "/admin"
+                ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
+                : "border-transparent text-gray-400 hover:bg-white/5 hover:border-white/5"
             }`}
           >
             <ShieldCheck size={16} /> Owner
           </Link>
         )}
-        <ThemeToggle />
+        <div className="pt-1"><ThemeToggle /></div>
         <button
           onClick={logout}
-          className="touch-manipulation w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-500 hover:text-red-400 transition"
+          className="touch-manipulation w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border border-transparent text-gray-500 hover:bg-white/5 hover:border-white/5 hover:text-red-400 transition"
         >
           <LogOut size={16} /> Sign out
         </button>
@@ -201,8 +209,8 @@ export default function AppShell({
 
   return (
     <div ref={rootRef} className="app-height flex overflow-hidden">
-      {/* Desktop / landscape-tablet sidebar — widens on large monitors */}
-      <aside className="hidden lg:flex w-72 xl:w-80 2xl:w-96 flex-col border-r border-line bg-panel shrink-0">
+      {/* Desktop / landscape-tablet sidebar — cleaner, ChatGPT-like left rail */}
+      <aside className="hidden lg:flex w-[280px] xl:w-[300px] 2xl:w-[320px] flex-col border-r border-white/5 bg-[#0b0b0c] shrink-0">
         {sideNav}
       </aside>
 
@@ -231,15 +239,18 @@ export default function AppShell({
       {/* Main column: header → scrollable content → in-flow bottom tab bar */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0 relative z-0">
         {/* Header (phone + tablet) */}
-        <header className="lg:hidden flex items-center gap-2 border-b border-line px-3 py-3 bg-panel/60 backdrop-blur shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <header className="lg:hidden flex items-center gap-2 border-b border-white/5 px-3 py-3 bg-panel/85 backdrop-blur shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
           <button
             onClick={() => setDrawerOpen(true)}
-            className="touch-manipulation p-2 text-gray-300 hover:text-white"
+            className="touch-manipulation p-2 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition"
             aria-label="Open menu"
           >
             <Menu size={20} />
           </button>
-          <h1 className="flex-1 text-sm font-semibold truncate">{title}</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
+            <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
+          </div>
           <ThemeToggle compact />
           {headerRight}
         </header>
@@ -256,28 +267,28 @@ export default function AppShell({
             href="/admin"
             aria-label="Open owner panel"
             title="Owner panel"
-            className="touch-manipulation absolute z-30 right-3 bottom-[calc(13rem+env(safe-area-inset-bottom))] md:right-6 md:bottom-6 flex items-center gap-2 rounded-full bg-accent text-black font-semibold p-3 md:pl-3.5 md:pr-4 md:py-3 shadow-[0_10px_28px_rgba(0,0,0,0.5)] ring-1 ring-white/20 hover:brightness-110 hover:scale-[1.04] active:scale-95 transition"
+            className="touch-manipulation absolute z-30 right-6 bottom-6 hidden md:flex items-center gap-2 rounded-full bg-accent text-black font-semibold pl-3.5 pr-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.5)] ring-1 ring-white/20 hover:brightness-110 hover:scale-[1.04] active:scale-95 transition"
           >
             <ShieldCheck size={18} />
-            <span className="hidden md:inline text-xs tracking-wide">Admin</span>
+            <span className="text-xs tracking-wide">Admin</span>
           </Link>
         )}
 
         {/* Bottom tab bar (phones only) — in flow, raised above content, always tappable.
             Grok-clean: first 5 destinations only; the full list lives in the ☰ drawer. */}
-        <nav className="md:hidden shrink-0 relative z-10 border-t border-line bg-panel pb-[env(safe-area-inset-bottom)]">
-          <div className="grid grid-cols-5 h-14 max-[340px]:h-12">
+        <nav className="md:hidden shrink-0 relative z-10 border-t border-white/5 bg-[#0f0f10]/95 backdrop-blur pb-[env(safe-area-inset-bottom)] px-2 pt-2">
+          <div className="grid grid-cols-5 gap-1 rounded-2xl border border-white/6 bg-[#141415] p-1 shadow-[0_12px_28px_rgb(0_0_0/0.18)]">
             {NAV.slice(0, 5).map(({ href, label, icon: Icon }) => {
               const active = pathname === href;
               return (
                 <Link
                   key={href}
                   href={href}
-                  className={`touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 text-[10px] transition ${
-                    active ? "text-accent" : "text-gray-500 active:text-gray-300"
+                  className={`touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 text-[10px] transition ${
+                    active ? "bg-white text-black" : "text-gray-500 active:text-gray-300"
                   }`}
                 >
-                  <Icon size={20} />
+                  <Icon size={19} />
                   <span className="max-[340px]:hidden">{label}</span>
                 </Link>
               );

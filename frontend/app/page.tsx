@@ -1,11 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Mood AI — Grok-class chat, arena, research and AI films",
+  description:
+    "Mood AI is a Grok-class assistant for streaming chat, live-cited research, blind model debates, and AI films with voice and sound.",
+  alternates: { canonical: "/" },
+};
 
 const badges = ["S1 Mood-4", "⚔️ Arena v2", "🎙 Cinema Sound", "🔭 Deep Research", "🧠 Memory", "🔌 Plugins"];
 
 const features: [string, string, string][] = [
   ["💬", "Streaming chat", "Frontier-grade models with a sharp, witty personality — Grok-class answers, your rules."],
-  ["🎬", "Video with pure sound & voice", "Text-to-video with an AI voiceover in 10 voices and a cinematic ambient mix, loudness-polished by our ffmpeg studio."],
-  ["⚔️", "Arena v2", "S1 Mood-4, GPT and Gemini debate blind. Ballots, judge verdicts, score cards — with one-tap rematch."],
+  ["🎬", "Video with pure sound & voice", "Text-to-video with an AI voiceover and a cinematic ambient mix, polished by the built-in studio."],
+  ["⚔️", "Arena v2", "S1 Mood-4, GPT and Gemini debate blind. Ballots, judge verdicts and score cards with one-tap rematch."],
   ["🔭", "Deep research", "Multi-source investigations with live citations and a saved research library."],
   ["🌐", "Real-time search", "Answers grounded in the live web, news and X — every claim cited."],
   ["🧠", "Long-term memory", "Mood remembers what matters between conversations. You stay in control."],
@@ -20,24 +28,28 @@ const steps: [string, string][] = [
   ["3", "Take it anywhere — web app, Android app, your own custom domain."],
 ];
 
+const workflowCards: [string, string][] = [
+  ["Chat + memory", "Keep conversations, files and long-running work in one continuous workspace."],
+  ["Research + citations", "DeepSearch reports land in a library you can reopen and extend later."],
+  ["Images + video", "Generate visuals, direct films and iterate from chat without context switching."],
+];
+
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
-      {/* Hero */}
       <section className="flex-1 flex flex-col items-center px-4 sm:px-6 pt-16 sm:pt-24 pb-12 relative overflow-hidden">
         <div
           aria-hidden
           className="absolute inset-x-0 top-0 h-[420px] pointer-events-none"
           style={{ background: "radial-gradient(600px 240px at 50% 0%, rgba(124,155,255,0.18), transparent 70%)" }}
         />
-        <div className="relative max-w-3xl text-center space-y-6">
+        <div className="relative max-w-4xl text-center space-y-6">
           <span className="text-xs uppercase tracking-[0.3em] text-accent">Mood AI</span>
           <h1 className="text-[clamp(2.2rem,7vw,3.9rem)] font-bold leading-[1.08]">
             A Grok-class AI that <span className="text-accent">talks back — in voice, video and sound.</span>
           </h1>
-          <p className="text-gray-400 text-lg max-w-xl mx-auto">
-            Chat, search, see, hear, remember — and now direct videos with AI voiceovers and a cinematic soundtrack.
-            One assistant, your terms.
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto leading-relaxed">
+            Chat, search, see, hear and remember — then turn the same workspace into research, images, videos, films, plugin actions and team work.
           </p>
           <div className="flex flex-wrap gap-2 justify-center">
             {badges.map((b) => (
@@ -49,29 +61,35 @@ export default function Home() {
           <div className="flex flex-wrap gap-3 justify-center pt-2">
             <Link
               href="/login"
-              className="rounded-xl bg-accent text-black font-semibold px-6 py-3 hover:brightness-110 transition"
+              className="rounded-2xl bg-accent text-black font-semibold px-6 py-3 hover:brightness-110 transition shadow-[0_12px_28px_rgb(var(--mood-accent)/0.28)]"
             >
               Get started — free
             </Link>
-            <Link href="/chat" className="rounded-xl border border-line px-6 py-3 hover:bg-white/5 transition">
+            <Link href="/chat" className="rounded-2xl border border-line px-6 py-3 hover:bg-white/5 transition">
               Open the app
             </Link>
           </div>
+          <div className="grid sm:grid-cols-3 gap-3 pt-4 max-w-3xl mx-auto">
+            {workflowCards.map(([label, text]) => (
+              <div key={label} className="rounded-2xl border border-white/8 bg-[#141415] px-4 py-3 text-left shadow-[0_10px_28px_rgb(0_0_0/0.16)]">
+                <p className="text-sm font-medium text-gray-200">{label}</p>
+                <p className="mt-1 text-xs text-gray-500 leading-relaxed">{text}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Feature grid */}
         <div className="relative grid sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl 2xl:max-w-6xl mt-14 sm:mt-20 w-full">
           {features.map(([icon, title, desc]) => (
-            <div key={title} className="bg-panel border border-line rounded-2xl p-5 space-y-2 hover:border-accent/40 transition">
+            <div key={title} className="bg-panel border border-line rounded-2xl p-5 space-y-2 hover:border-accent/40 hover:bg-white/[0.03] transition shadow-[0_12px_28px_rgb(0_0_0/0.12)]">
               <div className="text-2xl">{icon}</div>
               <h3 className="font-semibold">{title}</h3>
-              <p className="text-sm text-gray-500">{desc}</p>
+              <p className="text-sm text-gray-500 leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* How it works */}
       <section className="border-t border-line px-4 sm:px-6 py-14">
         <div className="max-w-4xl 2xl:max-w-6xl mx-auto">
           <h2 className="text-center text-xl font-semibold mb-8">Up and running in three steps</h2>
@@ -88,13 +106,11 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Get the app */}
       <section className="border-t border-line px-4 sm:px-6 py-14">
         <div className="max-w-4xl 2xl:max-w-6xl mx-auto rounded-3xl border border-line bg-panel p-8 sm:p-10 text-center space-y-5">
           <h2 className="text-xl sm:text-2xl font-semibold">Take Mood everywhere</h2>
-          <p className="text-sm text-gray-400 max-w-lg mx-auto">
-            The Android app brings push notifications for Arena verdicts and approvals, voice mode on the go, and the
-            full studio in your pocket.
+          <p className="text-sm text-gray-400 max-w-lg mx-auto leading-relaxed">
+            The Android app brings push notifications for Arena verdicts and approvals, voice mode on the go, and the full studio in your pocket.
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
             <a
@@ -123,7 +139,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="border-t border-line px-4 sm:px-6 py-8">
         <div className="max-w-4xl 2xl:max-w-6xl mx-auto flex flex-wrap items-center gap-x-6 gap-y-3 text-xs text-gray-500">
           <span className="font-semibold text-gray-300">Mood AI</span>
