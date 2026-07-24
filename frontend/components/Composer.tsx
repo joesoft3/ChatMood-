@@ -142,7 +142,7 @@ export default function Composer({
             ))}
           </div>
         )}
-        <div className="flex items-end gap-0.5 sm:gap-1 rounded-[1.8rem] border border-white/10 bg-[#171718] px-2 sm:px-3 py-2 shadow-[0_18px_40px_rgb(0_0_0/0.38)] focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition">
+        <div className={`${bare ? "flex items-end gap-1 rounded-[1.35rem] border border-white/10 bg-[#171718] px-2 py-1.5 shadow-[0_14px_32px_rgb(0_0_0/0.28)]" : "flex items-end gap-0.5 sm:gap-1 rounded-[1.8rem] border border-white/10 bg-[#171718] px-2 sm:px-3 py-2 shadow-[0_18px_40px_rgb(0_0_0/0.38)]"} focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition`}>
           <input
             ref={fileRef}
             type="file"
@@ -180,62 +180,87 @@ export default function Composer({
               }
             }}
             placeholder={
-              agentMode
-                ? "Give the agent team a goal…"
-                : deepMode
-                  ? "Ask a complex question — deep multi-round research…"
-                  : arenaMode
-                    ? "Pose a question — 3+ AI models will debate it, Grok-4 judges…"
-                    : model === "grok-code-fast-1"
-                      ? "Describe code to write / a bug to fix (🧠 toggle for reasoning)…"
-                      : thinkOn
-                        ? "Ask something worth deep reasoning (grok-4 🧠)…"
-                        : "Ask Mood…"
+              bare
+                ? "Ask Mood anything…"
+                : agentMode
+                  ? "Give the agent team a goal…"
+                  : deepMode
+                    ? "Ask a complex question — deep multi-round research…"
+                    : arenaMode
+                      ? "Pose a question — 3+ AI models will debate it, Grok-4 judges…"
+                      : model === "grok-code-fast-1"
+                        ? "Describe code to write / a bug to fix (🧠 toggle for reasoning)…"
+                        : thinkOn
+                          ? "Ask something worth deep reasoning (grok-4 🧠)…"
+                          : "Ask Mood…"
             }
             className="flex-1 min-w-0 bg-transparent resize-none outline-none text-sm py-2.5 px-1 placeholder-gray-600 max-h-40 leading-6"
           />
-          <button
-            onClick={() => setSearchOn(!searchOn)}
-            title="Toggle live web search"
-            className={`composer-btn rounded-xl transition ${searchOn ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Globe size={18} />
-          </button>
-          <button
-            onClick={() => setAgentMode(!agentMode)}
-            title="Agent mode — planner, researcher, coder & writer agents team up on your goal"
-            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${agentMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Bot size={18} />
-          </button>
-          <button
-            onClick={() => setDeepMode(!deepMode)}
-            title="Deep search — multi-round agentic web research with full citations"
-            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${deepMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Telescope size={18} />
-          </button>
-          <button
-            onClick={() => setPluginMode(!pluginMode)}
-            title="Plugins — act on your connected apps (Gmail, Calendar, GitHub). Connect them in Settings."
-            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${pluginMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Puzzle size={18} />
-          </button>
-          <button
-            onClick={() => setVoiceMode(!voiceMode)}
-            title="Voice mode (talk & hear replies)"
-            className={`composer-btn rounded-xl transition hidden sm:inline-flex ${voiceMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Headphones size={18} />
-          </button>
-          <button
-            onClick={toggleMic}
-            title={recording ? "Stop recording" : voiceMode ? "Talk" : "Dictate"}
-            className={`composer-btn rounded-xl transition ${recording ? "text-red-400 bg-red-400/10 animate-pulse" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
-          >
-            {recording ? <Square size={18} /> : <Mic size={18} />}
-          </button>
+          {bare ? (
+            <>
+              <button
+                onClick={() => setSearchOn(!searchOn)}
+                title="Toggle live web search"
+                aria-label="Toggle live web search"
+                className={`composer-btn rounded-xl transition ${searchOn ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Globe size={18} />
+              </button>
+              <button
+                onClick={toggleMic}
+                title={recording ? "Stop recording" : "Dictate"}
+                aria-label={recording ? "Stop recording" : "Dictate"}
+                className={`composer-btn rounded-xl transition ${recording ? "text-red-400 bg-red-400/10 animate-pulse" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                {recording ? <Square size={18} /> : <Mic size={18} />}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setSearchOn(!searchOn)}
+                title="Toggle live web search"
+                className={`composer-btn rounded-xl transition ${searchOn ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Globe size={18} />
+              </button>
+              <button
+                onClick={() => setAgentMode(!agentMode)}
+                title="Agent mode — planner, researcher, coder & writer agents team up on your goal"
+                className={`composer-btn rounded-xl transition hidden sm:inline-flex ${agentMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Bot size={18} />
+              </button>
+              <button
+                onClick={() => setDeepMode(!deepMode)}
+                title="Deep search — multi-round agentic web research with full citations"
+                className={`composer-btn rounded-xl transition hidden sm:inline-flex ${deepMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Telescope size={18} />
+              </button>
+              <button
+                onClick={() => setPluginMode(!pluginMode)}
+                title="Plugins — act on your connected apps (Gmail, Calendar, GitHub). Connect them in Settings."
+                className={`composer-btn rounded-xl transition hidden sm:inline-flex ${pluginMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Puzzle size={18} />
+              </button>
+              <button
+                onClick={() => setVoiceMode(!voiceMode)}
+                title="Voice mode (talk & hear replies)"
+                className={`composer-btn rounded-xl transition hidden sm:inline-flex ${voiceMode ? "text-accent bg-accent/10" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
+              >
+                <Headphones size={18} />
+              </button>
+              <button
+                onClick={toggleMic}
+                title={recording ? "Stop recording" : voiceMode ? "Talk" : "Dictate"}
+                className={`composer-btn rounded-xl transition ${recording ? "text-red-400 bg-red-400/10 animate-pulse" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
+              >
+                {recording ? <Square size={18} /> : <Mic size={18} />}
+              </button>
+            </>
+          )}
           {busy ? (
             <button
               onClick={onStop}
@@ -256,55 +281,59 @@ export default function Composer({
             </button>
           )}
         </div>
-        <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
-          {[
-            { label: "Agent", active: agentMode, icon: <Bot size={12} />, onClick: () => setAgentMode(!agentMode) },
-            { label: "Deep", active: deepMode, icon: <Telescope size={12} />, onClick: () => setDeepMode(!deepMode) },
-            { label: "Plugins", active: pluginMode, icon: <Puzzle size={12} />, onClick: () => setPluginMode(!pluginMode) },
-            { label: "Voice", active: voiceMode, icon: <Headphones size={12} />, onClick: () => setVoiceMode(!voiceMode) },
-          ].map((item) => (
-            <button
-              key={item.label}
-              onClick={item.onClick}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] transition ${
-                item.active
-                  ? "border-accent/30 bg-accent/10 text-accent"
-                  : "border-white/8 bg-white/5 text-gray-400"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-1.5 px-1">
-          {[
-            searchOn ? "🌐 search live" : "🌐 search off",
-            agentMode ? "🤖 agents active" : null,
-            deepMode ? "🔭 deep research" : null,
-            pluginMode ? "🧩 plugins armed" : null,
-            voiceMode ? "🎧 voice mode" : null,
-            thinkOn && !arenaMode ? "🧠 reasoning on" : null,
-            arenaMode ? "⚔️ arena mode" : null,
-          ]
-            .filter((label): label is string => Boolean(label))
-            .map((label) => (
-              <span key={label} className="rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[10px] text-gray-400">
-                {label}
-              </span>
-            ))}
-        </div>
-        <p className="text-[11px] text-gray-600 text-center hidden sm:block">
-          {arenaMode
-            ? "⚔️ Arena: Grok-4 · GPT · Gemini draft in parallel, blind-vote each other, Grok-4 judges — premium, uses 3× tokens"
-            : thinkOn && model !== "grok-4-fast"
-              ? `🧠 ${model === "grok-code-fast-1" ? "S1 Code" : "S1 Mood-4"} extended reasoning — slower, deeper answers`
-              : model === "grok-4-fast"
-                ? "⚡ S1 Mood-4-Fast — newer generation with 2M context (no thinking mode)"
-                : model === "grok-3-mini"
-                  ? "💸 grok-3-mini — cheapest, great for quick questions"
-                  : "Mood can make mistakes — verify important info. 🧠 thinking & ⚔️ arena available above"}
-        </p>
+        {!bare && (
+          <>
+            <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1 pb-0.5">
+              {[
+                { label: "Agent", active: agentMode, icon: <Bot size={12} />, onClick: () => setAgentMode(!agentMode) },
+                { label: "Deep", active: deepMode, icon: <Telescope size={12} />, onClick: () => setDeepMode(!deepMode) },
+                { label: "Plugins", active: pluginMode, icon: <Puzzle size={12} />, onClick: () => setPluginMode(!pluginMode) },
+                { label: "Voice", active: voiceMode, icon: <Headphones size={12} />, onClick: () => setVoiceMode(!voiceMode) },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  onClick={item.onClick}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] transition ${
+                    item.active
+                      ? "border-accent/30 bg-accent/10 text-accent"
+                      : "border-white/8 bg-white/5 text-gray-400"
+                  }`}
+                >
+                  {item.icon}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-1.5 px-1">
+              {[
+                searchOn ? "🌐 search live" : "🌐 search off",
+                agentMode ? "🤖 agents active" : null,
+                deepMode ? "🔭 deep research" : null,
+                pluginMode ? "🧩 plugins armed" : null,
+                voiceMode ? "🎧 voice mode" : null,
+                thinkOn && !arenaMode ? "🧠 reasoning on" : null,
+                arenaMode ? "⚔️ arena mode" : null,
+              ]
+                .filter((label): label is string => Boolean(label))
+                .map((label) => (
+                  <span key={label} className="rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[10px] text-gray-400">
+                    {label}
+                  </span>
+                ))}
+            </div>
+            <p className="text-[11px] text-gray-600 text-center hidden sm:block">
+              {arenaMode
+                ? "⚔️ Arena: Grok-4 · GPT · Gemini draft in parallel, blind-vote each other, Grok-4 judges — premium, uses 3× tokens"
+                : thinkOn && model !== "grok-4-fast"
+                  ? `🧠 ${model === "grok-code-fast-1" ? "S1 Code" : "S1 Mood-4"} extended reasoning — slower, deeper answers`
+                  : model === "grok-4-fast"
+                    ? "⚡ S1 Mood-4-Fast — newer generation with 2M context (no thinking mode)"
+                    : model === "grok-3-mini"
+                      ? "💸 grok-3-mini — cheapest, great for quick questions"
+                      : "Mood can make mistakes — verify important info. 🧠 thinking & ⚔️ arena available above"}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

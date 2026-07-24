@@ -40,10 +40,13 @@ export default function AppShell({
   title,
   children,
   headerRight,
+  headerCenter,
 }: {
   title: string;
   children: React.ReactNode;
   headerRight?: React.ReactNode;
+  /** Optional centered mobile header content for focused surfaces such as chat home. */
+  headerCenter?: React.ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -247,10 +250,14 @@ export default function AppShell({
           >
             <Menu size={20} />
           </button>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
-            <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
-          </div>
+          {headerCenter ? (
+            <div className="min-w-0 flex-1">{headerCenter}</div>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
+              <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
+            </div>
+          )}
           <ThemeToggle compact />
           {headerRight}
         </header>
