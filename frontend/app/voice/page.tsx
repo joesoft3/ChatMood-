@@ -250,7 +250,8 @@ export default function VoicePage() {
         ) : undefined
       }
     >
-      <div className="flex-1 min-h-0 flex flex-col items-center px-4 py-6 compact-v">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div className="flex min-h-full flex-col items-center px-4 py-6 pb-10 compact-v">
         <div className="w-full max-w-3xl mb-4">
           <StudioHero
             title="Voice Studio"
@@ -388,7 +389,7 @@ export default function VoicePage() {
         </details>
 
         {/* live transcript */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin w-full max-w-2xl space-y-4 mt-2 compact-v">
+        <div className="min-h-[3rem] max-h-[34vh] w-full max-w-2xl space-y-4 overflow-y-auto scrollbar-thin mt-2 compact-v">
           {turns.map((t, i) => (
             <div key={i} className="space-y-2">
               <div className="flex justify-end">
@@ -402,6 +403,7 @@ export default function VoicePage() {
               </div>
             </div>
           ))}
+        </div>
         </div>
       </div>
     </AppShell>
