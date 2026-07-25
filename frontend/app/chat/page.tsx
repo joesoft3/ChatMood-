@@ -597,6 +597,8 @@ export default function ChatPage() {
     <div className="flex items-center justify-center gap-7 h-full">
       <span className="py-1 text-sm font-semibold text-white">Ask</span>
       <button onClick={() => router.push("/images")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Imagine</button>
+      {/* 📺 Creator Reel — the shared feed creators post their videos to */}
+      <button onClick={() => router.push("/reel")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Reel</button>
     </div>
   );
 
