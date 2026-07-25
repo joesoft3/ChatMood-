@@ -235,6 +235,44 @@ async def generate_video(
     }
 
 
+@router.post("/videos/grok")
+async def generate_video_grok(
+    req: VideoRequest, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """🎬 Explicit Grok video generation using the configured xAI video model
+    (grok-video-1 / settings.MODELS_VIDEO). Same professional payload and
+    cascade behavior as /videos, but directly targets the Grok provider."""
+    await enforce_rate_limit(f"video_grok:{user.id}", 2)
+    cap = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])["video_day"]
+    if cap and await count_today(db, user.id, "video") >= cap:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Daily video limit reached for the {user.plan} plan ({cap}/day). Upgrade for more.",
+        )
+    opts = VideoOptions(
+        duration=req.duration,
+        aspect_ratio=req.aspect_ratio,
+        quality=req.quality,
+        style=req.style if req.style in STYLE_PRESETS else "cinematic",
+        negative_prompt=req.negative_prompt,
+    )
+    try:
+        url, _i2v = await video.generate(req.prompt.strip(), opts)
+    except VideoNotConfigured as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
+    except VideoGenerationError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+    await record_usage(user.id, "video", settings.MODELS_VIDEO)
+    return {
+        "url": url,
+        "model": settings.MODELS_VIDEO,
+        "provider": "xai",
+        "prompt": req.prompt,
+        "audio": "none",
+        "meta": {"duration": opts.duration, "aspect_ratio": opts.aspect_ratio, "quality": opts.quality, "style": opts.style},
+    }
+
+
 @router.get("/files/{name}")
 async def serve_muxed_video(name: str):
     """Public, unguessable-id serving of muxed videos (24h TTL janitor).
