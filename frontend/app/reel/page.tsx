@@ -88,7 +88,10 @@ function ReelCard({
   }, [reel.id, onView]);
 
   return (
-    <section className="relative h-full w-full snap-start snap-always overflow-hidden bg-black">
+    // The inner column is capped at a phone-ish 9:16 width and centred, so on a
+    // wide desktop the caption and the action rail hug the video instead of
+    // drifting out to the far edges of the browser window.
+    <section className="relative mx-auto h-full w-full max-w-[calc(100vh*9/16)] snap-start snap-always overflow-hidden bg-black">
       {reel.url ? (
         <video
           ref={vidRef}
@@ -337,7 +340,7 @@ export default function ReelPage() {
         // full-bleed vertical snap feed — one reel per screen
         <div className="flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain scrollbar-thin">
           {reels.map((r) => (
-            <div key={r.id} className="h-full w-full">
+            <div key={r.id} className="h-full w-full bg-black">
               <ReelCard
                 reel={r}
                 muted={muted}

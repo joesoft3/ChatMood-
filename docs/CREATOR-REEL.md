@@ -83,3 +83,19 @@ Migration `0021_reels` adds two tables:
 default: SQLite's `CURRENT_TIMESTAMP` is only second-resolution, so two posts in
 the same second would tie and the paginated feed could skip or repeat rows. Feed
 queries also order by `id` as a deterministic tiebreak.
+
+## Screenshots
+
+Captured against a running stack seeded with 8 sample clips across 4 creators
+(`docs/screenshots/`):
+
+| Shot | What it shows |
+|---|---|
+| `reel-07-chat-home-tabs.png` | **Reel** tab at the top of the app home, beside *Ask* / *Imagine* |
+| `reel-09-landing-nav.png` | 📺 **Reel** button in the landing top nav |
+| `reel-01-reel-mobile.png` | feed on mobile — video playing, author, caption, like/mute rail |
+| `reel-02-reel-scrolled.png` | snap-scroll to the next reel (different creator + counts) |
+| `reel-05-my-reels.png` | *My reels* — 🗑 delete appears **only** on your own posts |
+| `reel-06-reel-desktop.png` | desktop: feed column centred, sidebar shows the Reel item |
+| `reel-03-composer-upload.png` | composer, Upload tab (MP4/MOV/WebM · up to 100 MB) |
+| `reel-04-composer-share.png` | composer, Share-a-film tab (empty state when no finished films) |
