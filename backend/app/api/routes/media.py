@@ -273,6 +273,35 @@ async def generate_video_grok(
     }
 
 
+@router.get("/videos/grok-info")
+async def grok_video_info(user: User = Depends(get_current_user)):
+    """🎬 Grok video capabilities configured for this deployment — model,
+    provider, and supported professional payload features."""
+    return {
+        "provider": "xai",
+        "model": settings.MODELS_VIDEO,
+        "base_url": settings.XAI_BASE_URL,
+        "features": {
+            "video_generation": True,
+            "image_to_video": True,
+            "professional_payload": True,
+            "lean_retry": True,
+            "cascade_retry": True,
+            "max_cascade_attempts": settings.VIDEO_MAX_CASCADE_ATTEMPTS,
+            "style_presets": list(STYLE_PRESETS.keys()),
+            "quality_tiers": ["720p", "1080p"],
+            "negative_default": NEGATIVE_DEFAULT[:80] + "...",
+        },
+        "config": {
+            "reel_enabled": settings.REEL_ENABLED,
+            "reel_max_scenes": settings.REEL_MAX_SCENES,
+            "reel_storyboard": settings.REEL_STORYBOARD,
+            "reel_narration": settings.REEL_NARRATION,
+            "video_provider_chain": [p.strip().lower() for p in (settings.VIDEO_PROVIDER or "reel").split(",") if p.strip()],
+        },
+    }
+
+
 @router.get("/files/{name}")
 async def serve_muxed_video(name: str):
     """Public, unguessable-id serving of muxed videos (24h TTL janitor).
