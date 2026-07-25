@@ -332,22 +332,53 @@ class _PlayerScreen extends StatefulWidget {
   State<_PlayerScreen> createState() => _PlayerScreenState();
 }
 
+final Map<String, Duration> _playbackPositions = {};
+
 class _PlayerScreenState extends State<_PlayerScreen> {
   late final VideoPlayerController _c;
   bool _ready = false;
   bool _failed = false;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    final filmId = widget.film['id'] as String? ?? '';
     _c = VideoPlayerController.networkUrl(Uri.parse(widget.film['url'] as String? ?? ''))
       ..initialize().then((_) {
         if (!mounted) return;
-        setState(() => _ready = true);
+        final saved = _playbackPositions[filmId] ?? Duration.zero;
+        if (saved > Duration.zero && saved < _c.value.duration) {
+          _c.seekTo(saved);
+        }
+        setState(() {
+          _ready = true;
+          _duration = _c.value.duration;
+        });
         _c.play();
+        _c.addListener(_onVideoUpdate);
       }).catchError((_) {
         if (mounted) setState(() => _failed = true);
       });
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final min = twoDigits(d.inMinutes.remainder(60));
+    final sec = twoDigits(d.inSeconds.remainder(60));
+    return '$min:$sec';
+  }
+
+  void _onVideoUpdate() {
+    if (!mounted) return;
+    final filmId = widget.film['id'] as String? ?? '';
+    _position = _c.value.position;
+    _duration = _c.value.duration;
+    if (_position.inMilliseconds > 500) {
+      _playbackPositions[filmId] = _position;
+    }
+    if (_ready) setState(() {});
   }
 
   @override
@@ -361,16 +392,63 @@ class _PlayerScreenState extends State<_PlayerScreen> {
             ? const Text('Playback failed — the link may have expired.', style: TextStyle(color: Colors.grey))
             : !_ready
                 ? const CircularProgressIndicator(color: MoodColors.accent)
-                : GestureDetector(
-                    onTap: () => setState(() => _c.value.isPlaying ? _c.pause() : _c.play()),
-                    child: AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)),
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _c.value.isPlaying ? _c.pause() : _c.play()),
+                          child: AspectRatio(aspectRatio: _c.value.aspectRatio, child: VideoPlayer(_c)),
+                        ),
+                      ),
+                      if (_duration.inMilliseconds > 0)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              Text(_formatDuration(_position), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              Expanded(
+                                child: Slider(
+                                  value: _position.inMilliseconds.toDouble(),
+                                  min: 0,
+                                  max: _duration.inMilliseconds.toDouble(),
+                                  onChanged: (v) => _c.seekTo(Duration(milliseconds: v.toInt())),
+                                ),
+                              ),
+                              Text(_formatDuration(_duration), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                    ],
                   ),
       ),
-      floatingActionButton: _ready
-          ? FloatingActionButton.small(
-              backgroundColor: MoodColors.accent,
-              onPressed: () => setState(() => _c.value.isPlaying ? _c.pause() : _c.play()),
-              child: Icon(_c.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _ready && !_failed
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.small(
+                  backgroundColor: MoodColors.accent,
+                  heroTag: 'play_pause',
+                  onPressed: () => setState(() => _c.value.isPlaying ? _c.pause() : _c.play()),
+                  child: Icon(_c.value.isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.black),
+                ),
+                const SizedBox(width: 12),
+                FloatingActionButton.small(
+                  backgroundColor: MoodColors.panel,
+                  heroTag: 'share',
+                  onPressed: () {
+                    final url = widget.film['url'] as String? ?? '';
+                    if (url.isNotEmpty) {
+                      Clipboard.setData(ClipboardData(text: url));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('🔗 Film link copied'), duration: Duration(seconds: 2)),
+                      );
+                    }
+                  },
+                  child: const Icon(Icons.link, size: 18, color: Colors.white70),
+                ),
+              ],
             )
           : null,
     );
@@ -378,6 +456,7 @@ class _PlayerScreenState extends State<_PlayerScreen> {
 
   @override
   void dispose() {
+    _c.removeListener(_onVideoUpdate);
     _c.dispose();
     super.dispose();
   }

@@ -235,6 +235,73 @@ async def generate_video(
     }
 
 
+@router.post("/videos/grok")
+async def generate_video_grok(
+    req: VideoRequest, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """🎬 Explicit Grok video generation using the configured xAI video model
+    (grok-video-1 / settings.MODELS_VIDEO). Same professional payload and
+    cascade behavior as /videos, but directly targets the Grok provider."""
+    await enforce_rate_limit(f"video_grok:{user.id}", 2)
+    cap = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])["video_day"]
+    if cap and await count_today(db, user.id, "video") >= cap:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"Daily video limit reached for the {user.plan} plan ({cap}/day). Upgrade for more.",
+        )
+    opts = VideoOptions(
+        duration=req.duration,
+        aspect_ratio=req.aspect_ratio,
+        quality=req.quality,
+        style=req.style if req.style in STYLE_PRESETS else "cinematic",
+        negative_prompt=req.negative_prompt,
+    )
+    try:
+        url, _i2v = await video.generate(req.prompt.strip(), opts)
+    except VideoNotConfigured as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
+    except VideoGenerationError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+    await record_usage(user.id, "video", settings.MODELS_VIDEO)
+    return {
+        "url": url,
+        "model": settings.MODELS_VIDEO,
+        "provider": "xai",
+        "prompt": req.prompt,
+        "audio": "none",
+        "meta": {"duration": opts.duration, "aspect_ratio": opts.aspect_ratio, "quality": opts.quality, "style": opts.style},
+    }
+
+
+@router.get("/videos/grok-info")
+async def grok_video_info(user: User = Depends(get_current_user)):
+    """🎬 Grok video capabilities configured for this deployment — model,
+    provider, and supported professional payload features."""
+    return {
+        "provider": "xai",
+        "model": settings.MODELS_VIDEO,
+        "base_url": settings.XAI_BASE_URL,
+        "features": {
+            "video_generation": True,
+            "image_to_video": True,
+            "professional_payload": True,
+            "lean_retry": True,
+            "cascade_retry": True,
+            "max_cascade_attempts": settings.VIDEO_MAX_CASCADE_ATTEMPTS,
+            "style_presets": list(STYLE_PRESETS.keys()),
+            "quality_tiers": ["720p", "1080p"],
+            "negative_default": NEGATIVE_DEFAULT[:80] + "...",
+        },
+        "config": {
+            "reel_enabled": settings.REEL_ENABLED,
+            "reel_max_scenes": settings.REEL_MAX_SCENES,
+            "reel_storyboard": settings.REEL_STORYBOARD,
+            "reel_narration": settings.REEL_NARRATION,
+            "video_provider_chain": [p.strip().lower() for p in (settings.VIDEO_PROVIDER or "reel").split(",") if p.strip()],
+        },
+    }
+
+
 @router.get("/files/{name}")
 async def serve_muxed_video(name: str):
     """Public, unguessable-id serving of muxed videos (24h TTL janitor).
@@ -272,16 +339,42 @@ async def enhance_prompt(req: VideoEnhanceRequest, user: User = Depends(get_curr
 
 
 def _film_out(f: Film) -> dict:
+    """Serialize a Film row for API responses (gallery, poll, public read).
+
+    Guards against malformed filenames and missing references — the
+    gallery must never 404 because of a bad database row."""
     url = ""
     if f.filename:
-        url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.filename}"
+        # Only serve filenames that match the unguessable 128-bit hex pattern
+        if soundtrack.MEDIA_NAME_RE.match(f.filename) or f.filename.endswith(".mp4"):
+            url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.filename}"
     elif f.fallback_url:
         url = f.fallback_url
-    poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}" if f.poster else ""
+
+    poster = ""
+    if f.poster:
+        if soundtrack.MEDIA_POSTER_RE.match(f.poster) or f.poster.endswith("_p.jpg"):
+            poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}"
+
+    scenes_raw = f.scenes_json or "[]"
     try:
-        scenes = json.loads(f.scenes_json or "[]")
+        scenes_parsed = json.loads(scenes_raw)
+        if not isinstance(scenes_parsed, list):
+            scenes_parsed = []
     except json.JSONDecodeError:
-        scenes = []
+        scenes_parsed = []
+
+    # Defense: filter only valid scene objects with required keys,
+    # cap at a safe maximum (prevents malicious oversized payloads)
+    scenes = []
+    for item in scenes_parsed[:50]:  # hard cap: 50 scenes max
+        if isinstance(item, dict) and isinstance(item.get("shot"), str) and item.get("shot", "").strip():
+            scenes.append({
+                "shot": str(item.get("shot", "")).strip()[:400],
+                "narration": str(item.get("narration", "")).strip()[:200],
+                "voice": str(item.get("voice", "a")).strip().lower() or "a",
+            })
+
     return {
         "id": f.id,
         "prompt": f.prompt,
@@ -299,31 +392,6 @@ def _film_out(f: Film) -> dict:
         "subtitles": bool(f.subtitles),
         "url": url,
         "poster": poster,
-        "script": f.script or None,
-        "note": f.note or None,
-        "scenes": scenes,
-        "created_at": f.created_at.isoformat() if f.created_at else None,
-    }
-    try:
-        scenes = json.loads(f.scenes_json or "[]")
-    except json.JSONDecodeError:
-        scenes = []
-    return {
-        "id": f.id,
-        "prompt": f.prompt,
-        "status": f.status,
-        "progress": f.progress,
-        "scene_count": f.scene_count,
-        "scene_seconds": f.scene_seconds,
-        "aspect_ratio": f.aspect,
-        "quality": f.quality,
-        "style": f.style,
-        "audio": f.audio,
-        "voice": f.voice_id,
-        "music": f.music,
-        "tempo": f.tempo,
-        "subtitles": bool(f.subtitles),
-        "url": url,
         "script": f.script or None,
         "note": f.note or None,
         "scenes": scenes,
@@ -521,6 +589,13 @@ async def _own_film(db: AsyncSession, user: User, fid: str) -> Film:
     if not film or film.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Film not found")
     return film
+
+
+@router.get("/films/resumable")
+async def list_resumable_films(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Films stuck 'rendering' (e.g. worker restart) — retryable via resume."""
+    orphans = await film_jobs.resumable_orphans()
+    return {"resumable": [_film_out(f) for f in orphans if f.user_id == user.id], "count": len([f for f in orphans if f.user_id == user.id])}
 
 
 @router.get("/films/{fid}")

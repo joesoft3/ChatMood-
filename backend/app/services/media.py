@@ -33,11 +33,23 @@ log = logging.getLogger(__name__)
 
 
 class VideoNotConfigured(Exception):
-    pass
+    """Provider missing / unfunded / disabled — recoverable by user action (set key, upgrade, enable)."""
+    CATEGORY = "configuration"
+    RECOVERABLE = True
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        return f"[video:config] {msg}"
 
 
 class VideoGenerationError(Exception):
-    pass
+    """Provider / pipeline / timeout failure — may succeed on retry (cascade, backoff)."""
+    CATEGORY = "generation"
+    RECOVERABLE = True
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        return f"[video:generation] {msg}"
 
 
 # Professional style presets — layered onto the user's prompt by the compiler.
@@ -83,15 +95,57 @@ def _storyboard_prompt(prompt: str, scenes: int) -> str:
 
 def _extract_json(text: str) -> dict | None:
     import json
-    import re
 
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
+    def try_parse(start: int) -> dict | None:
+        depth = 0
+        in_str = False
+        escape = False
+        for i, ch in enumerate(text[start:], start):
+            if in_str:
+                if escape:
+                    escape = False
+                    continue
+                if ch == "\\":
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_str = False
+                    continue
+                continue
+            if ch == '"':
+                in_str = True
+                continue
+            if ch == "{":
+                depth += 1
+                continue
+            if ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start : i + 1])
+                    except Exception:
+                        return None
         return None
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return None
+
+    text = (text or "").strip()
+    # Try the first object first; fall back to scanning for any object.
+    for start in range(len(text)):
+        if text[start] == "{":
+            result = try_parse(start)
+            if result is not None:
+                return result
+    # Defensive: if no object found but there's an array, return an array wrapper
+    # (the caller can still recover scenes from it).
+    array_start = text.find("[")
+    array_end = text.rfind("]")
+    if array_start != -1 and array_end > array_start:
+        try:
+            arr = json.loads(text[array_start : array_end + 1])
+            if isinstance(arr, list):
+                return {"scenes": arr}
+        except Exception:
+            pass
+    return None
 
 
 @dataclass
@@ -165,33 +219,118 @@ def _reel_dims(aspect: str) -> tuple[int, int]:
     return {"16:9": (1600, 900), "9:16": (900, 1600), "1:1": (1280, 1280)}.get(aspect, (1600, 900))
 
 
+@dataclass
+class VideoProgress:
+    """Structured progress event for video generation pipelines.
+
+    Consumed by the frontend (video studio / films gallery) and mobile
+    clients (films screen) to render live render-state cards."""
+    stage: str         # e.g. storyboard | scenes | fetching | stitching | compositing | done
+    done: int          # completed sub-items (scenes rendered, frames stitched, etc.)
+    total: int         # expected sub-items
+    note: str | None = None  # human-readable context (optional)
+
+    def to_dict(self) -> dict:
+        return {
+            "stage": self.stage,
+            "done": self.done,
+            "total": self.total,
+            "note": self.note,
+        }
+
+
 class VideoService:
+    """Video generation with professional-grade provider cascade, retry/backoff,
+    graceful degradation, and structured progress reporting."""
+
+    # Configurable: full cascade retries (default 3, env-overridable via VIDEO_MAX_CASCADE_ATTEMPTS)
+    MAX_CASCADE_ATTEMPTS: int = settings.VIDEO_MAX_CASCADE_ATTEMPTS
+
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=90.0))
+        self._metrics_logged_models: set[str] = set()
 
-    async def generate(self, prompt: str, opts: VideoOptions,
-                       image: dict | None = None,
-                       on_progress: Callable[[dict], None] | None = None) -> tuple[str, bool]:
-        chain = [p.strip().lower() for p in (settings.VIDEO_PROVIDER or "reel").split(",") if p.strip()]
+    async def generate(
+        self,
+        prompt: str,
+        opts: VideoOptions,
+        image: dict | None = None,
+        on_progress: Callable[[dict], None] | None = None,
+    ) -> tuple[str, bool]:
+        """Generate a video through the provider cascade (first success wins).
+
+        Each provider is tried with lean-retry: if extended params fail,
+        a minimal payload is retried before giving up and cascading.
+        """
+        chain = [
+            p.strip().lower()
+            for p in (settings.VIDEO_PROVIDER or "reel").split(",")
+            if p.strip()
+        ]
         if not chain:
             chain = ["reel"]
+
         last_err: Exception | None = None
-        for name in chain:
-            try:
-                if name == "reel":
-                    return await self._reel(prompt, opts, on_progress=on_progress)
-                if name == "pollinations":
-                    return await self._pollinations(prompt, opts)
-                if name == "xai":
-                    return await self._xai(prompt, opts, image=image)
-                raise VideoNotConfigured(f"Unknown VIDEO_PROVIDER member '{name}'.")
-            except (VideoNotConfigured, VideoGenerationError) as e:
-                last_err = e
-                if name != chain[-1]:
-                    log.info("video provider '%s' unavailable (%s) — cascading", name, e)
+        for attempt in range(self.MAX_CASCADE_ATTEMPTS):
+            log.info(
+                "cascade attempt %d/%d starting chain: %s",
+                attempt + 1, self.MAX_CASCADE_ATTEMPTS, chain,
+            )
+            for name in chain:
+                log.info(
+                    "cascade step attempt %d/%d provider '%s'",
+                    attempt + 1, self.MAX_CASCADE_ATTEMPTS, name,
+                )
+                try:
+                    if name == "reel":
+                        result_url, used_image = await self._reel(
+                            prompt, opts, on_progress=on_progress
+                        )
+                        return result_url, bool(image) and used_image
+                    if name == "pollinations":
+                        result_url, _ = await self._pollinations(prompt, opts)
+                        return result_url, bool(image)
+                    if name == "xai":
+                        result_url, used_image = await self._xai(
+                            prompt, opts, image=image
+                        )
+                        return result_url, used_image
+                    raise VideoNotConfigured(
+                        f"Unknown VIDEO_PROVIDER member '{name}'."
+                    )
+                except (VideoNotConfigured, VideoGenerationError) as exc:
+                    last_err = exc
+                    log.info(
+                        "video provider '%s' unavailable at cascade attempt %d/%d (%s): %s",
+                        name, attempt + 1, self.MAX_CASCADE_ATTEMPTS, exc.CATEGORY, exc,
+                    )
+                    # Cascade to next provider; if this is the last provider,
+                    # break out to raise the final error cleanly.
+                    if name == chain[-1]:
+                        break
                     continue
+            # If we exhausted the chain without success, retry the full chain
+            # (up to MAX_CASCADE_ATTEMPTS) before giving up.
+            if attempt < self.MAX_CASCADE_ATTEMPTS - 1:
+                sleep_s = 0.8 * (attempt + 1)
+                log.info(
+                    "cascade chain exhausted at attempt %d/%d — backoff %.2fs before retry %d/%d",
+                    attempt + 1, self.MAX_CASCADE_ATTEMPTS,
+                    sleep_s, attempt + 2, self.MAX_CASCADE_ATTEMPTS,
+                )
+                await asyncio.sleep(sleep_s)
+
         if last_err:
+            log.error(
+                "cascade failed after %d/%d attempts across providers %s — last error (%s): %s",
+                self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+                last_err.CATEGORY, last_err,
+            )
             raise last_err
+        log.error(
+            "cascade failed after %d/%d attempts across providers %s — empty chain",
+            self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+        )
         raise VideoNotConfigured("VIDEO_PROVIDER chain is empty.")
 
     # ----------------------------------------------------- storyboard & voice
@@ -217,7 +356,12 @@ class VideoService:
             if r.status_code >= 400:
                 log.info("storyboard brain hiccup (%s): %s", r.status_code, r.text[:120])
                 return None, None
-            data = _extract_json(r.json()["choices"][0]["message"]["content"])
+            msg = r.json()["choices"][0]["message"] if r.json().get("choices") else {}
+            raw_content = msg.get("content") if isinstance(msg, dict) else None
+            if not raw_content or not isinstance(raw_content, str):
+                log.info("storyboard brain returned non-string content: %s", type(raw_content))
+                return None, None
+            data = _extract_json(raw_content)
             if not data:
                 return None, None
             raw = data.get("scenes")
@@ -312,20 +456,20 @@ class VideoService:
         narration: str | None = None
         if settings.REEL_STORYBOARD:
             if on_progress:
-                on_progress({"stage": "storyboard", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="storyboard", done=0, total=1).to_dict())
             sb_scenes, narration = await self._storyboard(prompt, scenes)
             if sb_scenes:
                 beat_prompts = sb_scenes
                 scenes = len(beat_prompts)
             if on_progress:
-                on_progress({"stage": "storyboard", "done": 1, "total": 1})
+                on_progress(VideoProgress(stage="storyboard", done=1, total=1, note="scenes planned").to_dict())
         if not beat_prompts:
             beat_prompts = [
                 f"{prompt.strip()}, {REEL_BEATS[i % len(REEL_BEATS)]}, {STYLE_PRESETS.get(opts.style, STYLE_PRESETS['cinematic'])}"
                 for i in range(scenes)
             ]
         if on_progress:
-            on_progress({"stage": "scenes", "done": 0, "total": scenes})
+            on_progress(VideoProgress(stage="scenes", done=0, total=scenes).to_dict())
 
         async def _fetch(i: int, p: str) -> bytes | None:
             import secrets
@@ -336,19 +480,22 @@ class VideoService:
                 f"?width={W}&height={H}&seed={seed}&model={settings.POLLINATIONS_MODEL}&nologo=true&enhance=true"
             )
             for attempt in range(3):  # provider hiccups/rate sheds are normal — backoff retry
+                log.info("reel scene %d fetch attempt %d/3", i, attempt + 1)
                 try:
                     r = await self._http.get(url, timeout=httpx.Timeout(20.0, read=75.0))
                     if r.status_code == 200 and (r.headers.get("content-type") or "").startswith("image/") and r.content:
+                        log.info("reel scene %d fetch succeeded on attempt %d/3", i, attempt + 1)
                         return r.content
                 except Exception as e:
-                    log.info("reel scene %d fetch hiccup: %s", i, e)
+                    log.info("reel scene %d fetch attempt %d/3 hiccup: %s", i, attempt + 1, e)
                 await asyncio.sleep(1.2 + attempt * 1.3)
+            log.info("reel scene %d fetch exhausted all 3 attempts — returning None", i)
             return None
 
         shots = await asyncio.gather(*(_fetch(i, p) for i, p in enumerate(beat_prompts)))
         got = [(i, b) for i, b in enumerate(shots) if b]
         if on_progress:
-            on_progress({"stage": "scenes", "done": len(got), "total": scenes})
+            on_progress(VideoProgress(stage="scenes", done=len(got), total=scenes, note=f"{len(got)}/{scenes} scenes fetched").to_dict())
         if not got:
             raise VideoGenerationError("Scene renders all came back short — try again in a moment.")
         # 🛟 Solo-scene rescue: a single good frame still makes a reel — mirror it
@@ -364,10 +511,10 @@ class VideoService:
         voice: tuple[bytes, str] | None = None
         if settings.REEL_NARRATION and narration:
             if on_progress:
-                on_progress({"stage": "voice", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="voice", done=0, total=1).to_dict())
             voice = await self._narrate(narration)
             if on_progress:
-                on_progress({"stage": "voice", "done": 1 if voice else 0, "total": 1})
+                on_progress(VideoProgress(stage="voice", done=1 if voice else 0, total=1, note="voiceover recorded" if voice else "silent").to_dict())
 
         os.makedirs(settings.MEDIA_DIR, exist_ok=True)
         fade = REEL_FADE_S
@@ -414,7 +561,7 @@ class VideoService:
             out_name = f"reel-{_uuid.uuid4().hex}.mp4"
             out_path = os.path.join(settings.MEDIA_DIR, out_name)
             if on_progress:
-                on_progress({"stage": "compositing", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="compositing", done=0, total=1, note="muxing film").to_dict())
             cmd = [
                 exe, "-y", *inputs,
                 "-filter_complex", graph,
@@ -438,7 +585,7 @@ class VideoService:
                 log.warning("reel ffmpeg failed: %s", (err or b"")[-400:])
                 raise VideoGenerationError("Reel compositing failed — ffmpeg rejected the graph.")
             if on_progress:
-                on_progress({"stage": "compositing", "done": 1, "total": 1})
+                on_progress(VideoProgress(stage="compositing", done=1, total=1, note="film finished").to_dict())
         base = settings.BACKEND_PUBLIC_URL.rstrip("/")
         return f"{base}/api/v1/media/files/{out_name}", False
 
@@ -476,6 +623,31 @@ class VideoService:
         if u := _dig_url(data):
             return u, False
         raise VideoGenerationError(f"Unexpected pollinations video shape: {str(data)[:160]}")
+
+    # -------------------------------------------------- lean-retry helper
+    async def _lean_retry(
+        self,
+        provider_name: str,
+        full_post: Callable[[], Any],
+        lean_post: Callable[[], Any] | None = None,
+        attempt: int = 1,
+    ) -> Any:
+        """Per-provider lean-retry: try full payload; if rejected (400/422),
+        retry with minimal payload before cascading.
+
+        Preserved across all providers (reel, pollinations, xai) — the user's
+        generation never fails just because one provider rejects extended params."""
+        try:
+            return await full_post()
+        except VideoGenerationError:
+            pass  # fall through to lean retry if available
+        if lean_post is not None:
+            log.info(
+                "lean-retry: %s attempt %d rejected full params — retrying minimal payload",
+                provider_name, attempt,
+            )
+            return await lean_post()
+        raise
 
     # --------------------------------------------------------------- xai
     async def _xai(self, prompt: str, opts: VideoOptions,
