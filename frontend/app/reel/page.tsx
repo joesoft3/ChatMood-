@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bookmark,
+  Check,
   Clapperboard,
   Copy,
   Link2,
@@ -14,6 +15,7 @@ import {
   EyeOff,
   Heart,
   Loader2,
+  Music2,
   Play,
   Plus,
   Send,
@@ -271,6 +273,8 @@ function ReelCard({
   onDelete,
   onVisibility,
   onView,
+  isFollowing,
+  onFollow,
 }: {
   reel: Reel;
   muted: boolean;
@@ -283,12 +287,43 @@ function ReelCard({
   onDelete: (id: string) => void;
   onVisibility: (r: Reel) => void;
   onView: (id: string) => void;
+  isFollowing: boolean;
+  onFollow: () => void;
 }) {
   const vidRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
   const counted = useRef(false);
+
+  // TikTok-style double-tap-to-like: a single tap toggles play/pause, a quick
+  // second tap inside the window likes the reel and pops a heart where you tapped.
+  const tapTimer = useRef<number | null>(null);
+  const [burst, setBurst] = useState<{ id: number; x: number; y: number } | null>(null);
+
+  function handleTap(e: React.MouseEvent<HTMLVideoElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    if (tapTimer.current !== null) {
+      // second tap inside the window → like (double-tap never unlikes)
+      window.clearTimeout(tapTimer.current);
+      tapTimer.current = null;
+      if (!reel.liked) onLike(reel.id);
+      const id = Date.now();
+      setBurst({ id, x, y });
+      window.setTimeout(() => setBurst((b) => (b && b.id === id ? null : b)), 850);
+      return;
+    }
+    // first tap → wait to see if a second one lands before pausing
+    tapTimer.current = window.setTimeout(() => {
+      tapTimer.current = null;
+      const el = vidRef.current;
+      if (!el) return;
+      if (el.paused) el.play().catch(() => {});
+      else el.pause();
+    }, 240);
+  }
 
   // Autoplay only while the card actually fills the screen — an off-screen
   // <video> that keeps decoding is the fastest way to melt a phone battery.
@@ -334,12 +369,7 @@ function ReelCard({
             const v = e.currentTarget;
             if (v.duration) setProgress((v.currentTime / v.duration) * 100);
           }}
-          onClick={() => {
-            const el = vidRef.current;
-            if (!el) return;
-            if (el.paused) el.play().catch(() => {});
-            else el.pause();
-          }}
+          onClick={handleTap}
           className="h-full w-full object-contain"
         />
       ) : (
@@ -354,6 +384,17 @@ function ReelCard({
           <span className="grid h-16 w-16 place-items-center rounded-full bg-black/45 backdrop-blur">
             <Play size={30} className="ml-1 text-white/90" />
           </span>
+        </div>
+      )}
+
+      {/* double-tap heart burst — pops where you tapped, then floats away */}
+      {burst && (
+        <div
+          key={burst.id}
+          className="reel-heart-burst pointer-events-none absolute z-20"
+          style={{ left: burst.x, top: burst.y }}
+        >
+          <Heart size={96} className="fill-white text-white drop-shadow-lg" />
         </div>
       )}
 
@@ -408,10 +449,41 @@ function ReelCard({
             </>
           )}
         </p>
+        {/* sound row with a scrolling marquee (TikTok signature) */}
+        <div className="mt-2 flex items-center gap-1.5 overflow-hidden text-[11px] text-gray-200">
+          <Music2 size={12} className="shrink-0" />
+          <div className="relative flex-1 overflow-hidden">
+            <div className="reel-marquee flex w-max whitespace-nowrap">
+              <span className="pr-8">♪ original sound — @{reel.author}</span>
+              <span className="pr-8">♪ original sound — @{reel.author}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* right rail */}
       <div className="absolute bottom-24 right-3 flex flex-col items-center gap-3.5">
+        {/* creator avatar + follow badge (TikTok signature) */}
+        {!reel.mine && (
+          <div className="relative mb-1.5 flex flex-col items-center">
+            <span
+              title={`@${reel.author}`}
+              className="grid h-12 w-12 place-items-center rounded-full border-2 border-white bg-accent text-base font-bold uppercase text-black shadow"
+            >
+              {reel.author.slice(0, 1)}
+            </span>
+            <button
+              onClick={onFollow}
+              aria-label={isFollowing ? `Unfollow @${reel.author}` : `Follow @${reel.author}`}
+              title={isFollowing ? "Following" : "Follow"}
+              className={`absolute -bottom-2.5 grid h-5 w-5 place-items-center rounded-full border border-white/70 transition active:scale-90 ${
+                isFollowing ? "bg-white text-black" : "bg-red-500 text-white"
+              }`}
+            >
+              {isFollowing ? <Check size={12} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
+            </button>
+          </div>
+        )}
         <RailButton
           icon={<Heart size={20} className={reel.liked ? "fill-white" : ""} />}
           count={reel.likes}
@@ -455,6 +527,16 @@ function ReelCard({
           </>
         )}
       </div>
+
+      {/* spinning vinyl music disc (TikTok signature) */}
+      {reel.url && !failed && (
+        <div className="pointer-events-none absolute bottom-3 right-3 z-10 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-zinc-600 via-zinc-800 to-black shadow-lg ring-1 ring-white/15">
+          <div className="absolute inset-0 animate-spin rounded-full [animation-duration:5s]">
+            <Music2 size={15} className="absolute left-1.5 top-1.5 text-white/80" />
+          </div>
+          <span className="h-3 w-3 rounded-full bg-black ring-2 ring-white/25" />
+        </div>
+      )}
     </section>
   );
 }
@@ -489,10 +571,37 @@ export default function ReelPage() {
   const [effect, setEffect] = useState("none");
   const [speed, setSpeed] = useState(1);
   const [autoCaptions, setAutoCaptions] = useState(false);
+  // Creators you follow — a light, local-only preference that powers the
+  // TikTok-style follow badge on each reel. Persisted so it survives reloads.
+  const [following, setFollowing] = useState<Set<string>>(new Set());
 
   const flash = useCallback((t: string) => {
     setMsg(t);
     window.setTimeout(() => setMsg(""), 4000);
+  }, []);
+
+  // Restore who you follow (local-only preference, see `following` above).
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("mood.reel.following");
+      if (raw) setFollowing(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* corrupted preference — start fresh */
+    }
+  }, []);
+
+  const toggleFollow = useCallback((author: string) => {
+    setFollowing((prev) => {
+      const next = new Set(prev);
+      if (next.has(author)) next.delete(author);
+      else next.add(author);
+      try {
+        window.localStorage.setItem("mood.reel.following", JSON.stringify([...next]));
+      } catch {
+        /* private mode — keep it in-memory only */
+      }
+      return next;
+    });
   }, []);
 
   const query = useMemo(
@@ -799,14 +908,30 @@ export default function ReelPage() {
 
   return (
     <AppShell title="Reel" headerRight={postButton}>
+      {/* keyframes for the TikTok-style heart burst + sound marquee */}
+      <style>{`
+        @keyframes reel-heart-burst {
+          0%   { transform: translate(-50%, -50%) scale(0) rotate(-12deg); opacity: 0; }
+          15%  { transform: translate(-50%, -50%) scale(1.25) rotate(-12deg); opacity: 1; }
+          30%  { transform: translate(-50%, -50%) scale(0.95) rotate(-12deg); opacity: 1; }
+          70%  { transform: translate(-50%, -50%) scale(1) rotate(-12deg); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(1.4) rotate(-12deg); opacity: 0; }
+        }
+        .reel-heart-burst { animation: reel-heart-burst 0.85s ease-out forwards; }
+        @keyframes reel-marquee {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        .reel-marquee { animation: reel-marquee 9s linear infinite; }
+      `}</style>
       {msg && (
         <div className="shrink-0 border-b border-line bg-accent/10 px-4 py-2 text-center text-xs text-accent">
           {msg}
         </div>
       )}
 
-      {/* feed tabs */}
-      <div className="flex shrink-0 items-center justify-center gap-1 border-b border-line bg-base/80 px-4 py-2 backdrop-blur">
+      {/* feed tabs — TikTok-style top switcher (active = bold + underline bar) */}
+      <div className="flex shrink-0 items-center justify-center gap-6 border-b border-line bg-base/80 px-4 py-2.5 backdrop-blur">
         {TABS.map(([id, label]) => (
           <button
             key={id}
@@ -817,11 +942,14 @@ export default function ReelPage() {
               setNextOffset(null);
               setLoadError("");
             }}
-            className={`rounded-full px-4 py-1.5 text-xs transition ${
-              tab === id ? "bg-white font-semibold text-black" : "text-gray-400 hover:text-gray-200"
+            className={`relative pb-1.5 text-sm transition ${
+              tab === id ? "font-semibold text-white" : "font-medium text-gray-400 hover:text-gray-200"
             }`}
           >
             {label}
+            {tab === id && (
+              <span className="absolute -bottom-px left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white" />
+            )}
           </button>
         ))}
       </div>
@@ -921,6 +1049,8 @@ export default function ReelPage() {
                 onDelete={remove}
                 onVisibility={visibility}
                 onView={view}
+                isFollowing={following.has(r.author)}
+                onFollow={() => toggleFollow(r.author)}
               />
             </div>
           ))}

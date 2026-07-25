@@ -7,6 +7,17 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-25
 
+### 🎵 TikTok-style Reel polish (PR #20)
+
+- **TikTok-style interactions on the existing full-bleed vertical snap feed** (the feed itself
+  shipped in PR #18): creator **avatar + red follow "+" badge** atop the action rail (local-only,
+  `localStorage`-persisted follow set), **double-tap-to-like** with a heart that bursts where you
+  tapped (single tap still pauses; 240 ms disambiguation; double-tap never unlikes), a **spinning
+  vinyl music disc** in the bottom-right corner, a scrolling **"♪ original sound — @author"**
+  marquee under the caption, and **TikTok-style underline top tabs** (For you / Saved / My reels).
+- Frontend-only (`frontend/app/reel/page.tsx`) — no backend/API/schema changes; `npm run verify`
+  (typecheck + build) green.
+
 ### 📺 Creator Reel (merged from PR #16)
 
 - **`/reel` creator feed** — one shared public feed: full-bleed vertical snap, one reel per
