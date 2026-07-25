@@ -6,7 +6,7 @@ import { Bot, Brain, Download, Image as ImageIcon, Link2Off, Share2, Sparkles, S
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
-import { LAST_CONV_KEY, useConversations } from "@/lib/conversations";
+import { OPEN_CONV_KEY, useConversations } from "@/lib/conversations";
 import AppShell from "@/components/AppShell";
 import MessageBubble, { ChatMsg } from "@/components/MessageBubble";
 import Composer, { FileChip } from "@/components/Composer";
@@ -46,7 +46,8 @@ export default function ChatPage() {
   const skipNextLoad = useRef(false);
   const busyRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
-  const restoredRef = useRef(false);
+  const pendingOpenRef = useRef(false);
+  const [transportError, setTransportError] = useState("");
 
   // Agent mode, Deep search and Arena are mutually exclusive
   function setAgentMode(v: boolean) {
@@ -107,17 +108,32 @@ export default function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Resume the conversation you last had open (once per visit, when nothing is selected)
+  // Chat opens clean by default. Only an explicit library action may reopen
+  // a saved conversation (the history menu still selects one directly).
   useEffect(() => {
-    if (restoredRef.current || activeId || convs.length === 0 || wsId) return;
-    restoredRef.current = true;
+    if (pendingOpenRef.current || activeId || wsId) return;
+    pendingOpenRef.current = true;
     try {
-      const last = localStorage.getItem(LAST_CONV_KEY);
-      if (last && convs.some((c) => c.id === last)) setActiveId(last);
+      const pending = localStorage.getItem(OPEN_CONV_KEY);
+      if (pending) {
+        localStorage.removeItem(OPEN_CONV_KEY);
+        setActiveId(pending);
+      }
     } catch {
       /* storage unavailable */
     }
-  }, [convs, activeId, setActiveId, wsId]);
+  }, [activeId, setActiveId, wsId]);
+
+  // The Chat destination means “new chat”; history items set activeId directly.
+  useEffect(() => {
+    const h = () => {
+      if (busyRef.current) return;
+      setFiles([]);
+      setActiveId(null);
+    };
+    window.addEventListener("mood:new-chat", h);
+    return () => window.removeEventListener("mood:new-chat", h);
+  }, [setActiveId]);
 
   // 🏠 Idle auto-reset: AppShell fires mood:idle-reset after 5 min of inactivity.
   // We only comply when NOT streaming (never chop a live answer); the activeId→null
@@ -386,7 +402,12 @@ export default function ChatPage() {
       if (e?.name === "AbortError") {
         patchLast((m) => ({ ...m, content: m.content + "\n\n⏹ *Stopped by user*" }));
       } else {
-        patchLast((m) => ({ ...m, content: "⚠️ " + (e.message ?? "Request failed") }));
+        const message = e.message ?? "Request failed";
+        if (/Can't reach|Failed to fetch|NetworkError/i.test(message)) {
+          setTransportError(message);
+          window.setTimeout(() => setTransportError(""), 8000);
+        }
+        patchLast((m) => ({ ...m, content: "⚠️ " + message }));
       }
     } finally {
       abortRef.current = null;
@@ -445,7 +466,8 @@ export default function ChatPage() {
       if (res.audio_b64) void new Audio("data:audio/mpeg;base64," + res.audio_b64).play();
       await refresh();
     } catch (e: any) {
-      alert(e.message ?? "Voice request failed");
+      setTransportError(e.message ?? "Voice request failed");
+      window.setTimeout(() => setTransportError(""), 8000);
     } finally {
       setBusy(false);
       busyRef.current = false;
@@ -506,7 +528,8 @@ export default function ChatPage() {
       await apiFetch(`/conversations/${activeId}/share`, { method: "DELETE" });
       setShared(false);
     } catch (e: any) {
-      alert(e.message ?? "Revoke failed");
+      setTransportError(e.message ?? "Revoke failed");
+      window.setTimeout(() => setTransportError(""), 8000);
     }
   }
 
@@ -691,6 +714,12 @@ export default function ChatPage() {
           )}
         </div>
       )}
+      {transportError && (
+        <div role="alert" className="border-b border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200 flex items-center gap-2 shrink-0">
+          <span className="flex-1">{transportError}</span>
+          <button type="button" onClick={() => setTransportError("")} className="text-red-200/70 hover:text-red-100" aria-label="Dismiss server error">✕</button>
+        </div>
+      )}
       {billingNote && (
         <div className="border-b border-accent/30 bg-accent/10 px-3 sm:px-4 py-2 text-xs text-accent flex items-center gap-2 shrink-0">
           <span className="flex-1">{billingNote}</span>
@@ -717,6 +746,15 @@ export default function ChatPage() {
         <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
             <div className="flex min-h-[calc(100dvh-10rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
+              <div className="flex flex-col items-center gap-2 text-center select-none">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/icon.png"
+                  alt="Mood AI"
+                  className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
+                />
+                <p className="text-base font-semibold tracking-tight text-gray-200">Mood AI</p>
+              </div>
               <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
               <div className="w-full max-w-xl">{composerEl(true)}</div>
               <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Start with an action">
