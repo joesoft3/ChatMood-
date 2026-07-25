@@ -41,7 +41,8 @@ export default function ChatPage() {
   const [teamConvs, setTeamConvs] = useState<{ id: string; title: string; author: string }[] | null>(null);
   const [showTeam, setShowTeam] = useState(false);
   const [draft, setDraft] = useState<{ text: string; nonce: number } | undefined>(undefined);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const answerStartRef = useRef<HTMLDivElement>(null);
+  const previousMessageCount = useRef(0);
   const lastLoaded = useRef<string | null>(null);
   const skipNextLoad = useRef(false);
   const busyRef = useRef(false);
@@ -69,9 +70,15 @@ export default function ChatPage() {
     abortRef.current?.abort();
   }
 
+  // Keep the beginning of each new answer in view. While the assistant is
+  // streaming, the bubble grows downward without repeatedly pulling the
+  // viewport back to its last line, so the response reads top-to-bottom.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs]);
+    if (msgs.length > previousMessageCount.current && msgs[msgs.length - 1]?.role === "assistant") {
+      answerStartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    previousMessageCount.current = msgs.length;
+  }, [msgs.length]);
 
   // Team workspace mode via /chat?ws=<id> (linked from Settings → Teams)
   useEffect(() => {
@@ -732,21 +739,24 @@ export default function ChatPage() {
             </div>
           )}
           {msgs.map((m, i) => (
-            <MessageBubble
+            <div
               key={i}
-              msg={m}
-              isStreaming={busy && i === msgs.length - 1 && m.role === "assistant"}
-              onRegenerate={
-                !busy && i === msgs.length - 1 && m.role === "assistant" && msgs.length >= 2
-                  ? regenerate
-                  : undefined
-              }
-              onRematch={
-                !busy && i === msgs.length - 1 && m.role === "assistant" && m.arena ? rematch : undefined
-              }
-            />
+              ref={i === msgs.length - 1 && m.role === "assistant" ? answerStartRef : undefined}
+            >
+              <MessageBubble
+                msg={m}
+                isStreaming={busy && i === msgs.length - 1 && m.role === "assistant"}
+                onRegenerate={
+                  !busy && i === msgs.length - 1 && m.role === "assistant" && msgs.length >= 2
+                    ? regenerate
+                    : undefined
+                }
+                onRematch={
+                  !busy && i === msgs.length - 1 && m.role === "assistant" && m.arena ? rematch : undefined
+                }
+              />
+            </div>
           ))}
-          <div ref={bottomRef} />
         </div>
       </div>
       {!emptyHome && (
