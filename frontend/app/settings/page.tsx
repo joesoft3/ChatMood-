@@ -966,7 +966,7 @@ export default function SettingsPage() {
             ) : (
               <p className="text-sm text-gray-600">Loading…</p>
             )}
-            <button onClick={logout} className="flex items-center gap-2 text-sm text-gray-500 hover:text-red-400 transition">
+            <button onClick={logout} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg px-3 -mx-3 text-sm text-gray-500 hover:bg-white/5 hover:text-red-400 transition">
               <LogOut size={14} /> Sign out
             </button>
           </Card>
@@ -1000,7 +1000,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => setPwShow((s) => !s)}
                     aria-label={pwShow ? "Hide password" : "Show password"}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-200 p-1"
+                    className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-gray-500 hover:text-gray-200"
                   >
                     {pwShow ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
@@ -1970,7 +1970,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-400">
                   Permanently delete your Mood AI account — chats, uploads, designs, films, edits, orders, memory,
                   plugin tokens, and teams you own. <span className="font-semibold text-red-300">This is instant and cannot be undone.</span>{" "}
-                  Details at <a href="/account-deletion" className="text-accent underline underline-offset-2">/account-deletion</a>.
+                  Details at <a href="/account-deletion" className="inline-block py-1 text-accent underline underline-offset-2">/account-deletion</a>.
                 </p>
                 {!confirmDel ? (
                   <button onClick={() => setConfirmDel(true)}

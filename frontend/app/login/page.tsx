@@ -143,13 +143,13 @@ export default function LoginPage() {
 
           <p className="text-xs text-center text-gray-500">
             {mode === "login" ? "No account? " : "Have an account? "}
-            <button onClick={() => setMode(mode === "login" ? "register" : "login")} className="text-accent underline">
+            <button type="button" onClick={() => setMode(mode === "login" ? "register" : "login")} className="inline-flex min-h-[44px] items-center px-1 text-accent underline">
               {mode === "login" ? "Sign up" : "Sign in"}
             </button>
           </p>
 
           <p className="text-[11px] text-center text-gray-600 leading-relaxed">
-            By continuing you agree to the <a href="/terms" className="underline hover:text-gray-400">Terms of Service</a> and <a href="/privacy" className="underline hover:text-gray-400">Privacy Policy</a>.
+            By continuing you agree to the <a href="/terms" className="inline-flex min-h-[44px] items-center underline hover:text-gray-400">Terms of Service</a> and <a href="/privacy" className="inline-flex min-h-[44px] items-center underline hover:text-gray-400">Privacy Policy</a>.
           </p>
         </div>
       </div>

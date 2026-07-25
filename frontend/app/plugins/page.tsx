@@ -169,7 +169,9 @@ export default function PluginsPage() {
 
   return (
     <AppShell title="Plugin Store">
-      <div className="flex-1 overflow-y-auto">
+      {/* min-h-0 is required: without it the flex item refuses to shrink below
+          its content, so the store grows the shell instead of scrolling. */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
         <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
           <StudioHero
             icon={<Puzzle size={20} />}

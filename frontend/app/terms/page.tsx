@@ -104,7 +104,7 @@ export default function TermsPage() {
         <h1 className="mt-6 text-3xl font-bold">Terms of Service</h1>
         <p className="mt-1 text-sm text-gray-500">
           Effective 18 July 2026 ·{" "}
-          <a href="/privacy" className="text-accent underline">Privacy Policy →</a>
+          <a href="/privacy" className="inline-flex min-h-[44px] items-center text-accent underline">Privacy Policy →</a>
         </p>
         <p className="mt-6 text-[15px] leading-relaxed text-gray-300">
           These Terms are an agreement between you and the operator of Mood AI covering the apps,
@@ -121,9 +121,9 @@ export default function TermsPage() {
             ))}
           </section>
         ))}
-        <p className="mt-12 border-t border-line pt-6 text-xs text-gray-600">
-          Source: <a className="underline" href="https://github.com/joesoft3/moodai/blob/main/docs/TERMS.md">docs/TERMS.md</a>
-          {" "}· <a className="underline" href="/login">Back to sign in</a>
+        <p className="mt-12 flex flex-wrap items-center gap-x-1 border-t border-line pt-6 text-xs text-gray-600">
+          Source: <a className="inline-flex min-h-[44px] items-center underline" href="https://github.com/joesoft3/moodai/blob/main/docs/TERMS.md">docs/TERMS.md</a>
+          {" "}· <a className="inline-flex min-h-[44px] items-center underline" href="/login">Back to sign in</a>
         </p>
       </div>
     </main>

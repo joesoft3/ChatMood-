@@ -91,7 +91,7 @@ export default function PrivacyPage() {
         <h1 className="mt-6 text-3xl font-bold">Privacy Policy</h1>
         <p className="mt-1 text-sm text-gray-500">
           Effective 18 July 2026 ·{" "}
-          <a href="/terms" className="text-accent underline">Terms of Service →</a>
+          <a href="/terms" className="inline-flex min-h-[44px] items-center text-accent underline">Terms of Service →</a>
         </p>
         <p className="mt-6 rounded-xl border border-accent/30 bg-accent/10 px-4 py-3 text-[15px] text-accent">
           Short version: your chats belong to you. Plugins always ask before acting. You can delete everything.
@@ -106,9 +106,9 @@ export default function PrivacyPage() {
             ))}
           </section>
         ))}
-        <p className="mt-12 border-t border-line pt-6 text-xs text-gray-600">
-          Source: <a className="underline" href="https://github.com/joesoft3/moodai/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>
-          {" "}· <a className="underline" href="/login">Back to sign in</a>
+        <p className="mt-12 flex flex-wrap items-center gap-x-1 border-t border-line pt-6 text-xs text-gray-600">
+          Source: <a className="inline-flex min-h-[44px] items-center underline" href="https://github.com/joesoft3/moodai/blob/main/docs/PRIVACY.md">docs/PRIVACY.md</a>
+          {" "}· <a className="inline-flex min-h-[44px] items-center underline" href="/login">Back to sign in</a>
         </p>
       </div>
     </main>

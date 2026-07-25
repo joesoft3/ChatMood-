@@ -308,7 +308,12 @@ export default function DesignPage() {
 
   return (
     <AppShell title="Design Studio">
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      {/* The shell gives every page a fixed-height flex column; a page that
+          doesn't own a scrollport has its overflow clipped by .app-height and
+          becomes unreachable below the fold (generate button, brand kit, batch
+          studio, client links all stranded). */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
         <StudioHero
           icon={<Palette size={22} />}
           title="Design Studio"
@@ -501,19 +506,19 @@ export default function DesignPage() {
 
         {/* toggles + go */}
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
-            <input type="checkbox" checked={enhance} onChange={(e) => setEnhance(e.target.checked)} className="accent-[rgb(var(--mood-accent))]" />
+          <label className="flex min-h-[44px] items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+            <input type="checkbox" checked={enhance} onChange={(e) => setEnhance(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
             <Wand2 size={13} className="text-accent" /> Art-director brief
           </label>
           {kind === "logo" && (
-            <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
-              <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} className="accent-[rgb(var(--mood-accent))]" />
+            <label className="flex min-h-[44px] items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+              <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
               Transparent background
             </label>
           )}
           {brand.brand_name && kind !== "logo" && (
-            <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
-              <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} className="accent-[rgb(var(--mood-accent))]" />
+            <label className="flex min-h-[44px] items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
+              <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
               <Star size={12} className="text-amber-400" /> Use my brand{brand.has_logo ? " (logo included)" : ""}
             </label>
           )}
@@ -672,7 +677,8 @@ export default function DesignPage() {
               ))}
             </div>
           )}
-        </section>
+          </section>
+        </div>
       </div>
     </AppShell>
   );

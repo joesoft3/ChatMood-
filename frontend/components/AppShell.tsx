@@ -179,7 +179,13 @@ export default function AppShell({
         </div>
       </div>
       <ConversationList onNavigate={() => setDrawerOpen(false)} />
-      <div className="border-t border-white/5 p-2.5 space-y-1.5 shrink-0">
+      {/* The workspace block used to be shrink-0 while the history above it was
+          the only flexible row. On short viewports (<=720px tall) that crushed
+          the history to ~65px, so its own "New chat" button and search field
+          overflowed their box and were painted UNDER this block — visible but
+          impossible to click. Both regions may now shrink and scroll, and the
+          history keeps a floor tall enough for its header. */}
+      <div className="border-t border-white/5 p-2.5 space-y-1.5 shrink min-h-0 overflow-y-auto scrollbar-thin">
         <div className="px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-600">Workspace</div>
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
