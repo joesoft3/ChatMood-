@@ -157,6 +157,11 @@ export default function AppShell({
     };
   }, [router]);
 
+  function navigateTo(href: string) {
+    if (href === "/chat") window.dispatchEvent(new CustomEvent("mood:new-chat"));
+    setDrawerOpen(false);
+  }
+
   const sideNav = (
     <div className="flex flex-col h-full bg-[#0b0b0c]">
       <div className="px-4 py-4 flex items-center gap-3 border-b border-white/5 shrink-0">
@@ -176,7 +181,7 @@ export default function AppShell({
           <Link
             key={href}
             href={href}
-            onClick={() => setDrawerOpen(false)}
+            onClick={() => navigateTo(href)}
             className={`touch-manipulation flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border transition ${
               pathname === href
                 ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
@@ -291,6 +296,7 @@ export default function AppShell({
                 <Link
                   key={href}
                   href={href}
+                  onClick={() => navigateTo(href)}
                   className={`touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 text-[10px] transition ${
                     active ? "bg-white text-black" : "text-gray-500 active:text-gray-300"
                   }`}

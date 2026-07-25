@@ -75,6 +75,7 @@ export default function Composer({
   const [input, setInput] = useState("");
   const [searchOn, setSearchOn] = useState(true);
   const [showMore, setShowMore] = useState(false);
+  const [composerError, setComposerError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -112,6 +113,7 @@ export default function Composer({
   async function submit() {
     if (!canSend) return;
     const text = input;
+    setComposerError("");
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "auto";
     await onSend(text, searchOn);
@@ -129,7 +131,7 @@ export default function Composer({
       const res = await apiFetch<{ text: string }>("/voice/transcribe", { method: "POST", body: fd });
       setInput((i) => (i ? i + " " : "") + res.text);
     } catch (e: any) {
-      alert(e.message ?? "Transcription failed");
+      setComposerError(e.message ?? "Transcription failed");
     }
   }
 
@@ -141,12 +143,13 @@ export default function Composer({
       try {
         await start();
       } catch {
-        alert("Microphone access denied or unavailable.");
+        setComposerError("Microphone access denied or unavailable.");
       }
     }
   }
 
   function autoGrow(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setComposerError("");
     setInput(e.target.value);
     const t = e.target;
     t.style.height = "auto";
@@ -230,6 +233,12 @@ export default function Composer({
             ))}
           </div>
         )}
+        {composerError && (
+          <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+            <span className="flex-1">{composerError}</span>
+            <button type="button" onClick={() => setComposerError("")} className="text-red-200/70 hover:text-red-100" aria-label="Dismiss composer error">✕</button>
+          </div>
+        )}
         {bare && deepMode && (
           <div className="flex justify-center">
             <button
@@ -260,7 +269,7 @@ export default function Composer({
                 try {
                   await onUpload(f);
                 } catch (err: any) {
-                  alert(err.message ?? "Upload failed");
+                  setComposerError(err.message ?? "Upload failed");
                 }
               }
               e.target.value = "";

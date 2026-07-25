@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch, token } from "@/lib/api";
-import { LAST_CONV_KEY } from "@/lib/conversations";
+import { OPEN_CONV_KEY } from "@/lib/conversations";
 
 type ResearchItem = { id: string; title: string; updated_at: string | null };
 
@@ -68,12 +68,14 @@ export default function ResearchPage() {
   }, []);
 
   function openReport(id: string) {
-    localStorage.setItem(LAST_CONV_KEY, id);
+    window.dispatchEvent(new CustomEvent("mood:new-chat"));
+    localStorage.setItem(OPEN_CONV_KEY, id);
     router.push("/chat");
   }
 
   function fresh() {
-    localStorage.removeItem(LAST_CONV_KEY);
+    window.dispatchEvent(new CustomEvent("mood:new-chat"));
+    localStorage.removeItem(OPEN_CONV_KEY);
     router.push("/chat");
   }
 

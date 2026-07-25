@@ -27,16 +27,33 @@ function pageHost(): string | null {
   return typeof window === "undefined" ? null : window.location.host;
 }
 
-/** Raw browser fetch errors ("Failed to fetch") read unprofessionally — translate. */
+/** Raw browser fetch errors ("Failed to fetch") read unprofessionally — translate.
+ * Safe reads get two short retries because the Fly app can briefly wake from idle.
+ * Mutating requests are never replayed here; callers can decide whether retrying
+ * their particular operation is safe.
+ */
 async function guardedFetch(input: string, init: RequestInit): Promise<Response> {
-  try {
-    return await fetch(input, init);
-  } catch (e) {
-    if (e instanceof TypeError) {
-      throw new Error("Can't reach the Mood AI server — it may be starting up or your connection dropped. Try again in a few seconds.");
+  const method = (init.method ?? "GET").toUpperCase();
+  const retryable = method === "GET" || method === "HEAD" || method === "OPTIONS";
+  let lastError: unknown;
+  const attempts = retryable ? 3 : 1;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (e) {
+      if (!(e instanceof TypeError)) throw e;
+      lastError = e;
+      if (attempt + 1 < attempts) {
+        await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+      }
     }
-    throw e;
   }
+
+  if (lastError instanceof TypeError) {
+    throw new Error("Can't reach the Mood AI server — it may be starting up or your connection dropped. Try again in a few seconds.");
+  }
+  throw lastError;
 }
 
 export async function apiFetch<T = any>(path: string, opts: RequestInit = {}): Promise<T> {

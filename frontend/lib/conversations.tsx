@@ -9,8 +9,10 @@ export interface ConvItem {
   title: string;
 }
 
-/** Where the last open conversation id is remembered across sessions/reloads. */
+/** Legacy key retained for integrations that still clear the previous selection. */
 export const LAST_CONV_KEY = "mood.lastConvId";
+/** One-shot target used when a library surface explicitly opens a chat. */
+export const OPEN_CONV_KEY = "mood.openConvId";
 
 interface CtxType {
   convs: ConvItem[];
@@ -58,6 +60,15 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     void refresh();
   }, [refresh, pathname]);
+
+  // The Chat destination is always a clean new-chat surface. History items
+  // select activeId directly, while other surfaces can explicitly clear it
+  // before routing to /chat.
+  useEffect(() => {
+    const h = () => setActiveId(null);
+    window.addEventListener("mood:new-chat", h);
+    return () => window.removeEventListener("mood:new-chat", h);
+  }, [setActiveId]);
 
   // Any feature can ping "conversations changed" (idle home-reset, share/join
   // flows, background jobs) → debounced refresh so ☰ history is always current

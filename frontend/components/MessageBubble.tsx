@@ -314,6 +314,7 @@ export default function MessageBubble({
 }) {
   const [copied, setCopied] = useState(false);
   const [reading, setReading] = useState(false);
+  const [readError, setReadError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   async function copyMessage() {
@@ -323,6 +324,7 @@ export default function MessageBubble({
   }
 
   async function readAloud() {
+    setReadError("");
     if (reading) {
       audioRef.current?.pause();
       setReading(false);
@@ -342,7 +344,7 @@ export default function MessageBubble({
       await audio.play();
     } catch (e: any) {
       setReading(false);
-      alert(e.message ?? "Read-aloud unavailable (set OPENAI_API_KEY)");
+      setReadError(e.message ?? "Read-aloud unavailable (set OPENAI_API_KEY)");
     }
   }
 
@@ -457,6 +459,12 @@ export default function MessageBubble({
             );
           })()}
 
+          {readError && (
+            <div role="alert" className="mt-3 flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+              <span className="flex-1">{readError}</span>
+              <button type="button" onClick={() => setReadError("")} aria-label="Dismiss read-aloud error">✕</button>
+            </div>
+          )}
           {msg.content.length > 0 && (
             <div className="mt-3 flex items-center gap-2 text-gray-600 flex-wrap">
               <button onClick={copyMessage} title="Copy answer" className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition">
