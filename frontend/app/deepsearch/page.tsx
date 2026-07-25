@@ -84,7 +84,10 @@ export default function ResearchPage() {
 
   return (
     <AppShell title="Research">
-      <div className="mx-auto w-full max-w-3xl p-6 space-y-6">
+      {/* Own scrollport — without it the library is clipped by the shell's
+          fixed-height column on short screens instead of scrolling. */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
+        <div className="mx-auto w-full max-w-3xl p-6 space-y-6">
         <StudioHero
           title="Research library"
           subtitle="Every DeepSearch run lands here — re-open a report any time with sources included."
@@ -117,13 +120,13 @@ export default function ResearchPage() {
         {items === null && !error && (
           <div className="grid gap-3">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-20 animate-pulse rounded-2xl border border-line bg-surface" />
+              <div key={i} className="h-20 animate-pulse rounded-2xl border border-line bg-panel" />
             ))}
           </div>
         )}
 
         {items && items.length === 0 && (
-          <div className="rounded-2xl border border-line bg-surface p-8 text-center">
+          <div className="rounded-2xl border border-line bg-panel p-8 text-center">
             <p className="text-3xl">🔭</p>
             <p className="mt-3 text-sm text-gray-400">
               No saved research yet. Ask a big question in chat with <span className="text-accent">🔭 Deep</span> on —
@@ -138,19 +141,21 @@ export default function ResearchPage() {
               <button
                 key={it.id}
                 onClick={() => openReport(it.id)}
-                className="group flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface p-4 text-left transition hover:border-accent/50"
+                className="group flex items-center justify-between gap-4 rounded-2xl border border-line bg-panel p-4 text-left transition hover:border-accent/50"
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-gray-200">{it.title}</p>
                   <p className="mt-0.5 text-xs text-gray-600">🔭 DeepSearch report · {fmtDate(it.updated_at)}</p>
                 </div>
-                <span className="shrink-0 text-xs text-accent opacity-0 transition group-hover:opacity-100">
+                {/* hover-only affordances never appear on touch — show it there */}
+                <span className="shrink-0 text-xs text-accent opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100">
                   Open →
                 </span>
               </button>
             ))}
           </div>
-        )}
+          )}
+        </div>
       </div>
     </AppShell>
   );

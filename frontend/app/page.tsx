@@ -170,14 +170,17 @@ export default function Home() {
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-3 text-xs text-gray-500 2xl:max-w-6xl">
           <span className="font-semibold text-gray-300">Mood AI</span>
           <span>© 2026 · Built with ❤️ in Accra</span>
-          <span className="ml-auto flex gap-5">
-            <Link href="/terms" className="transition hover:text-gray-300">
+          {/* -my-2/py-2 keeps the visual rhythm while giving each link a
+              44px-tall tap target (they were 16px — well under the 44px
+              minimum and easy to miss on a phone). */}
+          <span className="ml-auto -my-2 flex flex-wrap items-center gap-x-5">
+            <Link href="/terms" className="inline-flex min-h-[44px] items-center transition hover:text-gray-300">
               Terms of Service
             </Link>
-            <Link href="/privacy" className="transition hover:text-gray-300">
+            <Link href="/privacy" className="inline-flex min-h-[44px] items-center transition hover:text-gray-300">
               Privacy Policy
             </Link>
-            <Link href="/login" className="transition hover:text-gray-300">
+            <Link href="/login" className="inline-flex min-h-[44px] items-center transition hover:text-gray-300">
               Sign in
             </Link>
           </span>

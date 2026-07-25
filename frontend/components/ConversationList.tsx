@@ -46,8 +46,10 @@ export default function ConversationList({ onNavigate }: { onNavigate?: () => vo
   }
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="p-3 space-y-3">
+    <div className="flex-1 flex flex-col min-h-0 basis-auto">
+      {/* shrink-0: the New chat button + search must never be squeezed out of
+          their own container (they used to overflow and sit under the nav). */}
+      <div className="p-3 space-y-3 shrink-0">
         <div className="flex items-center justify-between px-1 text-[11px] text-gray-600">
           <span className="uppercase tracking-[0.18em]">Live history</span>
           <span className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">

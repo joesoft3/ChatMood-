@@ -29,9 +29,15 @@
   color-scheme: light;
 }
 
+/* The document — not <body> — must be the scroll container.
+   `height: 100%` on both made <body> a fixed-height scroller: window.scrollY
+   stayed 0 forever, so keyboard scrolling (End / Page Down / Space), anchor
+   links, scrollIntoView() and scroll restoration silently did nothing on every
+   public page. `min-height` lets the page grow and hands scrolling back to the
+   viewport, while still letting full-height layouts fill a short screen. */
 html,
 body {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
@@ -218,6 +224,15 @@ input::placeholder {
   content: "";
 }
 
+/* A closed <details> must not leave its panel in the layout. Chromium keeps a
+   zero-painted-but-measured box for the collapsed content slot, which overlapped
+   the live transcript below it and made the analyzer's own input/button report as
+   occluded (they were laid out on top of the transcript while unclickable).
+   Collapsing it explicitly keeps the closed state a single summary row. */
+details:not([open]) > *:not(summary) {
+  display: none !important;
+}
+
 /* voice orb animations */
 @keyframes orb-pulse {
   0%,
@@ -262,9 +277,13 @@ input::placeholder {
   }
 }
 
-/* never let content blow out the layout horizontally */
-html,
-body {
+/* Never let content blow out the layout horizontally.
+   Only on <html>: its overflow propagates to the viewport, so this clips the
+   page without turning <html> itself into a scroll container. Repeating it on
+   <body> is what broke vertical scrolling — per spec a non-visible overflow-x
+   forces overflow-y to compute to `auto`, which quietly made <body> its own
+   scroller and stranded window scrolling at 0. */
+html {
   overflow-x: hidden;
 }
 img,
