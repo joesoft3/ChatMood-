@@ -154,6 +154,30 @@ def test_video_request_music_and_tempo_validation():
         VideoRequest(prompt="x" * 10, tempo=0.5)           # below the 0.7 floor
 
 
+def test_mux_cmd_respects_dialogue_subtitles_and_music():
+    """The full video-studio sound pipeline: dialogue films carry subtitles,
+    ambience beds (soft/epic/lofi/tension) mix under the voice, and original
+    provider audio is ducked to 35% volume."""
+    # Voice-only minimal mix (no ambience, no original audio)
+    cmd = soundtrack.build_mux_cmd(
+        "ffmpeg", "clip.mp4", "voice.mp3", "out.mp4",
+        seconds=8, with_bed=False, with_original=False, music="soft"
+    )
+    filt = cmd[cmd.index("-filter_complex") + 1]
+    assert "amix" not in filt  # nothing to mix
+    assert "loudnorm=I=-16" in filt
+
+    # Full cinema mix with ambience and ducked original
+    cmd_full = soundtrack.build_mux_cmd(
+        "ffmpeg", "clip.mp4", "voice.mp3", "out.mp4",
+        seconds=10, with_bed=True, with_original=True, music="epic"
+    )
+    filt_full = cmd_full[cmd_full.index("-filter_complex") + 1]
+    assert "amix=inputs=3" in filt_full
+    assert "volume=0.35" in filt_full     # original audio ducked
+    assert "tremolo=f=0.07" in filt_full  # epic ambience tremolo rate
+
+
 # ---------------------------------------------------------------- film posters
 def test_poster_cmd_seeks_to_hero_moment():
     cmd = soundtrack.build_poster_cmd("ffmpeg", "film.mp4", "out.jpg", 18)
