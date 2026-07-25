@@ -48,16 +48,34 @@ async def get_redis() -> redis.Redis:
     return _redis
 
 
+_RL_LUA = """
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local ttl = tonumber(ARGV[2])
+local cur = redis.call('INCR', key)
+if cur == 1 then
+    redis.call('EXPIRE', key, ttl)
+end
+if cur > limit then
+    return 0
+end
+return 1
+"""
+_rl_script = None
+
+
 async def enforce_rate_limit(bucket: str, per_minute: int) -> None:
-    """Simple per-user token bucket. Fails open if Redis is unavailable."""
+    """Atomic per-user token bucket (Lua script — no race between INCR & EXPIRE).
+
+    Fails open if Redis is unavailable so a down cache never blocks real users.
+    """
+    global _rl_script
     try:
         r = await get_redis()
-        key = f"rl:{bucket}"
-        async with r.pipeline(transaction=False) as pipe:
-            pipe.incr(key)
-            pipe.expire(key, 60)
-            count, _ = await pipe.execute()
-        if int(count) > per_minute:
+        if _rl_script is None:
+            _rl_script = r.register_script(_RL_LUA)
+        allowed = await _rl_script(keys=[f"rl:{bucket}"], args=[per_minute, 60])
+        if not int(allowed):
             raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Rate limit exceeded — slow down.")
     except HTTPException:
         raise
