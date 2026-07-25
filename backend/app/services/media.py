@@ -169,7 +169,8 @@ class VideoService:
     """Video generation with professional-grade provider cascade, retry/backoff,
     graceful degradation, and structured progress reporting."""
 
-    MAX_CASCADE_ATTEMPTS = 3
+    # Configurable: full cascade retries (default 3, env-overridable via VIDEO_MAX_CASCADE_ATTEMPTS)
+    MAX_CASCADE_ATTEMPTS: int = settings.VIDEO_MAX_CASCADE_ATTEMPTS
 
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=90.0))
