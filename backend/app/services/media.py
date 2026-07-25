@@ -33,11 +33,23 @@ log = logging.getLogger(__name__)
 
 
 class VideoNotConfigured(Exception):
-    pass
+    """Provider missing / unfunded / disabled — recoverable by user action (set key, upgrade, enable)."""
+    CATEGORY = "configuration"
+    RECOVERABLE = True
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        return f"[video:config] {msg}"
 
 
 class VideoGenerationError(Exception):
-    pass
+    """Provider / pipeline / timeout failure — may succeed on retry (cascade, backoff)."""
+    CATEGORY = "generation"
+    RECOVERABLE = True
+
+    def __str__(self) -> str:
+        msg = super().__str__()
+        return f"[video:generation] {msg}"
 
 
 # Professional style presets — layered onto the user's prompt by the compiler.
