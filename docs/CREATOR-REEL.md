@@ -183,6 +183,20 @@ glyphs (lucide ships none, by trademark policy). TikTok and Instagram have **no
 public web share intent**, so those copy the link to paste; pretending otherwise
 would open a dead tab. A dismissed native share sheet is *not* counted.
 
+## Feed behaviour
+
+- **Infinite scroll** — the API paginates 20 per page and returns `next_offset`;
+  the feed appends the next page ~1.5 screens from the end, de-duping by id so
+  a reel posted mid-scroll can't appear twice.
+- **A network failure is not an empty feed.** If the request fails the screen
+  says so and offers *Try again*, instead of the cheerful "the reel is quiet"
+  empty state — which reads as "your reels are gone".
+- **Views count once per reel per session.** The guard lives at module scope,
+  not in a component ref, so remounting a card (switching tabs, reloading the
+  feed) can't re-count a view that was already recorded.
+- **Refresh on focus** — returning to the tab reloads the feed and stats, since
+  counts move while you're away.
+
 ## Two details worth knowing
 
 **Reel media is never swept by the media janitor.** Muxed films are ephemeral —

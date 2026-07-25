@@ -107,6 +107,12 @@ function ago(iso: string | null): string {
   return new Date(then).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
+// A view is counted once per reel per session. `counted` used to be a ref
+// INSIDE the card, so every remount (switching tabs, reloading the feed) reset
+// it and re-counted the same view — three tab round-trips inflated the count
+// by six. Hoisting it to module scope makes the guard survive remounts.
+const viewedThisSession = new Set<string>();
+
 const SOURCE_BADGE: Record<Reel["source"], string> = {
   upload: "🎥 Uploaded",
   film: "🎬 Mood film",
@@ -294,8 +300,9 @@ function ReelCard({
         const visible = entry.intersectionRatio > 0.6;
         if (visible) {
           el.play().catch(() => {});
-          if (!counted.current) {
+          if (!counted.current && !viewedThisSession.has(reel.id)) {
             counted.current = true;
+            viewedThisSession.add(reel.id);
             onView(reel.id);
           }
         } else {
@@ -468,6 +475,12 @@ export default function ReelPage() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [shareFor, setShareFor] = useState<Reel | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // Distinguish "the feed is empty" from "we couldn't reach the server" —
+  // showing the cheerful empty state for a network failure tells the user
+  // their reels are gone when they aren't.
+  const [loadError, setLoadError] = useState("");
   const [duetFor, setDuetFor] = useState<Reel | null>(null);
   const [duetFile, setDuetFile] = useState<File | null>(null);
   const [duetLayout, setDuetLayout] = useState("side");
@@ -489,12 +502,39 @@ export default function ReelPage() {
 
   const load = useCallback(async () => {
     try {
-      const j = await apiFetch<{ reels: Reel[] }>(`/reels${query}`);
+      const j = await apiFetch<{ reels: Reel[]; next_offset: number | null }>(`/reels${query}`);
       setReels(j.reels);
-    } catch {
+      setNextOffset(j.next_offset ?? null);
+      setLoadError("");
+    } catch (e) {
       setReels((r) => r ?? []);
+      setLoadError(e instanceof Error ? e.message : "Couldn't load the reel");
     }
   }, [query]);
+
+  /** Append the next page — the feed used to dead-end at the first 20 reels
+   *  because `next_offset` was returned by the API but never used. */
+  const loadMore = useCallback(async () => {
+    if (nextOffset === null || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const sep = query ? "&" : "?";
+      const j = await apiFetch<{ reels: Reel[]; next_offset: number | null }>(
+        `/reels${query}${sep}offset=${nextOffset}`,
+      );
+      // De-dupe by id: a reel posted while you were scrolling shifts the
+      // offset window and would otherwise appear twice.
+      setReels((rs) => {
+        const seen = new Set((rs ?? []).map((r) => r.id));
+        return [...(rs ?? []), ...j.reels.filter((r) => !seen.has(r.id))];
+      });
+      setNextOffset(j.next_offset ?? null);
+    } catch {
+      /* keep what we have; the sentinel will retry on the next scroll */
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextOffset, loadingMore, query]);
 
   const loadStats = useCallback(() => {
     apiFetch<Stats>("/reels/stats").then(setStats).catch(() => {});
@@ -503,6 +543,20 @@ export default function ReelPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Refresh when the tab regains focus: counts move while you're away (other
+  // creators liking/sharing), and a feed frozen at the numbers from ten
+  // minutes ago looks broken.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        load();
+        loadStats();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [load, loadStats]);
   useEffect(() => {
     loadStats();
   }, [loadStats]);
@@ -760,6 +814,8 @@ export default function ReelPage() {
               if (id === tab) return;
               setTab(id);
               setReels(null);
+              setNextOffset(null);
+              setLoadError("");
             }}
             className={`rounded-full px-4 py-1.5 text-xs transition ${
               tab === id ? "bg-white font-semibold text-black" : "text-gray-400 hover:text-gray-200"
@@ -792,6 +848,24 @@ export default function ReelPage() {
         <div className="grid flex-1 place-items-center">
           <Loader2 className="animate-spin text-gray-600" />
         </div>
+      ) : loadError && reels.length === 0 ? (
+        <div className="grid flex-1 place-items-center px-8">
+          <div className="text-center">
+            <p className="text-3xl">📡</p>
+            <p className="mt-2 text-sm font-semibold text-gray-200">Couldn&apos;t load the reel</p>
+            <p className="mt-1 text-xs text-gray-500">{loadError}</p>
+            <button
+              onClick={() => {
+                setReels(null);
+                setLoadError("");
+                load();
+              }}
+              className="mt-4 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-[#0b0f14] hover:brightness-110"
+            >
+              Try again
+            </button>
+          </div>
+        </div>
       ) : reels.length === 0 ? (
         <div className="p-4">
           <StudioEmptyState
@@ -819,7 +893,17 @@ export default function ReelPage() {
         </div>
       ) : (
         // full-bleed vertical snap feed — one reel per screen
-        <div className="flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain scrollbar-thin">
+        <div
+          className="flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain scrollbar-thin"
+          onScroll={(e) => {
+            // Load the next page ~1.5 screens from the end so the next reel is
+            // already there when the reader swipes.
+            const el = e.currentTarget;
+            if (el.scrollHeight - el.scrollTop - el.clientHeight < el.clientHeight * 1.5) {
+              loadMore();
+            }
+          }}
+        >
           {reels.map((r) => (
             <div key={r.id} className="h-full w-full bg-black">
               <ReelCard
@@ -840,6 +924,11 @@ export default function ReelPage() {
               />
             </div>
           ))}
+          {loadingMore && (
+            <div className="grid h-24 w-full place-items-center bg-black">
+              <Loader2 className="animate-spin text-gray-600" />
+            </div>
+          )}
         </div>
       )}
 
