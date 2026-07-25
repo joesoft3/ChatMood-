@@ -2,22 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------------------------------------------------------- theme tokens
-   Dark is the brand default. [data-theme="light"] flips surfaces + the
-   readability overrides below (components stay theme-agnostic). */
+/* ---------------------------------------------------------- Arena palette
+   Arena's current identity uses warm paper/sand lights and worn leather
+   darks. Keep the palette in RGB tokens so every Tailwind surface, border,
+   input and text color can follow the same theme without hidden black boxes.
+   Palette reference: white #fff, gray-01 #f5f1ec, gray-02 #ebe7e2,
+   gray-03 #c7c2bc, gray-04 #8b887e, gray-05 #66615a, gray-06 #403c38,
+   gray-07 #2b2b29, black #1c1c1a, teal #31b8b5. */
 :root {
-  --mood-base: 0 0 0;          /* #000000 — true black, Grok-style chrome */
-  --mood-panel: 10 10 10;      /* #0a0a0a — barely-elevated surfaces */
-  --mood-line: 38 38 38;       /* #262626 — neutral-800 hairlines */
-  --mood-accent: 124 155 255;  /* #7c9bff */
+  --mood-base: 28 28 26;       /* Arena black */
+  --mood-panel: 43 43 41;      /* Arena gray-07 */
+  --mood-line: 64 60 56;       /* Arena gray-06 */
+  --mood-accent: 49 184 181;   /* Arena teal */
+  --mood-text: 245 241 236;    /* Arena gray-01 */
+  --mood-muted: 199 194 188;   /* Arena gray-03 */
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --mood-base: 246 248 251;
-  --mood-panel: 255 255 255;
-  --mood-line: 226 232 240;
-  --mood-accent: 79 91 213;    /* deeper blue: passes contrast on white */
+  --mood-base: 245 241 236;    /* Arena gray-01 — weathered notebook page */
+  --mood-panel: 255 255 255;   /* Arena white */
+  --mood-line: 199 194 188;    /* Arena gray-03 */
+  --mood-accent: 49 184 181;   /* Arena teal */
+  --mood-text: 28 28 26;       /* Arena black */
+  --mood-muted: 102 97 90;     /* Arena gray-05 */
   color-scheme: light;
 }
 
@@ -28,8 +36,22 @@ body {
 
 body {
   background: rgb(var(--mood-base));
+  color: rgb(var(--mood-text));
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Explicit input color fixes the invisible-typed-text bug on mobile browsers. */
+.composer-input,
+textarea,
+input,
+select {
+  color: rgb(var(--mood-text));
+}
+.composer-input::placeholder,
+textarea::placeholder,
+input::placeholder {
+  color: rgb(var(--mood-muted) / 0.75);
 }
 
 /* thin scrollbars */
@@ -38,35 +60,51 @@ body {
   height: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #333333;
+  background: rgb(var(--mood-line));
   border-radius: 3px;
 }
-[data-theme="light"] .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #c2cddd;
-}
 
-/* ---- light-mode readability sheet: the app was authored dark-first with
-   Tailwind grays; flip the whole gray ramp + translucent whites once, here. */
-[data-theme="light"] .text-gray-100 { color: #0f172a !important; }
-[data-theme="light"] .text-gray-200 { color: #1e293b !important; }
-[data-theme="light"] .text-gray-300 { color: #334155 !important; }
-[data-theme="light"] .text-gray-400 { color: #475569 !important; }
-[data-theme="light"] .text-gray-500 { color: #64748b !important; }
-[data-theme="light"] .text-gray-600 { color: #94a3b8 !important; }
-[data-theme="light"] .bg-white\/5 { background-color: rgb(2 6 23 / 0.045) !important; }
-[data-theme="light"] .bg-white\/10 { background-color: rgb(2 6 23 / 0.07) !important; }
-[data-theme="light"] .hover\:bg-white\/5:hover { background-color: rgb(2 6 23 / 0.06) !important; }
-[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgb(2 6 23 / 0.09) !important; }
-[data-theme="light"] .hover\:text-gray-200:hover { color: #1e293b !important; }
-[data-theme="light"] .hover\:text-gray-300:hover { color: #334155 !important; }
-[data-theme="light"] .hover\:text-gray-400:hover { color: #475569 !important; }
-[data-theme="light"] .hover\:text-whit:hover, [data-theme="light"] .hover\:text-white:hover { color: #0f172a !important; }
-[data-theme="light"] .text-white:not(.keep-white) { color: #0f172a !important; }
-[data-theme="light"] .placeholder-gray-600::placeholder { color: #94a3b8 !important; }
-[data-theme="light"] .bg-black\/60 { background-color: rgb(2 6 23 / 0.45) !important; }
-[data-theme="light"] .msg h1, [data-theme="light"] .msg h2, [data-theme="light"] .msg h3, [data-theme="light"] .msg h4 { color: #0f172a; }
-/* accent text must survive on white; keep accent-filled buttons' black label */
-[data-theme="light"] .text-accent { color: rgb(var(--mood-accent)) !important; }
+/* Readability ramp — shared by dark and light surfaces. */
+.text-gray-100 { color: rgb(var(--mood-text)) !important; }
+.text-gray-200 { color: rgb(var(--mood-text) / 0.92) !important; }
+.text-gray-300 { color: rgb(var(--mood-text) / 0.78) !important; }
+.text-gray-400 { color: rgb(var(--mood-muted)) !important; }
+.text-gray-500 { color: rgb(var(--mood-muted) / 0.82) !important; }
+.text-gray-600 { color: rgb(var(--mood-muted) / 0.62) !important; }
+.text-white:not(.keep-white) { color: rgb(var(--mood-text)) !important; }
+.text-accent { color: rgb(var(--mood-accent)) !important; }
+.hover\:text-gray-200:hover { color: rgb(var(--mood-text)) !important; }
+.hover\:text-gray-300:hover { color: rgb(var(--mood-text) / 0.9) !important; }
+.hover\:text-gray-400:hover { color: rgb(var(--mood-text) / 0.82) !important; }
+.hover\:text-white:hover { color: rgb(var(--mood-text)) !important; }
+
+/* Keep translucent utility surfaces warm instead of default blue-gray. */
+.bg-white\/5 { background-color: rgb(var(--mood-text) / 0.05) !important; }
+.bg-white\/10 { background-color: rgb(var(--mood-text) / 0.10) !important; }
+.hover\:bg-white\/5:hover { background-color: rgb(var(--mood-text) / 0.08) !important; }
+.hover\:bg-white\/10:hover { background-color: rgb(var(--mood-text) / 0.14) !important; }
+.border-white\/5,
+.border-white\/6,
+.border-white\/8,
+.border-white\/10 { border-color: rgb(var(--mood-line) / 0.62) !important; }
+
+/* Dark-first components also contain literal Tailwind hex surfaces. Re-map
+   those exact tokens so light mode never produces a dark composer/sidebar,
+   and dark mode stays on Arena's leather/paper palette too. */
+[class~="bg-[#0b0b0c]"] { background-color: rgb(var(--mood-base)) !important; }
+[class~="bg-[#0f0f10]"],
+[class~="bg-[#0f1011]"],
+[class~="bg-[#111214]"],
+[class~="bg-[#121213]"] { background-color: rgb(var(--mood-panel)) !important; }
+[class~="bg-[#141415]"],
+[class~="bg-[#171718]"],
+[class~="bg-[#0f1012]"] { background-color: rgb(var(--mood-panel)) !important; }
+
+[data-theme="light"] .bg-black\/60 { background-color: rgb(28 28 26 / 0.45) !important; }
+[data-theme="light"] .msg h1,
+[data-theme="light"] .msg h2,
+[data-theme="light"] .msg h3,
+[data-theme="light"] .msg h4 { color: rgb(var(--mood-text)); }
 
 
 /* markdown message styling (ChatGPT-like readability without typography plugin) */

@@ -313,7 +313,7 @@ export default function Composer({
                           ? "Ask something worth deep reasoning (grok-4 🧠)…"
                           : "Ask Mood anything…"
             }
-            className="min-h-[3.25rem] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-6 outline-none placeholder-gray-600"
+            className="composer-input min-h-[3.25rem] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-6 outline-none placeholder-gray-600"
           />
           <button
             type="button"
