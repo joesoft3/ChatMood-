@@ -230,7 +230,15 @@ class VideoService:
 
         last_err: Exception | None = None
         for attempt in range(self.MAX_CASCADE_ATTEMPTS):
+            log.info(
+                "cascade attempt %d/%d starting chain: %s",
+                attempt + 1, self.MAX_CASCADE_ATTEMPTS, chain,
+            )
             for name in chain:
+                log.info(
+                    "cascade step attempt %d/%d provider '%s'",
+                    attempt + 1, self.MAX_CASCADE_ATTEMPTS, name,
+                )
                 try:
                     if name == "reel":
                         result_url, used_image = await self._reel(
@@ -251,8 +259,8 @@ class VideoService:
                 except (VideoNotConfigured, VideoGenerationError) as exc:
                     last_err = exc
                     log.info(
-                        "video provider '%s' unavailable (attempt %d/%d): %s",
-                        name, attempt + 1, self.MAX_CASCADE_ATTEMPTS, exc,
+                        "video provider '%s' unavailable at cascade attempt %d/%d (%s): %s",
+                        name, attempt + 1, self.MAX_CASCADE_ATTEMPTS, exc.CATEGORY, exc,
                     )
                     # Cascade to next provider; if this is the last provider,
                     # break out to raise the final error cleanly.
@@ -262,10 +270,25 @@ class VideoService:
             # If we exhausted the chain without success, retry the full chain
             # (up to MAX_CASCADE_ATTEMPTS) before giving up.
             if attempt < self.MAX_CASCADE_ATTEMPTS - 1:
-                await asyncio.sleep(0.8 * (attempt + 1))
+                sleep_s = 0.8 * (attempt + 1)
+                log.info(
+                    "cascade chain exhausted at attempt %d/%d — backoff %.2fs before retry %d/%d",
+                    attempt + 1, self.MAX_CASCADE_ATTEMPTS,
+                    sleep_s, attempt + 2, self.MAX_CASCADE_ATTEMPTS,
+                )
+                await asyncio.sleep(sleep_s)
 
         if last_err:
+            log.error(
+                "cascade failed after %d/%d attempts across providers %s — last error (%s): %s",
+                self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+                last_err.CATEGORY, last_err,
+            )
             raise last_err
+        log.error(
+            "cascade failed after %d/%d attempts across providers %s — empty chain",
+            self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+        )
         raise VideoNotConfigured("VIDEO_PROVIDER chain is empty.")
 
     # ----------------------------------------------------- storyboard & voice
@@ -410,13 +433,16 @@ class VideoService:
                 f"?width={W}&height={H}&seed={seed}&model={settings.POLLINATIONS_MODEL}&nologo=true&enhance=true"
             )
             for attempt in range(3):  # provider hiccups/rate sheds are normal — backoff retry
+                log.info("reel scene %d fetch attempt %d/3", i, attempt + 1)
                 try:
                     r = await self._http.get(url, timeout=httpx.Timeout(20.0, read=75.0))
                     if r.status_code == 200 and (r.headers.get("content-type") or "").startswith("image/") and r.content:
+                        log.info("reel scene %d fetch succeeded on attempt %d/3", i, attempt + 1)
                         return r.content
                 except Exception as e:
-                    log.info("reel scene %d fetch hiccup: %s", i, e)
+                    log.info("reel scene %d fetch attempt %d/3 hiccup: %s", i, attempt + 1, e)
                 await asyncio.sleep(1.2 + attempt * 1.3)
+            log.info("reel scene %d fetch exhausted all 3 attempts — returning None", i)
             return None
 
         shots = await asyncio.gather(*(_fetch(i, p) for i, p in enumerate(beat_prompts)))
@@ -557,6 +583,7 @@ class VideoService:
         provider_name: str,
         full_post: Callable[[], Any],
         lean_post: Callable[[], Any] | None = None,
+        attempt: int = 1,
     ) -> Any:
         """Per-provider lean-retry: try full payload; if rejected (400/422),
         retry with minimal payload before cascading.
@@ -568,7 +595,10 @@ class VideoService:
         except VideoGenerationError:
             pass  # fall through to lean retry if available
         if lean_post is not None:
-            log.info("lean-retry: %s rejected full params — retrying minimal payload", provider_name)
+            log.info(
+                "lean-retry: %s attempt %d rejected full params — retrying minimal payload",
+                provider_name, attempt,
+            )
             return await lean_post()
         raise
 
