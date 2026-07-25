@@ -28,3 +28,24 @@ def test_video_analysis_raises_without_ffmpeg(monkeypatch):
     with pytest.raises(video_analysis.VideoAnalysisError, match="ffmpeg"):
         import asyncio
         asyncio.run(video_analysis.analyze_video_file(b"fake", "mp4"))
+
+
+def test_build_sample_filter_uniform():
+    vf = video_analysis.build_sample_filter(
+        video_analysis.SAMPLING_UNIFORM, interval_sec=5.0, max_frames=6
+    )
+    assert "fps=1/5" in vf and "scale=768:-2" in vf
+
+
+def test_build_sample_filter_scene():
+    vf = video_analysis.build_sample_filter(
+        video_analysis.SAMPLING_SCENE, interval_sec=5.0, max_frames=6, scene_threshold=0.3
+    )
+    assert "gte(scene,0.3)" in vf and "scale=768:-2" in vf
+
+
+def test_build_sample_filter_keyframe():
+    vf = video_analysis.build_sample_filter(
+        video_analysis.SAMPLING_KEYFRAME, interval_sec=5.0, max_frames=6
+    )
+    assert "eq(pict_type,I)" in vf and "scale=768:-2" in vf
