@@ -289,12 +289,24 @@ def _film_out(f: Film) -> dict:
         if soundtrack.MEDIA_POSTER_RE.match(f.poster) or f.poster.endswith("_p.jpg"):
             poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}"
 
+    scenes_raw = f.scenes_json or "[]"
     try:
-        scenes = json.loads(f.scenes_json or "[]")
-        if not isinstance(scenes, list):
-            scenes = []
+        scenes_parsed = json.loads(scenes_raw)
+        if not isinstance(scenes_parsed, list):
+            scenes_parsed = []
     except json.JSONDecodeError:
-        scenes = []
+        scenes_parsed = []
+
+    # Defense: filter only valid scene objects with required keys,
+    # cap at a safe maximum (prevents malicious oversized payloads)
+    scenes = []
+    for item in scenes_parsed[:50]:  # hard cap: 50 scenes max
+        if isinstance(item, dict) and isinstance(item.get("shot"), str) and item.get("shot", "").strip():
+            scenes.append({
+                "shot": str(item.get("shot", "")).strip()[:400],
+                "narration": str(item.get("narration", "")).strip()[:200],
+                "voice": str(item.get("voice", "a")).strip().lower() or "a",
+            })
 
     return {
         "id": f.id,
