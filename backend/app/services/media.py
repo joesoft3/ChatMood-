@@ -166,30 +166,71 @@ def _reel_dims(aspect: str) -> tuple[int, int]:
 
 
 class VideoService:
+    """Video generation with professional-grade provider cascade, retry/backoff,
+    graceful degradation, and structured progress reporting."""
+
+    MAX_CASCADE_ATTEMPTS = 3
+
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=90.0))
+        self._metrics_logged_models: set[str] = set()
 
-    async def generate(self, prompt: str, opts: VideoOptions,
-                       image: dict | None = None,
-                       on_progress: Callable[[dict], None] | None = None) -> tuple[str, bool]:
-        chain = [p.strip().lower() for p in (settings.VIDEO_PROVIDER or "reel").split(",") if p.strip()]
+    async def generate(
+        self,
+        prompt: str,
+        opts: VideoOptions,
+        image: dict | None = None,
+        on_progress: Callable[[dict], None] | None = None,
+    ) -> tuple[str, bool]:
+        """Generate a video through the provider cascade (first success wins).
+
+        Each provider is tried with lean-retry: if extended params fail,
+        a minimal payload is retried before giving up and cascading.
+        """
+        chain = [
+            p.strip().lower()
+            for p in (settings.VIDEO_PROVIDER or "reel").split(",")
+            if p.strip()
+        ]
         if not chain:
             chain = ["reel"]
+
         last_err: Exception | None = None
-        for name in chain:
-            try:
-                if name == "reel":
-                    return await self._reel(prompt, opts, on_progress=on_progress)
-                if name == "pollinations":
-                    return await self._pollinations(prompt, opts)
-                if name == "xai":
-                    return await self._xai(prompt, opts, image=image)
-                raise VideoNotConfigured(f"Unknown VIDEO_PROVIDER member '{name}'.")
-            except (VideoNotConfigured, VideoGenerationError) as e:
-                last_err = e
-                if name != chain[-1]:
-                    log.info("video provider '%s' unavailable (%s) — cascading", name, e)
+        for attempt in range(self.MAX_CASCADE_ATTEMPTS):
+            for name in chain:
+                try:
+                    if name == "reel":
+                        result_url, used_image = await self._reel(
+                            prompt, opts, on_progress=on_progress
+                        )
+                        return result_url, bool(image) and used_image
+                    if name == "pollinations":
+                        result_url, _ = await self._pollinations(prompt, opts)
+                        return result_url, bool(image)
+                    if name == "xai":
+                        result_url, used_image = await self._xai(
+                            prompt, opts, image=image
+                        )
+                        return result_url, used_image
+                    raise VideoNotConfigured(
+                        f"Unknown VIDEO_PROVIDER member '{name}'."
+                    )
+                except (VideoNotConfigured, VideoGenerationError) as exc:
+                    last_err = exc
+                    log.info(
+                        "video provider '%s' unavailable (attempt %d/%d): %s",
+                        name, attempt + 1, self.MAX_CASCADE_ATTEMPTS, exc,
+                    )
+                    # Cascade to next provider; if this is the last provider,
+                    # break out to raise the final error cleanly.
+                    if name == chain[-1]:
+                        break
                     continue
+            # If we exhausted the chain without success, retry the full chain
+            # (up to MAX_CASCADE_ATTEMPTS) before giving up.
+            if attempt < self.MAX_CASCADE_ATTEMPTS - 1:
+                await asyncio.sleep(0.8 * (attempt + 1))
+
         if last_err:
             raise last_err
         raise VideoNotConfigured("VIDEO_PROVIDER chain is empty.")
