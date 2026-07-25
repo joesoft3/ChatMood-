@@ -17,6 +17,11 @@ log = logging.getLogger(__name__)
 
 VIDEO_EXTS = {"mp4", "mov", "webm", "mkv", "m4v"}
 
+# Frame sampling strategies
+SAMPLING_UNIFORM = "uniform"          # fixed interval (default)
+SAMPLING_SCENE = "scene"              # scene-change detection
+SAMPLING_KEYFRAME = "keyframe"        # sample only I-frames
+
 
 class VideoAnalysisError(Exception):
     pass
@@ -64,21 +69,36 @@ async def _caption_frame(path: str) -> str | None:
         return None
 
 
-async def analyze_video_file(data: bytes, ext: str) -> dict:
-    """Extract + understand. Returns {frames, captions, audio_wav_bytes}."""
+async def analyze_video_file(
+    data: bytes,
+    ext: str,
+    *,
+    sampling: str = SAMPLING_UNIFORM,
+    interval_sec: float = 5.0,
+    max_frames: int | None = None,
+    scene_threshold: float = 0.3,
+) -> dict:
+    """Extract + understand. Returns {frames, captions, audio_wav_bytes}.
+
+    New frame sampling strategies (v1.9.8+):
+    - uniform (default): fixed interval, one frame every N seconds
+    - scene: scene-change detection (threshold 0.3), captures motion events
+    - keyframe: sample only I-frames (most visually distinct frames)
+    """
     if not have_ffmpeg():
         raise VideoAnalysisError("ffmpeg isn't installed on the backend image — video analysis unavailable")
+    cap = max_frames if max_frames is not None else settings.VIDEO_ANALYSIS_FRAMES
     with tempfile.TemporaryDirectory() as td:
         src = os.path.join(td, f"input.{ext}")
         with open(src, "wb") as fh:
             fh.write(data)
         try:
-            # one frame every ~5s, capped, small enough for fast vision tokens
+            vf = build_sample_filter(sampling, interval_sec, cap, scene_threshold)
             await _run(
                 [
                     "ffmpeg", "-y", "-i", src,
-                    "-vf", "fps=1/5,scale=768:-2",
-                    "-frames:v", str(settings.VIDEO_ANALYSIS_FRAMES),
+                    "-vf", vf,
+                    "-frames:v", str(cap),
                     "-q:v", "4",
                     os.path.join(td, "frame%02d.jpg"),
                 ],
@@ -104,3 +124,27 @@ async def analyze_video_file(data: bytes, ext: str) -> dict:
 def video_ext(filename: str) -> str | None:
     ext = os.path.splitext((filename or "").lower())[1].lstrip(".")
     return ext if ext in VIDEO_EXTS else None
+
+
+def build_sample_filter(
+    strategy: str = SAMPLING_UNIFORM,
+    interval_sec: float = 5.0,
+    max_frames: int = 6,
+    scene_threshold: float = 0.3,
+) -> str:
+    """Build an ffmpeg -vf string for intelligent frame sampling.
+
+    - uniform:  fps=1/<interval> (one frame every N seconds)
+    - scene:    select='gte(scene,0.3)', then cap frames
+    - keyframe: select='eq(pict_type,I)' with interval throttle
+    """
+    if strategy == SAMPLING_SCENE:
+        return (
+            f"select='gte(scene,{scene_threshold})',"
+            f"scale=768:-2,fps=1/30,"
+            f"trim=duration={max(1, max_frames * 5)}"
+        )
+    if strategy == SAMPLING_KEYFRAME:
+        return f"select='eq(pict_type,I)',scale=768:-2,fps=1/{interval_sec}"
+    # uniform default
+    return f"fps=1/{max(1, interval_sec)},scale=768:-2"
