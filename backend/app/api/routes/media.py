@@ -524,6 +524,13 @@ async def _own_film(db: AsyncSession, user: User, fid: str) -> Film:
     return film
 
 
+@router.get("/films/resumable")
+async def list_resumable_films(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Films stuck 'rendering' (e.g. worker restart) — retryable via resume."""
+    orphans = await film_jobs.resumable_orphans()
+    return {"resumable": [_film_out(f) for f in orphans if f.user_id == user.id], "count": len([f for f in orphans if f.user_id == user.id])}
+
+
 @router.get("/films/{fid}")
 async def get_film(fid: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     return _film_out(await _own_film(db, user, fid))
