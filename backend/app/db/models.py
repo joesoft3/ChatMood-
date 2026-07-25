@@ -392,11 +392,17 @@ class Reel(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     author_name: Mapped[str] = mapped_column(String(80), default="")   # denormalized for the feed
     caption: Mapped[str] = mapped_column(Text, default="")
-    source: Mapped[str] = mapped_column(String(12), default="upload")  # upload|film|chat
+    source: Mapped[str] = mapped_column(String(12), default="upload")  # upload|film|chat|duet|repost
     film_id: Mapped[str] = mapped_column(String(36), default="")       # set when shared from a film
     filename: Mapped[str] = mapped_column(String(48), default="")      # <uuid>_r.mp4 in MEDIA_DIR
     source_url: Mapped[str] = mapped_column(String(600), default="")   # shared (already-hosted) media
     poster: Mapped[str] = mapped_column(String(48), default="")        # <uuid>_rp.jpg cover frame
+    # 🎬 Studio lineage — a duet/repost credits the reel it came from, so the
+    # feed can show "duet with @x" and the original author keeps attribution.
+    parent_id: Mapped[str] = mapped_column(String(36), default="", index=True)
+    parent_author: Mapped[str] = mapped_column(String(80), default="")
+    effect: Mapped[str] = mapped_column(String(16), default="")         # key into reel_studio.EFFECTS
+    captioned: Mapped[bool] = mapped_column(Boolean, default=False)     # captions burned in
     status: Mapped[str] = mapped_column(String(12), default="live", index=True)  # live|hidden
     # Denormalized engagement counters — the feed reads them straight off the
     # row instead of running three COUNT(*)s per card. `likes` and `saves` are
@@ -405,6 +411,7 @@ class Reel(Base):
     likes: Mapped[int] = mapped_column(Integer, default=0)
     shares: Mapped[int] = mapped_column(Integer, default=0)
     saves: Mapped[int] = mapped_column(Integer, default=0)
+    reposts: Mapped[int] = mapped_column(Integer, default=0)
     # Python-side default (microseconds) in ADDITION to the server default:
     # SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so two posts in
     # the same second would tie and the paginated feed could skip or repeat

@@ -15,7 +15,9 @@ posted reels alone — a feed whose videos evaporate overnight is not a feed.
 import logging
 import os
 import re
+import shutil
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -25,7 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...config import settings
 from ...db.models import Film, Reel, ReelLike, ReelSave, User
 from ...db.session import get_db
-from ...services import soundtrack
+from ...services import reel_studio as studio, soundtrack
+from ...services.editor import transcribe_srt
 from ...services.metering import plan_rate_mult, record_usage
 from ..deps import enforce_rate_limit, get_current_user
 
@@ -84,6 +87,11 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
         "likes": r.likes or 0,
         "shares": r.shares or 0,
         "saves": r.saves or 0,
+        "reposts": r.reposts or 0,
+        "parent_id": r.parent_id or "",
+        "parent_author": r.parent_author or "",
+        "effect": r.effect or "",
+        "captioned": bool(r.captioned),
         "liked": liked,
         "saved": saved,
         "mine": mine,
@@ -188,15 +196,88 @@ async def _own_reel(db: AsyncSession, user: User, reel_id: str) -> Reel:
     return r
 
 
+# ------------------------------------------------------- studio helpers
+async def _make_poster(path: str, uid: str) -> str:
+    """Cover frame — best effort: a reel without a poster still plays fine."""
+    try:
+        ffbin = soundtrack.ffmpeg_path()
+        if not ffbin:
+            return ""
+        got = await soundtrack.extract_poster(ffbin, path, settings.MEDIA_DIR, f"{uid}_r.mp4", 6.0)
+        if got:
+            # extract_poster writes <base>_p.jpg → move into the reel namespace
+            src = os.path.join(settings.MEDIA_DIR, got)
+            dst_name = f"{uid}_rp.jpg"
+            os.replace(src, os.path.join(settings.MEDIA_DIR, dst_name))
+            return dst_name
+    except Exception:  # noqa: BLE001 — cover frames are cosmetic, never fatal
+        log.info("reel poster extraction skipped", exc_info=True)
+    return ""
+
+
+async def _apply_effect(path: str, uid: str, effect: str, speed: float) -> str:
+    """Burn a look/speed into the clip IN PLACE. Returns the effect actually
+    applied ("" when it was skipped) — never raises: a failed grade must not
+    cost the creator their upload."""
+    if effect not in studio.EFFECTS:
+        effect = "none"
+    tmp = os.path.join(settings.MEDIA_DIR, f"{uid}_fx.mp4")
+    try:
+        studio.run(studio.build_effect_cmd(path, tmp, effect=effect, speed=speed))
+        os.replace(tmp, path)
+        return effect if effect != "none" else ""
+    except Exception:  # noqa: BLE001
+        log.info("reel effect skipped (%s)", effect, exc_info=True)
+        _unlink(tmp)
+        return ""
+
+
+async def _apply_captions(path: str, uid: str, style: str) -> bool:
+    """Auto-transcribe with Whisper and burn the captions in (fail-open).
+
+    Reuses editor.transcribe_srt so there is exactly one transcription path in
+    the codebase. Burning uses libass — this ffmpeg build has no `drawtext`.
+    """
+    work = Path(settings.MEDIA_DIR) / f"{uid}_cap"
+    tmp = os.path.join(settings.MEDIA_DIR, f"{uid}_cp.mp4")
+    try:
+        work.mkdir(parents=True, exist_ok=True)
+        srt = await transcribe_srt(Path(path), work)
+        if not srt or not srt.exists() or not srt.read_text(encoding="utf-8").strip():
+            return False
+        studio.run(studio.build_caption_cmd(
+            path, tmp, str(srt), style=style, fontsdir=settings.REEL_FONTS_DIR or None))
+        os.replace(tmp, path)
+        return True
+    except Exception:  # noqa: BLE001
+        log.info("reel captions skipped", exc_info=True)
+        _unlink(tmp)
+        return False
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def _unlink(p: str) -> None:
+    try:
+        os.remove(p)
+    except OSError:
+        pass
+
+
 # ------------------------------------------------------------------- upload
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
 async def upload_reel(
     file: UploadFile = File(...),
     caption: str = Form(default="", max_length=CAPTION_MAX),
+    effect: str = Form(default="none"),
+    speed: float = Form(default=1.0),
+    captions: bool = Form(default=False),
+    caption_style: str = Form(default="clean"),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """🎥 Post your own clip to the creator feed."""
+    """🎥 Post your own clip — optionally with an effect, speed change and
+    auto-generated burned-in captions."""
     await enforce_rate_limit(f"reelup:{user.id}", 4 * plan_rate_mult(user.plan))
 
     mime = (file.content_type or "").lower()
@@ -220,20 +301,15 @@ async def upload_reel(
     with open(path, "wb") as fh:
         fh.write(raw)
 
-    # Cover frame — best effort: a reel without a poster still plays fine.
-    poster = ""
-    try:
-        ffbin = soundtrack.ffmpeg_path()
-        if ffbin:
-            got = await soundtrack.extract_poster(ffbin, path, settings.MEDIA_DIR, f"{uid}_r.mp4", 6.0)
-            # extract_poster writes <base>_p.jpg → rename into the reel namespace
-            if got:
-                src = os.path.join(settings.MEDIA_DIR, got)
-                dst_name = f"{uid}_rp.jpg"
-                os.replace(src, os.path.join(settings.MEDIA_DIR, dst_name))
-                poster = dst_name
-    except Exception:  # noqa: BLE001 — cover frames are cosmetic, never fatal
-        log.info("reel poster extraction skipped", exc_info=True)
+    # 🎬 Studio pass — effect/speed burn-in, then captions. Both fail OPEN: a
+    # look that won't render must never cost the creator their upload.
+    applied_effect, captioned = "", False
+    if effect and effect != "none" or (speed and float(speed) != 1.0):
+        applied_effect = await _apply_effect(path, uid, effect, float(speed or 1.0))
+    if captions:
+        captioned = await _apply_captions(path, uid, caption_style)
+
+    poster = await _make_poster(path, uid)
 
     row = Reel(
         id=uid,
@@ -243,6 +319,8 @@ async def upload_reel(
         source="upload",
         filename=name,
         poster=poster,
+        effect=applied_effect,
+        captioned=captioned,
     )
     db.add(row)
     await db.commit()
@@ -337,6 +415,172 @@ async def share_to_reel(
     await db.commit()
     await record_usage(user.id, "reel", "chat")
     return {"reel": _reel_out(row, mine=True)}
+
+
+# --------------------------------------------------------------------- duet
+@router.get("/effects")
+async def list_effects(user: User = Depends(get_current_user)):
+    """🎨 Effect catalog — the studio renders its chips straight from this, and
+    each entry carries the CSS equivalent so the live preview matches the burn."""
+    return {
+        "effects": studio.effect_catalog(),
+        "speeds": studio.SPEEDS,
+        "caption_styles": sorted(studio.CAPTION_STYLES),
+        "duet_layouts": list(studio.DUET_LAYOUTS),
+    }
+
+
+@router.post("/{reel_id}/duet", status_code=status.HTTP_201_CREATED)
+async def create_duet(
+    reel_id: str,
+    file: UploadFile = File(...),
+    caption: str = Form(default="", max_length=CAPTION_MAX),
+    layout: str = Form(default="side"),
+    audio: str = Form(default="both"),
+    effect: str = Form(default="none"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """🎭 Duet — your clip stacked with theirs in one 1080x1920 frame.
+
+    The original stays untouched; the duet is a NEW reel that credits it via
+    `parent_id` / `parent_author`, so the first creator keeps attribution.
+    """
+    await enforce_rate_limit(f"reelduet:{user.id}", 3 * plan_rate_mult(user.plan))
+    if layout not in studio.DUET_LAYOUTS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            f"layout must be one of {', '.join(studio.DUET_LAYOUTS)}")
+    if audio not in ("both", "mine", "theirs"):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            "audio must be both, mine or theirs")
+
+    parent = await db.get(Reel, reel_id)
+    if not parent or parent.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    # A duet needs the other side's actual bytes on this host. Shared/hotlinked
+    # reels (film or chat sources) have no local file to stack against.
+    if not parent.filename or not REEL_NAME_RE.match(parent.filename):
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "That reel can't be dueted — it isn't a local upload")
+    theirs = os.path.join(settings.MEDIA_DIR, parent.filename)
+    if not os.path.exists(theirs):
+        raise HTTPException(status.HTTP_409_CONFLICT, "The original video is no longer available")
+
+    mime = (file.content_type or "").lower()
+    if mime not in REEL_MIMES:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                            "Upload an MP4, MOV or WebM video")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
+    if len(raw) > REEL_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"Reels must be ≤ {REEL_MAX_BYTES // (1024 * 1024)} MB")
+
+    if not soundtrack.ffmpeg_path():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "Duets need the video renderer, which is unavailable on this host")
+
+    uid = uuid.uuid4().hex
+    name = f"{uid}_r.mp4"
+    os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+    mine_path = os.path.join(settings.MEDIA_DIR, f"{uid}_duetsrc.mp4")
+    out_path = os.path.join(settings.MEDIA_DIR, name)
+    with open(mine_path, "wb") as fh:
+        fh.write(raw)
+    try:
+        # Probe both sides: referencing an audio stream that doesn't exist
+        # fails the whole filtergraph, so a silent clip must degrade instead.
+        studio.run(studio.build_duet_cmd(
+            mine_path, theirs, out_path, layout=layout, audio=audio,
+            mine_has_audio=studio.probe_has_audio(mine_path),
+            theirs_has_audio=studio.probe_has_audio(theirs),
+        ))
+    except studio.StudioError as e:
+        _unlink(mine_path)
+        _unlink(out_path)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)[:200])
+    finally:
+        _unlink(mine_path)
+
+    applied_effect = ""
+    if effect and effect != "none":
+        applied_effect = await _apply_effect(out_path, uid, effect, 1.0)
+    poster = await _make_poster(out_path, uid)
+
+    row = Reel(
+        id=uid,
+        user_id=user.id,
+        author_name=_author_label(user),
+        caption=caption.strip()[:CAPTION_MAX] or f"Duet with @{parent.author_name}",
+        source="duet",
+        filename=name,
+        poster=poster,
+        parent_id=parent.id,
+        parent_author=parent.author_name,
+        effect=applied_effect,
+    )
+    db.add(row)
+    await db.commit()
+    await record_usage(user.id, "reel", "duet")
+    return {"reel": _reel_out(row, mine=True)}
+
+
+@router.post("/{reel_id}/repost", status_code=status.HTTP_201_CREATED)
+async def repost(
+    reel_id: str,
+    body: dict | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """🔁 Repost — surface someone else's reel on your own profile.
+
+    No bytes are copied: the new row points at the same media and credits the
+    original author. Reposting your own reel, or the same reel twice, is a
+    conflict rather than a silent duplicate.
+    """
+    await enforce_rate_limit(f"reelrepost:{user.id}", 10 * plan_rate_mult(user.plan))
+    src = await db.get(Reel, reel_id)
+    if not src or src.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    if src.user_id == user.id:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            "That's already your reel — no need to repost it")
+    # The original of a repost is always the ROOT reel, so a chain of reposts
+    # credits the true author instead of the last person who reposted.
+    root_id = src.parent_id if src.source == "repost" and src.parent_id else src.id
+    root = await db.get(Reel, root_id) if root_id != src.id else src
+    if not root:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "The original reel is gone")
+
+    dupe = await db.scalar(
+        select(Reel.id).where(
+            Reel.user_id == user.id, Reel.parent_id == root.id,
+            Reel.source == "repost", Reel.status == "live",
+        )
+    )
+    if dupe:
+        raise HTTPException(status.HTTP_409_CONFLICT, "You already reposted that reel")
+
+    caption = str((body or {}).get("caption") or "").strip()[:CAPTION_MAX]
+    row = Reel(
+        id=uuid.uuid4().hex,
+        user_id=user.id,
+        author_name=_author_label(user),
+        caption=caption or root.caption,
+        source="repost",
+        filename=root.filename,          # same media, no copy
+        source_url=root.source_url,
+        poster=root.poster,
+        parent_id=root.id,
+        parent_author=root.author_name,
+        effect=root.effect,
+    )
+    root.reposts = (root.reposts or 0) + 1
+    db.add(row)
+    await db.commit()
+    await record_usage(user.id, "reel", "repost")
+    return {"reel": _reel_out(row, mine=True), "reposts": root.reposts}
 
 
 # ------------------------------------------------------------ engage/manage
@@ -472,15 +716,36 @@ async def delete_reel(
 ):
     """Delete your post — and its uploaded bytes (shares leave the original alone)."""
     r = await _own_reel(db, user, reel_id)
-    for name in (r.filename, r.poster):
-        if not name:
-            continue
-        if not (REEL_NAME_RE.match(name) or REEL_POSTER_RE.match(name)):
-            continue  # never unlink anything outside the reel namespace
-        try:
-            os.remove(os.path.join(settings.MEDIA_DIR, name))
-        except OSError:
-            pass
+
+    # 🔁 Reposts share the ORIGINAL's media file. Deleting a repost must never
+    # unlink bytes another row still plays, and deleting an original that has
+    # live reposts must not leave them pointing at a missing file — so only
+    # unlink when no other reel references the same filename.
+    others = 0
+    if r.filename:
+        others = int(await db.scalar(
+            select(func.count(Reel.id)).where(
+                Reel.filename == r.filename, Reel.id != r.id)
+        ) or 0)
+    if others:
+        log.info("reel %s deleted but %d row(s) still use %s — keeping the file",
+                 r.id, others, r.filename)
+    else:
+        for name in (r.filename, r.poster):
+            if not name:
+                continue
+            if not (REEL_NAME_RE.match(name) or REEL_POSTER_RE.match(name)):
+                continue  # never unlink anything outside the reel namespace
+            try:
+                os.remove(os.path.join(settings.MEDIA_DIR, name))
+            except OSError:
+                pass
+
+    # An original going away shouldn't leave dangling "duet with @x" credits.
+    if r.parent_id:
+        parent = await db.get(Reel, r.parent_id)
+        if parent and r.source == "repost":
+            parent.reposts = max(0, (parent.reposts or 0) - 1)
     # Clear both join tables explicitly: SQLite doesn't enforce ON DELETE
     # CASCADE unless PRAGMA foreign_keys is on, so a deleted reel could
     # otherwise leave orphan likes/saves that break other users' Saved tabs.

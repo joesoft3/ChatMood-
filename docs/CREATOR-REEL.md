@@ -43,6 +43,9 @@ already know from Reels/TikTok/Shorts:
 | `POST /api/v1/reels/{id}/like` | idempotent toggle → `{liked, likes}` |
 | `POST /api/v1/reels/{id}/save` | idempotent bookmark toggle → `{saved, saves}` |
 | `POST /api/v1/reels/{id}/share` | tally + the link to copy → `{shares, url}` |
+| `GET /api/v1/reels/effects` | 🎨 effect catalog (+ CSS preview), speeds, caption styles, duet layouts |
+| `POST /api/v1/reels/{id}/duet` | 🎭 multipart clip + `layout`/`audio`/`effect` → new duet reel |
+| `POST /api/v1/reels/{id}/repost` | 🔁 repost to your profile, crediting the root author |
 | `POST /api/v1/reels/{id}/view` | bump the view counter |
 | `POST /api/v1/reels/{id}/visibility` | `{"live": false}` unposts; author only |
 | `DELETE /api/v1/reels/{id}` | deletes the row **and** uploaded bytes; author only |
@@ -81,6 +84,53 @@ is *not* counted — only a completed share or a successful copy increments.
   so orphan likes/saves would otherwise break other users' Saved tabs.
 - **My reels** shows a stats strip — posts · live · views · likes · shares —
   from `GET /reels/stats`, plus per-card **unpost** and **delete**.
+
+## 🎬 Reel Studio — duet, effects, captions
+
+`services/reel_studio.py` holds pure argv builders (unit-testable without the
+binary, same pattern as `soundtrack.py` / `editor.py`). Everything composes onto
+one **1080×1920** canvas so results are predictable whatever was uploaded.
+
+**Duet** (`POST /reels/{id}/duet`, multipart) — stacks your clip with theirs:
+
+| layout | result |
+|---|---|
+| `side` | theirs left, yours right (the classic duet read) |
+| `top` | theirs on top, yours underneath |
+| `green` | theirs full-frame, yours as a corner inset |
+
+`audio` is `both | mine | theirs` — two people talking over each other is
+unwatchable. The original is never modified: a duet is a **new** reel carrying
+`parent_id`/`parent_author`, so the first creator keeps attribution.
+
+**Effects** (`GET /reels/effects`) — 8 looks, each pairing an ffmpeg chain with
+an equivalent **CSS filter**. The browser previews with the CSS while you edit
+and the server burns the ffmpeg chain in on post, so the preview is a promise
+about the render rather than a rough guess. Speeds 0.5×–2× (clamped to the
+range `atempo` accepts). Effects fail **open**: a look that won't render must
+never cost a creator their upload.
+
+**Captions** — auto-transcribed with Whisper (reusing `editor.transcribe_srt`,
+so there is exactly one transcription path) and burned in with libass.
+This ffmpeg build ships **no `drawtext` filter**, so text goes through
+`subtitles=` — which wraps, outlines and times text better anyway. Set
+`REEL_FONTS_DIR` on hosts with no system fonts.
+
+## 🔁 Repost & 📣 social share
+
+**Repost** (`POST /reels/{id}/repost`) copies no bytes — the new row points at
+the same media and credits the author. Reposting a repost credits the **root**
+author, not the middle-man, and reposting your own reel (or the same one twice)
+is a `409` rather than a silent duplicate.
+
+Because reposts share the original's file, delete only unlinks media when **no
+other row references that filename** — otherwise deleting a repost would break
+the original's playback.
+
+**Share sheet** — WhatsApp · X · Facebook · TikTok · Instagram, with real brand
+glyphs (lucide ships none, by trademark policy). TikTok and Instagram have **no
+public web share intent**, so those copy the link to paste; pretending otherwise
+would open a dead tab. A dismissed native share sheet is *not* counted.
 
 ## Two details worth knowing
 

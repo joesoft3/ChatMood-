@@ -268,6 +268,10 @@ class Settings(BaseSettings):
     FFMPEG_PATH: str = "ffmpeg"
     MEDIA_DIR: str = "/tmp/mood-media"      # muxed videos served from /media/files/{name}
     MEDIA_TTL_HOURS: int = 24               # janitor purges muxed files older than this
+    # 📺 Reel Studio: extra font dir for libass caption burn-in. Serverless
+    # images ship no system fonts, so point this at the bundled family when the
+    # host has none (the app's own DejaVu lives in app/assets/fonts).
+    REEL_FONTS_DIR: str = ""
     VIDEO_MAX_DOWNLOAD_MB: int = 256        # cap when pulling the provider clip for muxing
     VIDEO_MAX_CASCADE_ATTEMPTS: int = 3     # provider cascade retries (reel → pollinations → xai)
 
