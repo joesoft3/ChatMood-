@@ -551,6 +551,27 @@ class VideoService:
             return u, False
         raise VideoGenerationError(f"Unexpected pollinations video shape: {str(data)[:160]}")
 
+    # -------------------------------------------------- lean-retry helper
+    async def _lean_retry(
+        self,
+        provider_name: str,
+        full_post: Callable[[], Any],
+        lean_post: Callable[[], Any] | None = None,
+    ) -> Any:
+        """Per-provider lean-retry: try full payload; if rejected (400/422),
+        retry with minimal payload before cascading.
+
+        Preserved across all providers (reel, pollinations, xai) — the user's
+        generation never fails just because one provider rejects extended params."""
+        try:
+            return await full_post()
+        except VideoGenerationError:
+            pass  # fall through to lean retry if available
+        if lean_post is not None:
+            log.info("lean-retry: %s rejected full params — retrying minimal payload", provider_name)
+            return await lean_post()
+        raise
+
     # --------------------------------------------------------------- xai
     async def _xai(self, prompt: str, opts: VideoOptions,
                    image: dict | None = None) -> tuple[str, bool]:
