@@ -19,6 +19,13 @@ def test_video_progress_structured():
     assert d == {"stage": "scenes", "done": 2, "total": 4, "note": "halfway"}
 
 
+def test_video_progress_omits_empty_note():
+    """Progress events without context stay a stable 3-key wire contract."""
+    assert VideoProgress(stage="compositing", done=1, total=1).to_dict() == {
+        "stage": "compositing", "done": 1, "total": 1,
+    }
+
+
 def test_video_errors_structured():
     assert VideoNotConfigured.CATEGORY == "configuration"
     assert VideoNotConfigured.RECOVERABLE is True
@@ -60,6 +67,12 @@ def test_max_cascade_attempts_configurable(monkeypatch):
     monkeypatch.setattr(settings, "VIDEO_MAX_CASCADE_ATTEMPTS", 5)
     monkeypatch.setattr(settings, "VIDEO_PROVIDER", "reel")
     assert video.MAX_CASCADE_ATTEMPTS == 5
+    # live read: lowering it again takes effect without a restart, and it never
+    # degenerates to zero attempts even if misconfigured
+    monkeypatch.setattr(settings, "VIDEO_MAX_CASCADE_ATTEMPTS", 1)
+    assert video.MAX_CASCADE_ATTEMPTS == 1
+    monkeypatch.setattr(settings, "VIDEO_MAX_CASCADE_ATTEMPTS", 0)
+    assert video.MAX_CASCADE_ATTEMPTS == 1
 
 
 def test_lean_retry_preserved():
