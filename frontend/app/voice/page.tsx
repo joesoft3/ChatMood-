@@ -242,6 +242,7 @@ export default function VoicePage() {
   return (
     <AppShell
       title="Voice"
+      mobileMenuOnly
       headerRight={
         sessionConv ? (
           <button onClick={reset} className="flex items-center gap-1 text-xs text-accent px-2 py-1">
@@ -251,7 +252,7 @@ export default function VoicePage() {
       }
     >
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin">
-        <div className="flex min-h-full flex-col items-center px-4 py-6 pb-10 compact-v">
+        <div className="voice-screen flex min-h-full flex-col items-center px-4 py-6 pb-10 compact-v">
         <div className="w-full max-w-3xl mb-4">
           <StudioHero
             title="Voice Studio"
@@ -309,7 +310,7 @@ export default function VoicePage() {
         </div>
 
         {/* 🎵 analyze an audio or video file (song, podcast, voice note, clip) */}
-        <details className="w-full max-w-2xl rounded-2xl border border-line bg-panel/60 open:pb-3 compact-v">
+        <details className="voice-analyzer w-full max-w-2xl rounded-2xl border border-line bg-panel/60 open:pb-3 compact-v">
           <summary className="cursor-pointer select-none px-4 py-2.5 text-xs text-gray-400 hover:text-gray-200 transition flex items-center gap-2">
             <FileAudio size={13} className="text-accent" />
             🎵 Analyze audio or video — lyrics, summaries, scene-by-scene, what song is this?

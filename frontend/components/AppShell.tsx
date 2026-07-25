@@ -41,12 +41,15 @@ export default function AppShell({
   children,
   headerRight,
   headerCenter,
+  mobileMenuOnly = false,
 }: {
   title: string;
   children: React.ReactNode;
   headerRight?: React.ReactNode;
   /** Optional centered mobile header content for focused surfaces such as chat home. */
   headerCenter?: React.ReactNode;
+  /** Hide the mobile title bar while keeping its menu control fixed in place. */
+  mobileMenuOnly?: boolean;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -246,26 +249,37 @@ export default function AppShell({
 
       {/* Main column: header → scrollable content → in-flow bottom tab bar */}
       <div className="flex-1 min-w-0 flex flex-col min-h-0 relative z-0">
-        {/* Header (phone + tablet) */}
-        <header className="lg:hidden flex items-center gap-2 border-b border-white/5 px-3 py-3 bg-panel/85 backdrop-blur shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
+        {/* Header (phone + tablet). Focused surfaces can keep only the menu
+            button, fixed at this same safe-area position without the bar. */}
+        {mobileMenuOnly ? (
           <button
-            onClick={() => setDrawerOpen(true)}
-            className="touch-manipulation p-2 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition"
-            aria-label="Open menu"
+            onClick={() => setDrawerOpen((v) => !v)}
+            className="lg:hidden fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 touch-manipulation rounded-xl border border-line bg-panel/90 p-2 text-gray-300 shadow-[0_8px_22px_rgb(0_0_0/0.22)] backdrop-blur hover:bg-white/10 hover:text-white transition"
+            aria-label={drawerOpen ? "Close menu" : "Open menu"}
           >
             <Menu size={20} />
           </button>
-          {headerCenter ? (
-            <div className="min-w-0 flex-1">{headerCenter}</div>
-          ) : (
-            <div className="min-w-0 flex-1">
-              <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
-              <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
-            </div>
-          )}
-          <ThemeToggle compact />
-          {headerRight}
-        </header>
+        ) : (
+          <header className="lg:hidden flex items-center gap-2 border-b border-white/5 px-3 py-3 bg-panel/85 backdrop-blur shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="touch-manipulation p-2 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition"
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
+            {headerCenter ? (
+              <div className="min-w-0 flex-1">{headerCenter}</div>
+            ) : (
+              <div className="min-w-0 flex-1">
+                <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
+                <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
+              </div>
+            )}
+            <ThemeToggle compact />
+            {headerRight}
+          </header>
+        )}
 
         {/* Page content */}
         <div className="flex-1 min-h-0 flex flex-col">{children}</div>

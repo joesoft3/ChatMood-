@@ -204,6 +204,20 @@ input::placeholder {
   animation: typing-blink 1s ease-in-out infinite;
 }
 
+/* Voice screen: the browser's default details marker reads as a stray
+   triangle under the chrome. The section remains keyboard/click accessible
+   without that extra marker. */
+.voice-screen summary,
+.voice-screen summary::-webkit-details-marker {
+  list-style: none;
+}
+.voice-screen summary::-webkit-details-marker {
+  display: none;
+}
+.voice-screen summary::marker {
+  content: "";
+}
+
 /* voice orb animations */
 @keyframes orb-pulse {
   0%,
