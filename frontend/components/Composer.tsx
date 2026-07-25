@@ -67,17 +67,21 @@ export default function Composer({
 
   const canSend = !busy && (input.trim().length > 0 || files.length > 0);
 
-  // 🎨🎬 "Create image/video" home chips prefill the composer (never auto-send)
+  // 🎨🎬 Home actions prefill the composer (never auto-send). Wait for the
+  // controlled textarea to render before measuring it or placing the cursor;
+  // otherwise the cursor can land at the old value's position.
   useEffect(() => {
     if (!draft) return;
     setInput(draft.text);
-    const t = inputRef.current;
-    if (t) {
+    const frame = window.requestAnimationFrame(() => {
+      const t = inputRef.current;
+      if (!t) return;
       t.focus();
       t.style.height = "auto";
       t.style.height = Math.min(t.scrollHeight, 160) + "px";
-      t.setSelectionRange(t.value.length, t.value.length);
-    }
+      t.setSelectionRange(draft.text.length, draft.text.length);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [draft]);
 
   async function submit() {
@@ -142,6 +146,18 @@ export default function Composer({
             ))}
           </div>
         )}
+        {bare && deepMode && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setDeepMode(false)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] text-accent transition hover:border-accent/45 hover:bg-accent/15"
+              aria-label="Turn off research mode"
+            >
+              <Telescope size={12} /> Research mode <X size={11} />
+            </button>
+          </div>
+        )}
         <div className={`${bare ? "flex items-end gap-1 rounded-[1.35rem] border border-white/10 bg-[#171718] px-2 py-1.5 shadow-[0_14px_32px_rgb(0_0_0/0.28)]" : "flex items-end gap-0.5 sm:gap-1 rounded-[1.8rem] border border-white/10 bg-[#171718] px-2 sm:px-3 py-2 shadow-[0_18px_40px_rgb(0_0_0/0.38)]"} focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition`}>
           <input
             ref={fileRef}
@@ -181,7 +197,9 @@ export default function Composer({
             }}
             placeholder={
               bare
-                ? "Ask Mood anything…"
+                ? deepMode
+                  ? "Ask a research question…"
+                  : "Ask Mood anything…"
                 : agentMode
                   ? "Give the agent team a goal…"
                   : deepMode
