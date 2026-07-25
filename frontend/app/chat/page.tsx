@@ -565,7 +565,10 @@ export default function ChatPage() {
     {
       icon: Telescope,
       label: "Research a topic",
-      onClick: () => setDeepMode(true),
+      onClick: () => {
+        setDeepMode(true);
+        setDraft({ text: "Research ", nonce: Date.now() });
+      },
     },
     {
       icon: ImageIcon,
