@@ -205,10 +205,10 @@ class TTSRequest(BaseModel):
 
 class DesignRequest(BaseModel):
     idea: str = Field(min_length=3, max_length=1500)         # user's rough idea / copy
-    kind: str = Field(default="flyer", pattern="^(flyer|logo|banner)$")
+    kind: str = Field(default="flyer", pattern="^(flyer|logo|banner|sticker)$")
     style: str = Field(default="minimal", max_length=24)
     palette: str = Field(default="auto", max_length=16)
-    transparent: bool = False                                 # logos: transparent bg (gpt-image native)
+    transparent: bool = False                                 # logos/stickers: transparent bg (gpt-image native)
     enhance: bool = True                                      # art-director brief rewrite
     use_brand: bool = False                                  # weave saved Brand Kit in
 

@@ -135,6 +135,33 @@ def test_cascade_unknown_member_skips(reel_env, monkeypatch):
     assert "reel-" in url
 
 
+def test_cascade_retries_whole_chain_per_live_setting(monkeypatch):
+    """VIDEO_MAX_CASCADE_ATTEMPTS is honoured live: the whole chain is retried
+    that many times before the last structured error surfaces."""
+    monkeypatch.setattr(settings, "VIDEO_PROVIDER", "pollinations")
+    monkeypatch.setattr(settings, "POLLINATIONS_API_KEY", "")
+    monkeypatch.setattr(settings, "VIDEO_MAX_CASCADE_ATTEMPTS", 2)
+
+    slept: list[float] = []
+
+    async def no_sleep(s):
+        slept.append(s)
+
+    monkeypatch.setattr(media_mod.asyncio, "sleep", no_sleep)
+    tries = {"n": 0}
+    real = video._pollinations
+
+    async def counting(prompt, opts):
+        tries["n"] += 1
+        return await real(prompt, opts)
+
+    monkeypatch.setattr(video, "_pollinations", counting)
+    with pytest.raises(VideoNotConfigured):
+        run(video.generate("x", VideoOptions()))
+    assert tries["n"] == 2          # chain replayed exactly VIDEO_MAX_CASCADE_ATTEMPTS times
+    assert len(slept) == 1          # one backoff between the two attempts
+
+
 def test_last_provider_failure_raises(monkeypatch):
     monkeypatch.setattr(settings, "VIDEO_PROVIDER", "pollinations")
     monkeypatch.setattr(settings, "POLLINATIONS_API_KEY", "")

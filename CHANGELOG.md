@@ -7,6 +7,35 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-25
 
+### 📺 Creator Reel (merged from PR #16)
+
+- **`/reel` creator feed** — one shared public feed: full-bleed vertical snap, one reel per
+  screen, `IntersectionObserver`-gated autoplay (only the on-screen reel decodes), optimistic
+  likes reconciled against the server, once-per-card views, *For you* + *My reels* tabs.
+- **Two ways in** — upload your own clip, or share a finished film / in-chat generation
+  (nothing copied; shares only accept media this deployment serves — hotlinks rejected).
+- **🎞 Reel editor** — record or add clips, timeline with duplicate/split/reorder, overlay
+  text, effects (CSS-accurate previews of the ffmpeg chain), auto-captions, then publish in
+  one ffmpeg pass; **_r/_rp files are deliberately outside the media janitor's sweep patterns,
+  so reels survive the 24h TTL** that purges ephemeral films.
+- **Duet, effects, repost & social share sheet**, view/like counters, saved tab and
+  per-reel stats; backend schema in migrations `0021_reels` → `0023_reel_studio`.
+- **🖨 Print-grade graphics (Design Studio)** — sticker kind with die-cut transparency,
+  per-kind DPI/print sizes, export presets filtered to what each design actually rendered.
+- 🛠 Also merges PR #16's reliability work: backend pytest gate restored, cascade-attempt
+  count read live from settings, terminal reel progress uses the canonical `{stage, done,
+  total}` completion contract.
+
+### 👁 Reel button visibility fixes (this branch, on top of #16)
+
+- **Mobile bottom tab bar dropped the Reel button** — the phone bar renders `NAV.slice(0, 5)`
+  and PR #16 inserted Reel at index 5, so on phones it was drawer-only. Reel now sits in the
+  first five (Chat · Voice · Images · **Reel** · Films); a code comment guards the ordering.
+- **The chat Reel tab vanished in conversations** — Ask/Imagine/Reel only rendered on the
+  empty-chat home, so the moment a conversation opened there was no Reel entry anywhere on
+  screen. The conversation toolbar pill now carries **Reel** too (all viewport sizes).
+
+
 ### 🎬 Landing & onboarding
 
 - **Ambient video hero on the home page** — seamless 8-second procedural video loop
@@ -114,10 +143,3 @@ domain analytics, owner panel, plan-aware Pro perks, one-env LLM failover, plugg
 R2/local/Docker file storage, the professional 🎬 video studio with 🎙 Cinema Sound and
 🎞 Storyboard films, auto-deploy workflows (Vercel/Netlify/Fly), and the Flutter mobile
 client — see the [README](README.md) feature list for the full surface.
-
-## 🚧 In review (not yet on `main`)
-
-- **PR #16 — backend-unit CI fix + print-grade graphics + 📺 Creator Reel** — restores the
-  backend pytest gate that is currently red on `main`; export-grade graphics rendering and a
-  new Creator Reel media surface. Merging it triggers the backend deploys (`deploy-vercel`,
-  `deploy-fly`).

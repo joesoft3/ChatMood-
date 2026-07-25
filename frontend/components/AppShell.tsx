@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AudioLines, Brush, Clapperboard, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope } from "lucide-react";
+import { AudioLines, Brush, Clapperboard, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
 import ErrorBoundary from "./ErrorBoundary";
@@ -15,12 +15,17 @@ import { applyAccent, applyFavicon, BrandMark } from "@/lib/brand";
 // Override per white-label deployment with NEXT_PUBLIC_OWNER_EMAIL.
 const OWNER_EMAIL = (process.env.NEXT_PUBLIC_OWNER_EMAIL ?? "joesoft2024@gmail.com").toLowerCase();
 
+// ⚠️ Order matters: the phone bottom tab bar renders NAV.slice(0, 5).
+// Reel must stay within the first five or it is drawer-only on mobile —
+// that was the "Reel button is hidden" bug: it sat at index 5 and the
+// bottom bar dropped it.
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/voice", label: "Voice", icon: AudioLines },
   { href: "/images", label: "Images", icon: ImageIcon },
-  { href: "/design", label: "Design", icon: Brush },
+  { href: "/reel", label: "Reel", icon: Tv },
   { href: "/films", label: "Films", icon: Clapperboard },
+  { href: "/design", label: "Design", icon: Brush },
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/deepsearch", label: "Research", icon: Telescope },

@@ -597,6 +597,8 @@ export default function ChatPage() {
     <div className="flex items-center justify-center gap-7 h-full">
       <span className="py-1 text-sm font-semibold text-white">Ask</span>
       <button onClick={() => router.push("/images")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Imagine</button>
+      {/* 📺 Creator Reel — the shared feed creators post their videos to */}
+      <button onClick={() => router.push("/reel")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Reel</button>
     </div>
   );
 
@@ -612,6 +614,11 @@ export default function ChatPage() {
             <span className="rounded-full bg-white text-black px-3 py-1.5 text-xs font-semibold">Ask</span>
             <button onClick={() => router.push("/images")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
               Imagine
+            </button>
+            {/* 📺 Creator Reel — keeps the feed reachable from inside a conversation,
+                not just the empty-chat home (the tab row there vanishes once chat starts). */}
+            <button onClick={() => router.push("/reel")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
+              Reel
             </button>
           </div>
           <div className="min-w-0 flex-1 hidden sm:block">

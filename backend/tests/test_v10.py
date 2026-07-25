@@ -10,9 +10,15 @@ from app.services.plugins import tools as ptools
 
 # --------------------------------------------------------------- print packs
 def test_export_preset_table():
-    assert set(dzn.EXPORT_PRESETS) == {"a4_bleed", "a5_bleed", "wa_status", "ig_post", "ig_square"}
+    assert set(dzn.EXPORT_PRESETS) == {
+        "a4_bleed", "a5_bleed", "a3_bleed", "wa_status", "ig_post", "ig_square",
+        "sticker_a4", "sticker_a4_mini",
+    }
     assert dzn.EXPORT_PRESETS["a4_bleed"].bleed_px == 35
     assert dzn.EXPORT_PRESETS["wa_status"].bleed_px == 0
+    # A3 is a true 300-DPI sheet (297×420 mm)
+    a3 = dzn.EXPORT_PRESETS["a3_bleed"]
+    assert (a3.trim_w, a3.trim_h) == (3508, 4961) and a3.bleed_px == 35
 
 
 def test_export_dims_center_trim():
@@ -46,6 +52,47 @@ def test_crop_mark_geometry():
     assert marks.count("drawbox") == 8
     for frag in ("x=54:y=100", "x=2588:y=100", "y=54", "y=3616"):
         assert frag in marks
+
+
+def test_sticker_sheet_tiles_with_transparent_gutters(monkeypatch):
+    monkeypatch.setattr(dzn, "ffmpeg_path", lambda: "/bin/ffmpeg")
+    cmd = dzn.build_export_cmd("in.png", "out.png", "sticker_a4")
+    vf = cmd[cmd.index("-vf") + 1]
+    c = dzn.sheet_cell("sticker_a4")
+    # one copy contain-fitted into a square cell, then tiled 3×4
+    assert f"scale={c['cell']}:{c['cell']}:force_original_aspect_ratio=decrease" in vf
+    assert f"tile=3x4:margin={dzn.SHEET_MARGIN}:padding={dzn.SHEET_GUTTER}" in vf
+    # gaps and background stay transparent so a cutter can kiss-cut each copy
+    assert "#00000000" in vf and "crop=" not in vf
+    assert cmd[cmd.index("-pix_fmt") + 1] == "rgba"
+    assert cmd[cmd.index("-dpi") + 1] == "300"
+    assert "-loop" in cmd  # single still fed to the tile filter
+
+
+def test_sticker_sheet_fits_inside_the_a4_page():
+    for preset in dzn.STICKER_EXPORTS:
+        p = dzn.EXPORT_PRESETS[preset]
+        c = dzn.sheet_cell(preset)
+        used_w = dzn.SHEET_MARGIN * 2 + c["cell"] * c["cols"] + dzn.SHEET_GUTTER * (c["cols"] - 1)
+        used_h = dzn.SHEET_MARGIN * 2 + c["cell"] * c["rows"] + dzn.SHEET_GUTTER * (c["rows"] - 1)
+        assert used_w <= p.trim_w, preset
+        assert used_h <= p.trim_h, preset
+        assert c["cell"] >= 400, preset  # ≥3.4 cm — still a usable sticker
+
+
+def test_sticker_sheets_only_offered_for_cutout_kinds():
+    for k in ("logo", "sticker"):
+        assert set(dzn.STICKER_EXPORTS) <= set(dzn.exports_for_kind(k)), k
+    for k in ("flyer", "banner"):
+        assert not set(dzn.STICKER_EXPORTS) & set(dzn.exports_for_kind(k)), k
+        assert "a4_bleed" in dzn.exports_for_kind(k)
+
+
+def test_paper_exports_flatten_but_social_keeps_no_alpha(monkeypatch):
+    monkeypatch.setattr(dzn, "ffmpeg_path", lambda: "/bin/ffmpeg")
+    for preset in ("a4_bleed", "wa_status", "ig_square"):
+        cmd = dzn.build_export_cmd("in.png", "out.png", preset)
+        assert cmd[cmd.index("-pix_fmt") + 1] == "rgb24", preset
 
 
 def test_export_files_stay_private():

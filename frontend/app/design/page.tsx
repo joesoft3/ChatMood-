@@ -14,6 +14,7 @@ import {
   Save,
   Sparkles,
   Star,
+  Sticker,
   Trash2,
   Wand2,
 } from "lucide-react";
@@ -23,9 +24,11 @@ import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 
 /* ---------------------------------------------------------------- types */
+type DesignKind = "flyer" | "logo" | "banner" | "sticker";
+
 interface Design {
   id: string;
-  kind: "flyer" | "logo" | "banner";
+  kind: DesignKind;
   idea: string;
   brief: string;
   style: string;
@@ -33,11 +36,18 @@ interface Design {
   transparent: boolean;
   width: number;
   height: number;
+  print_width: number;
+  print_height: number;
+  dpi: number;
+  exports: string[];
   note: string | null;
   created_at: string | null;
 }
 interface Presets {
-  kinds: { id: string; label: string; web: number[]; print: number[]; hint: string }[];
+  kinds: {
+    id: string; label: string; web: number[]; print: number[];
+    dpi: number; fit: string; transparent_ok: boolean; exports: string[]; hint: string;
+  }[];
   styles: { id: string; hint: string }[];
   palettes: { id: string; hint: string }[];
 }
@@ -54,7 +64,7 @@ const EMPTY_BRAND: Brand = {
   font_vibe: "modern", logo_design_id: "", has_logo: false,
 };
 
-const KIND_ICONS = { flyer: Frame, logo: Brush, banner: RectangleHorizontal } as const;
+const KIND_ICONS = { flyer: Frame, logo: Brush, banner: RectangleHorizontal, sticker: Sticker } as const;
 const PALETTE_SWATCH: Record<string, string> = {
   auto: "conic-gradient(#888,#ddd,#888)",
   noir: "linear-gradient(135deg,#111 50%,#fff 50%)",
@@ -69,12 +79,12 @@ const FONT_VIBES = ["classic", "modern", "bold"];
 /* ---------------------------------------------------------------- page */
 export default function DesignPage() {
   const [presets, setPresets] = useState<Presets | null>(null);
-  const [exports, setExports] = useState<{ id: string; label: string }[]>([]);
+  const [exports, setExports] = useState<{ id: string; label: string; sheet: number[] | null; transparent: boolean }[]>([]);
   const [orders, setOrders] = useState<{ id: string; token: string; path: string; status: string; customer_name: string | null; kind: string; idea: string | null }[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [designs, setDesigns] = useState<Design[]>([]);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
-  const [kind, setKind] = useState<"flyer" | "logo" | "banner">("flyer");
+  const [kind, setKind] = useState<DesignKind>("flyer");
   const [idea, setIdea] = useState("");
   const [style, setStyle] = useState("minimal");
   const [palette, setPalette] = useState("auto");
@@ -99,6 +109,10 @@ export default function DesignPage() {
 
   const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 4500); };
 
+  // active kind preset — drives canvas copy, the transparency toggle and which
+  // exports the gallery offers (sticker sheets only exist for cut-out kinds).
+  const kp = presets?.kinds.find((k) => k.id === kind);
+
   const thumbFor = useCallback(async (id: string) => {
     if (urlCache.current[id]) return;
     try {
@@ -118,7 +132,7 @@ export default function DesignPage() {
   useEffect(() => {
     apiFetch<Presets>("/media/designs/presets").then(setPresets).catch(() => flash("Could not load presets"));
     apiFetch<{ templates: Template[] }>("/media/designs/templates").then((j) => setTemplates(j.templates)).catch(() => {});
-    apiFetch<{ presets: { id: string; label: string }[] }>("/media/designs/exports").then((j) => setExports(j.presets)).catch(() => {});
+    apiFetch<{ presets: { id: string; label: string; sheet: number[] | null; transparent: boolean }[] }>("/media/designs/exports").then((j) => setExports(j.presets)).catch(() => {});
     apiFetch<{ orders: typeof orders }>("/media/design-orders").then((j) => setOrders(j.orders)).catch(() => {});
     apiFetch<Brand>("/media/brand").then((b) => {
       setBrand(b);
@@ -159,7 +173,7 @@ export default function DesignPage() {
         method: "POST",
         body: JSON.stringify({
           idea: idea.trim(), kind, style, palette,
-          transparent: kind === "logo" && transparent, enhance,
+          transparent: !!kp?.transparent_ok && transparent, enhance,
           use_brand: useBrand,
         }),
       });
@@ -302,7 +316,6 @@ export default function DesignPage() {
     }
   }
 
-  const kp = presets?.kinds.find((k) => k.id === kind);
   const logos = designs.filter((d) => d.kind === "logo");
   const activeOrders = orders.filter((o) => o.status !== "closed").length;
 
@@ -356,8 +369,8 @@ export default function DesignPage() {
         )}
 
         {/* kind tabs */}
-        <div className="grid grid-cols-3 gap-2">
-          {(["flyer", "logo", "banner"] as const).map((k) => {
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(["flyer", "logo", "banner", "sticker"] as const).map((k) => {
             const Icon = KIND_ICONS[k];
             const p = presets?.kinds.find((x) => x.id === k);
             return (
@@ -370,7 +383,9 @@ export default function DesignPage() {
               >
                 <Icon size={18} className={kind === k ? "text-accent" : "text-gray-400"} />
                 <div className="mt-1 text-sm font-semibold text-gray-100 capitalize">{k}</div>
-                <div className="text-[10px] text-gray-500">{p ? `${p.print[0]}×${p.print[1]} print` : ""}</div>
+                <div className="text-[10px] text-gray-500">
+                  {p ? `${p.print[0]}×${p.print[1]} · ${p.dpi} DPI` : ""}
+                </div>
               </button>
             );
           })}
@@ -387,7 +402,9 @@ export default function DesignPage() {
               ? "e.g. Minimal bird mark for 'Akwaaba Coffee' — warm beans brown, wordmark under a geometric bird"
               : kind === "flyer"
                 ? "e.g. Grand Opening Flyer — 'DUMSOR BURGER' opens Aug 1, Oxford St, Osu. Buy 1 get 1 free. Bold street-food energy"
-                : "e.g. Website banner for a fintech savings app — 'Grow your money' headline, calm trust-blue"
+                : kind === "sticker"
+                  ? "e.g. Die-cut sticker — smiling kelewele cart mascot with 'HOT & SPICY' banner, thick white cut outline"
+                  : "e.g. Website banner for a fintech savings app — 'Grow your money' headline, calm trust-blue"
           }
           className="w-full rounded-xl border border-line bg-white/5 p-3 text-sm text-gray-100 placeholder-gray-500 outline-none focus:border-accent resize-none"
         />
@@ -510,13 +527,13 @@ export default function DesignPage() {
             <input type="checkbox" checked={enhance} onChange={(e) => setEnhance(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
             <Wand2 size={13} className="text-accent" /> Art-director brief
           </label>
-          {kind === "logo" && (
+          {kp?.transparent_ok && (
             <label className="flex min-h-[44px] items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
               <input type="checkbox" checked={transparent} onChange={(e) => setTransparent(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
-              Transparent background
+              Transparent background{kind === "sticker" ? " (die-cut ready)" : ""}
             </label>
           )}
-          {brand.brand_name && kind !== "logo" && (
+          {brand.brand_name && !kp?.transparent_ok && (
             <label className="flex min-h-[44px] items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
               <input type="checkbox" checked={useBrand} onChange={(e) => setUseBrand(e.target.checked)} className="h-5 w-5 shrink-0 accent-[rgb(var(--mood-accent))]" />
               <Star size={12} className="text-amber-400" /> Use my brand{brand.has_logo ? " (logo included)" : ""}
@@ -530,7 +547,7 @@ export default function DesignPage() {
         </div>
         {busy && (
           <p className="text-xs text-gray-500 animate-pulse">
-            Art-directing your brief → rendering {kp?.web[0]}×{kp?.web[1]} → upscaling to {kp?.print[0]}×{kp?.print[1]} at 300 DPI…
+            Art-directing your brief → rendering {kp?.web[0]}×{kp?.web[1]} → sharpening up to {kp?.print[0]}×{kp?.print[1]} at {kp?.dpi ?? 300} DPI…
           </p>
         )}
         {toast && <StudioNotice tone="accent">{toast}</StudioNotice>}
@@ -654,7 +671,8 @@ export default function DesignPage() {
                         className="touch-manipulation flex-1 rounded-lg border border-line px-2 py-1.5 text-[10px] text-gray-300 hover:border-accent/50 transition">
                         <Download size={11} className="inline mr-1 -mt-0.5" />Web
                       </button>
-                      <button onClick={() => download(d.id, "print", d)} title="300 DPI upscaled — print & merch"
+                      <button onClick={() => download(d.id, "print", d)}
+                        title={`${d.print_width || ""}×${d.print_height || ""} at ${d.dpi || 300} DPI — print & merch`}
                         className="touch-manipulation flex-1 rounded-lg bg-accent/15 border border-accent/40 px-2 py-1.5 text-[10px] font-semibold text-accent hover:bg-accent/25 transition">
                         <Download size={11} className="inline mr-1 -mt-0.5" />Print HD
                       </button>
@@ -665,7 +683,9 @@ export default function DesignPage() {
                         className="touch-manipulation rounded-lg border border-line bg-panel px-2 py-1.5 text-[10px] text-gray-300 outline-none hover:border-accent/50"
                       >
                         <option value="" disabled>Export</option>
-                        {exports.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
+                        {exports
+                          .filter((x) => !d.exports || d.exports.includes(x.id))
+                          .map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
                       </select>
                       <button onClick={() => remove(d.id)} title="Delete design"
                         className="touch-manipulation rounded-lg border border-line px-2 py-1.5 text-gray-500 hover:text-red-400 hover:border-red-400/40 transition">

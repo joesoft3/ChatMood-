@@ -48,31 +48,67 @@ class KindPreset:
     print_h: int
     gpt_image_size: str          # native canvas when provider supports it
     hint: str                    # layout guidance woven into the brief prompt
+    fit: str = "cover"           # cover → full-bleed crop | contain → letterbox, never clip the mark
+    transparent_ok: bool = False  # kinds whose artwork is meant to be cut out
+    print_dpi: int = 300         # DPI tag written into the print tier
+
+    @property
+    def print_scale(self) -> float:
+        """How far the print tier is upscaled past the provider canvas."""
+        return self.print_w / self.web_w
 
 
+# Provider canvases are fixed by the image model (gpt-image accepts only
+# 1024x1024 / 1024x1536 / 1536x1024), so `web_*` mirrors what we can render
+# natively and `print_*` is the sharpened lanczos tier we hand to a print shop.
+# Print dims deliberately keep the web aspect exactly — build_upscale_cmd does a
+# straight scale, so any aspect drift would stretch the artwork. Paper-exact
+# canvases (A4/A3/social) come from EXPORT_PRESETS, which crop rather than warp.
 KIND_PRESETS: dict[str, KindPreset] = {
     "flyer": KindPreset(
         label="Flyer",
         web_w=1024, web_h=1536,
-        print_w=2048, print_h=3072,
+        print_w=2480, print_h=3720,     # 2:3 · A4-class at 300 DPI
         gpt_image_size="1024x1536",
         hint="portrait poster layout, strong headline at top, supporting visual middle, call-to-action band at bottom",
+        fit="cover",
     ),
     "logo": KindPreset(
         label="Logo",
         web_w=1024, web_h=1024,
-        print_w=2048, print_h=2048,
+        print_w=4096, print_h=4096,     # signage/embroidery-grade master
         gpt_image_size="1024x1024",
         hint="centered emblem/icon mark, generous negative space, works at favicon and billboard sizes",
+        fit="contain",                  # a cropped logo is a ruined logo
+        transparent_ok=True,
     ),
     "banner": KindPreset(
         label="Banner",
         web_w=1536, web_h=1024,
-        print_w=3072, print_h=2048,
+        print_w=4608, print_h=3072,     # 3:2 · large-format roll-up / web hero
         gpt_image_size="1536x1024",
         hint="wide landscape composition, headline left or centered, breathing room at the edges for cropping",
+        fit="cover",
+    ),
+    "sticker": KindPreset(
+        label="Sticker",
+        web_w=1024, web_h=1024,
+        print_w=3000, print_h=3000,     # 10×10 cm die-cut at 300 DPI
+        gpt_image_size="1024x1024",
+        hint=(
+            "single die-cut sticker: one bold centered subject, thick even white outline "
+            "hugging the silhouette, chunky readable shapes, nothing important near the edge"
+        ),
+        fit="contain",                  # the die-line must never be clipped
+        transparent_ok=True,
     ),
 }
+
+# Kinds whose artwork is cut out — the pipeline keeps their alpha channel end
+# to end (normalize pad, upscale, export) instead of flattening onto black.
+TRANSPARENT_KINDS: frozenset[str] = frozenset(
+    k for k, p in KIND_PRESETS.items() if p.transparent_ok
+)
 
 STYLE_PRESETS: dict[str, str] = {
     "minimal":   "clean minimalism, lots of negative space, refined thin typography, 2-3 colors max",
@@ -124,6 +160,9 @@ DESIGN_TEMPLATES: list[dict[str, str]] = [
     {"id": "nightlife", "emoji": "🎧", "label": "DJ & Nightlife", "kind": "flyer",
      "style": "neon", "palette": "noir",
      "idea": "Event flyer — '[Party Name]' with DJ [Name]. [Date] at [Club], doors [Time]. Entry [GH¢] / VIP [GH¢]. Afrobeat · Amapiano · Hiplife all night."},
+    {"id": "sticker_brand", "emoji": "🏷", "label": "Product Sticker", "kind": "sticker",
+     "style": "playful", "palette": "candy",
+     "idea": "Die-cut sticker for '[Brand Name]' — [mascot/product] with a small '[Tagline]' banner, thick white cut outline."},
     {"id": "provisions", "emoji": "🛒", "label": "Provisions Shop", "kind": "logo",
      "style": "minimal", "palette": "forest",
      "idea": "Friendly round shop mark for '[Shop Name] Provisions' — basket & sunrise motif, trustworthy neighborhood store since [Year]."},
@@ -156,7 +195,15 @@ def compile_design_prompt(
     if transparent:
         parts.append("Isolated on a fully transparent background — no backdrop, no shadow card.")
     parts.append(f"Design brief: {brief.strip()}")
-    parts.append("Crisp vector-clean edges, high detail, no watermark, no blurry text.")
+    # Resolution guidance: the provider canvas is fixed, so we ask for artwork
+    # that survives the upscale — clean geometry beats fake photographic detail.
+    parts.append(
+        "Crisp vector-clean edges, high detail, no watermark, no blurry text."
+        " Render sharp at full canvas resolution: solid flat color fields, precise"
+        " edges and evenly weighted strokes that stay clean when enlarged for print;"
+        " no noise, no JPEG artifacts, no soft focus, nothing important within the"
+        " outer 4% of the canvas."
+    )
     return " ".join(parts)
 
 
@@ -173,21 +220,65 @@ def provider_image_kwargs(model: str, kind: str, transparent: bool) -> dict[str,
     kp = KIND_PRESETS.get(kind, KIND_PRESETS["flyer"])
     kw: dict[str, Any] = {"size": kp.gpt_image_size, "quality": "high"}
     if transparent:
+        # transparency needs a lossless codec — the default webp/jpeg output
+        # would silently composite the art onto a background.
         kw["background"] = "transparent"
+        kw["output_format"] = "png"
     return kw
 
 
 # ------------------------------------------------------------------ ffmpeg
-def build_normalize_cmd(src: str, dst: str, w: int, h: int) -> list[str]:
-    """Exact-aspect normalize: cover-scale then center-crop (pure argv builder)."""
-    vf = f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h}"
-    return [ffmpeg_path() or "ffmpeg", "-y", "-i", src, "-vf", vf, "-frames:v", "1", dst]
+# PNG is lossless, but ffmpeg's default compression leaves print masters far
+# bigger than they need to be; 100 = max deflate effort, no quality cost.
+PNG_COMPRESSION = "100"
+# Lanczos upscales are slightly soft by nature — a gentle unsharp pass restores
+# the edge acuity that logo/flyer typography needs on paper. Luma only (the
+# chroma/alpha planes stay untouched so cut-outs keep clean edges).
+PRINT_UNSHARP = "unsharp=5:5:0.55:5:5:0"
 
 
-def build_upscale_cmd(src: str, dst: str, w: int, h: int, dpi: int = 300) -> list[str]:
-    """Print-quality lanczos upscale, tagged with DPI metadata (pure argv builder)."""
+def _alpha_tail(alpha: bool) -> list[str]:
+    """Encoder flags: keep RGBA for cut-out art, else flatten to plain RGB."""
+    return ["-pix_fmt", "rgba" if alpha else "rgb24", "-compression_level", PNG_COMPRESSION]
+
+
+def build_normalize_cmd(src: str, dst: str, w: int, h: int,
+                        fit: str = "cover", alpha: bool = False) -> list[str]:
+    """Normalize the provider render onto the exact kind canvas (pure argv builder).
+
+    fit="cover"   → scale up and center-crop: full-bleed, no bars (flyers/banners).
+    fit="contain" → scale down and pad: the whole mark survives, letterboxed.
+                    Logos and stickers use this — cropping a mark ruins it.
+    Padding is transparent when `alpha`, else white (print-safe, never black).
+    """
+    if fit == "contain":
+        pad_color = "#00000000" if alpha else "white"
+        vf = (
+            f"scale={w}:{h}:force_original_aspect_ratio=decrease:flags=lanczos,"
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color={pad_color}"
+        )
+    else:
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=increase:flags=lanczos,crop={w}:{h}"
+    if alpha:
+        vf += ",format=rgba"
+    return [ffmpeg_path() or "ffmpeg", "-y", "-i", src, "-vf", vf,
+            "-frames:v", "1", *_alpha_tail(alpha), dst]
+
+
+def build_upscale_cmd(src: str, dst: str, w: int, h: int, dpi: int = 300,
+                      alpha: bool = False, sharpen: bool = True) -> list[str]:
+    """Print-quality lanczos upscale + sharpen, tagged with DPI (pure argv builder).
+
+    The DPI tag is what makes a print shop lay the file out at physical size
+    instead of assuming 72 DPI, so it rides on every print tier.
+    """
     vf = f"scale={w}:{h}:flags=lanczos"
-    return [ffmpeg_path() or "ffmpeg", "-y", "-i", src, "-vf", vf, "-frames:v", "1", "-dpi", str(dpi), dst]
+    if sharpen:
+        vf += f",{PRINT_UNSHARP}"
+    if alpha:
+        vf += ",format=rgba"
+    return [ffmpeg_path() or "ffmpeg", "-y", "-i", src, "-vf", vf,
+            "-frames:v", "1", "-dpi", str(dpi), *_alpha_tail(alpha), dst]
 
 
 def _run(cmd: list[str]) -> None:
@@ -269,17 +360,41 @@ class ExportPreset:
     trim_h: int
     bleed_px: int        # 0 → social crop, no marks
     margin: int = 0      # canvas padding around the bleed area (crop-mark band)
+    tile: tuple[int, int] | None = None   # (cols, rows) → repeat the art as a kiss-cut sheet
+    keep_alpha: bool = False              # sheets/cut-outs keep transparency
 
 
 EXPORT_PRESETS: dict[str, ExportPreset] = {
     # 3 mm @300 DPI ≈ 35 px bleed; canvas = bleed + 2×margin for crop ticks
     "a4_bleed": ExportPreset("A4 300-DPI + 3mm bleed & crop marks", 2480, 3508, 35, 55),
     "a5_bleed": ExportPreset("A5 300-DPI + 3mm bleed & crop marks", 1748, 2480, 35, 45),
+    "a3_bleed": ExportPreset("A3 poster 300-DPI + 3mm bleed & crop marks", 3508, 4961, 35, 70),
     # Social crops — exact canvases, no bleed
     "wa_status": ExportPreset("WhatsApp Status 1080×1920", 1080, 1920, 0),
     "ig_post": ExportPreset("Instagram Portrait 1080×1350", 1080, 1350, 0),
     "ig_square": ExportPreset("Instagram Square 1080×1080", 1080, 1080, 0),
+    # 🏷 Die-cut sticker sheets — A4 @300 DPI, transparent gaps so a cutter can
+    # kiss-cut each copy. 3×4 for 10 cm stickers, 4×6 for small 6 cm ones.
+    "sticker_a4": ExportPreset("Sticker sheet A4 · 12 up (transparent)", 2480, 3508, 0,
+                               tile=(3, 4), keep_alpha=True),
+    "sticker_a4_mini": ExportPreset("Sticker sheet A4 · 24 up small (transparent)", 2480, 3508, 0,
+                                    tile=(4, 6), keep_alpha=True),
 }
+
+# Sheets only make sense for cut-out art; the studio hides them elsewhere.
+STICKER_EXPORTS: tuple[str, ...] = tuple(k for k, p in EXPORT_PRESETS.items() if p.tile)
+
+
+def exports_for_kind(kind: str) -> list[str]:
+    """Export presets worth offering for a kind (sticker sheets only for cut-outs)."""
+    sheets_ok = kind in TRANSPARENT_KINDS
+    return [k for k, p in EXPORT_PRESETS.items() if sheets_ok or not p.tile]
+
+
+# Sticker-sheet geometry @300 DPI: ~8 mm safe border, ~5 mm between stickers so
+# a cutting machine has room for the blade and the sheet survives handling.
+SHEET_MARGIN = 96
+SHEET_GUTTER = 60
 
 
 def _crop_marks(tx: int, ty: int, tw: int, th: int, tick: int = 38, gap: int = 8) -> str:
@@ -314,15 +429,46 @@ def export_filename(design_id: str, preset: str) -> str:
     return f"{design_id}_x_{preset}.png"
 
 
+def sheet_cell(preset: str) -> dict[str, int]:
+    """Per-sticker cell geometry for a tiled sheet (pure)."""
+    p = EXPORT_PRESETS[preset]
+    if not p.tile:
+        raise DesignError(f"{preset} is not a sticker sheet")
+    cols, rows = p.tile
+    cell_w = (p.trim_w - SHEET_MARGIN * 2 - SHEET_GUTTER * (cols - 1)) // cols
+    cell_h = (p.trim_h - SHEET_MARGIN * 2 - SHEET_GUTTER * (rows - 1)) // rows
+    side = max(64, min(cell_w, cell_h))          # square cell → sticker stays round
+    return {"cols": cols, "rows": rows, "cell": side}
+
+
 def build_export_cmd(src: str, dst: str, preset: str) -> list[str]:
-    """Render a print/social export (pure argv builder).
+    """Render a print/social/sticker-sheet export (pure argv builder).
 
     Social: cover-scale + center-crop to the exact canvas.
     Print: cover-scale to bleed size → pad to white canvas → 8 crop-mark
-    drawboxes outside the trim edges → 300 DPI tag."""
+    drawboxes outside the trim edges → 300 DPI tag.
+    Sticker sheet: contain-fit one copy into a square cell → tile cols×rows with
+    transparent gutters → pad to the exact A4 canvas, alpha intact for kiss-cut.
+    """
     p = EXPORT_PRESETS.get(preset)
     if not p:
         raise DesignError(f"unknown export preset: {preset}")
+
+    if p.tile:
+        c = sheet_cell(preset)
+        side, cols, rows = c["cell"], c["cols"], c["rows"]
+        chain = (
+            f"scale={side}:{side}:force_original_aspect_ratio=decrease:flags=lanczos,"
+            f"pad={side}:{side}:(ow-iw)/2:(oh-ih)/2:color=#00000000,"
+            f"tile={cols}x{rows}:margin={SHEET_MARGIN}:padding={SHEET_GUTTER}:color=#00000000,"
+            f"pad={p.trim_w}:{p.trim_h}:(ow-iw)/2:(oh-ih)/2:color=#00000000,format=rgba"
+        )
+        return [
+            ffmpeg_path() or "ffmpeg", "-y", "-loop", "1", "-i", src,
+            "-vf", chain, "-frames:v", "1", "-dpi", "300",
+            *_alpha_tail(True), dst,
+        ]
+
     d = export_dims(preset)
     bw, bh, cw, ch = d["bleed_w"], d["bleed_h"], d["canvas_w"], d["canvas_h"]
     chain = f"scale={bw}:{bh}:force_original_aspect_ratio=increase:flags=lanczos,crop={bw}:{bh}"
@@ -332,7 +478,7 @@ def build_export_cmd(src: str, dst: str, preset: str) -> list[str]:
     cmd = [ffmpeg_path() or "ffmpeg", "-y", "-i", src, "-vf", chain, "-frames:v", "1"]
     if p.bleed_px:
         cmd += ["-dpi", "300"]
-    cmd.append(dst)
+    cmd += [*_alpha_tail(p.keep_alpha), dst]
     return cmd
 
 
@@ -496,11 +642,15 @@ async def generate_design(
 
     note = None
     branded = False
+    # Cut-out kinds (logo/sticker) keep their alpha through every ffmpeg hop.
+    alpha = transparent and kp.transparent_ok
     if ffmpeg_path():
-        _run(build_normalize_cmd(str(raw_path), str(web_path), kp.web_w, kp.web_h))
-        if brand and kind != "logo" and brand.get("logo_file"):
+        _run(build_normalize_cmd(str(raw_path), str(web_path), kp.web_w, kp.web_h,
+                                 fit=kp.fit, alpha=alpha))
+        if brand and kind not in TRANSPARENT_KINDS and brand.get("logo_file"):
             branded = await _overlay_brand_logo(web_path, kind, brand)
-        _run(build_upscale_cmd(str(web_path), str(print_path), kp.print_w, kp.print_h))
+        _run(build_upscale_cmd(str(web_path), str(print_path), kp.print_w, kp.print_h,
+                               dpi=kp.print_dpi, alpha=alpha))
         width, height = kp.web_w, kp.web_h
     else:
         # no ffmpeg (local pytest/dev): serve the raw generation for both tiers
@@ -516,6 +666,11 @@ async def generate_design(
         "print_file": print_path.name,
         "width": width,
         "height": height,
+        "print_width": kp.print_w,
+        "print_height": kp.print_h,
+        "print_dpi": kp.print_dpi,
+        "fit": kp.fit,
+        "alpha": alpha,
         "prompt": prompt,
         "brief": brief,
         "note": note,

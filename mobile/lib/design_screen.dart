@@ -1,4 +1,4 @@
-// 🎨 Design Studio (mobile) — flyers, logos & banners at print resolution.
+// 🎨 Design Studio (mobile) — flyers, stickers, banners & logos at print resolution.
 //
 // Mirrors the web /design studio: kind tabs, art-director brief, style/palette
 // chips, brand-aware generation, two-tier PNG downloads (web / 300-DPI print),
@@ -23,11 +23,15 @@ class DesignScreen extends StatefulWidget {
 
 class _DesignScreenState extends State<DesignScreen> {
   // ---- catalog (mirrors backend designer.py presets) ----
+  // 'cutout' kinds contain-fit and may carry transparency (see designer.py).
   static const _kinds = <String, Map<String, Object>>{
-    'flyer': {'label': 'Flyer', 'icon': Icons.crop_portrait, 'print': '2048×3072'},
-    'logo': {'label': 'Logo', 'icon': Icons.brush_outlined, 'print': '2048×2048'},
-    'banner': {'label': 'Banner', 'icon': Icons.crop_16_9, 'print': '3072×2048'},
+    'flyer': {'label': 'Flyer', 'icon': Icons.crop_portrait, 'print': '2480×3720', 'cutout': false},
+    'logo': {'label': 'Logo', 'icon': Icons.brush_outlined, 'print': '4096×4096', 'cutout': true},
+    'banner': {'label': 'Banner', 'icon': Icons.crop_16_9, 'print': '4608×3072', 'cutout': false},
+    'sticker': {'label': 'Sticker', 'icon': Icons.auto_awesome_outlined, 'print': '3000×3000', 'cutout': true},
   };
+
+  bool get _isCutout => _kinds[_kind]?['cutout'] == true;
   static const _styles = ['minimal', 'bold', 'luxury', 'playful', 'corporate', 'retro', 'neon'];
   static const _palettes = <String, List<Color>>{
     'auto': [Colors.grey, Colors.white],
@@ -94,7 +98,7 @@ class _DesignScreenState extends State<DesignScreen> {
         'kind': _kind,
         'style': _style,
         'palette': _palette,
-        'transparent': _kind == 'logo' && _transparent,
+        'transparent': _isCutout && _transparent,
         'enhance': _enhance,
         'use_brand': _useBrand,
       }, timeout: const Duration(seconds: 150));
@@ -180,15 +184,15 @@ class _DesignScreenState extends State<DesignScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // kind tabs
+            // kind tabs — Row+Expanded (Wrap would throw: Expanded needs a Flex)
             Row(children: _kinds.entries.map((e) {
               final active = _kind == e.key;
               return Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() => _kind = e.key),
                   child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    padding: const EdgeInsets.all(10),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
                     decoration: BoxDecoration(
                       color: active ? MoodColors.accent.withValues(alpha: 0.12) : MoodColors.panel,
                       border: Border.all(color: active ? MoodColors.accent : MoodColors.line),
@@ -199,11 +203,16 @@ class _DesignScreenState extends State<DesignScreen> {
                           color: active ? MoodColors.accent : Colors.white54),
                       const SizedBox(height: 4),
                       Text('${e.value['label']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 11.5,
                               fontWeight: FontWeight.w600,
                               color: active ? MoodColors.accent : Colors.white)),
-                      Text('${e.value['print']}', style: const TextStyle(fontSize: 9, color: Colors.white38)),
+                      Text('${e.value['print']}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 8.5, color: Colors.white38)),
                     ]),
                   ),
                 ),
@@ -221,7 +230,9 @@ class _DesignScreenState extends State<DesignScreen> {
                 counterText: '',
                 hintText: _kind == 'logo'
                     ? "e.g. Minimal bird mark for 'Akwaaba Coffee' — geometric bird over wordmark"
-                    : "e.g. Waakye Friday at Auntie's Spot — from GH¢20, 11am sharp, East Legon junction",
+                    : _kind == 'sticker'
+                        ? "e.g. Die-cut sticker — kelewele cart mascot, 'HOT & SPICY' banner, thick white outline"
+                        : "e.g. Waakye Friday at Auntie's Spot — from GH¢20, 11am sharp, East Legon junction",
                 hintStyle: const TextStyle(fontSize: 12, color: Colors.white38),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.05),
@@ -258,13 +269,13 @@ class _DesignScreenState extends State<DesignScreen> {
                     onChanged: (v) => setState(() => _enhance = v ?? true)),
                 const Text('Art-director brief', style: TextStyle(fontSize: 12)),
               ]),
-              if (_kind == 'logo')
+              if (_isCutout)
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   Checkbox(value: _transparent, activeColor: MoodColors.accent,
                       onChanged: (v) => setState(() => _transparent = v ?? false)),
                   const Text('Transparent bg', style: TextStyle(fontSize: 12)),
                 ]),
-              if (_kind != 'logo')
+              if (!_isCutout)
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   Checkbox(value: _useBrand, activeColor: MoodColors.accent,
                       onChanged: (v) => setState(() => _useBrand = v ?? false)),
