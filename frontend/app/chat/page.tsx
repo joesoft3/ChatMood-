@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Brain, Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Swords, Telescope } from "lucide-react";
+import { Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -489,20 +489,6 @@ export default function ChatPage() {
   }
 
   const activeTitle = convs.find((c) => c.id === activeId)?.title;
-  const modeMeta = useMemo(() => {
-    if (arenaMode) return { label: "Arena", tone: "accent", icon: <Swords size={12} /> };
-    if (deepMode) return { label: "Deep research", tone: "accent", icon: <Telescope size={12} /> };
-    if (agentMode) return { label: "Agent", tone: "accent", icon: <Bot size={12} /> };
-    if (thinkOn) return { label: "Thinking", tone: "purple", icon: <Brain size={12} /> };
-    return { label: "Chat", tone: "default", icon: <Sparkles size={12} /> };
-  }, [agentMode, arenaMode, deepMode, thinkOn]);
-  const modelLabel = useMemo(() => {
-    if (model === "grok-4") return "S1 Mood-4";
-    if (model === "grok-4-fast") return "S1 Mood-4-Fast";
-    if (model === "grok-code-fast-1") return "Code";
-    if (model === "grok-3-mini") return "Mini";
-    return "Auto";
-  }, [model]);
 
   async function shareChat() {
     if (!activeId) return;
@@ -602,7 +588,7 @@ export default function ChatPage() {
 
   const chatTabs = (
     <div className="flex items-center justify-center gap-7 h-full">
-      <span className="relative py-1 text-sm font-semibold text-white after:absolute after:inset-x-0 after:-bottom-2 after:h-0.5 after:rounded-full after:bg-white">Ask</span>
+      <span className="py-1 text-sm font-semibold text-white">Ask</span>
       <button onClick={() => router.push("/images")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Imagine</button>
     </div>
   );
@@ -623,7 +609,6 @@ export default function ChatPage() {
           </div>
           <div className="min-w-0 flex-1 hidden sm:block">
             <p className="truncate text-sm font-medium text-gray-200">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "New chat")}</p>
-            <p className="truncate text-[11px] text-gray-500">Auto-saved conversation · premium live workspace shell</p>
           </div>
           {msgs.length > 0 && (
             <div className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -658,31 +643,6 @@ export default function ChatPage() {
             >
               👥 Team
             </button>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/20 bg-accent/10 px-2.5 py-1 text-[11px] text-accent">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent animate-pulse" /> Live
-          </span>
-          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${
-            modeMeta.tone === "purple"
-              ? "border-purple-400/25 bg-purple-400/10 text-purple-300"
-              : modeMeta.tone === "accent"
-                ? "border-accent/25 bg-accent/10 text-accent"
-                : "border-white/8 bg-white/5 text-gray-400"
-          }`}>
-            {modeMeta.icon} {modeMeta.label}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
-            🤖 {modelLabel}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
-            💬 {msgs.length} message{msgs.length === 1 ? "" : "s"}
-          </span>
-          {wsId && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400">
-              👥 {wsName || "Team workspace"}
-            </span>
           )}
         </div>
       </div>
