@@ -165,6 +165,26 @@ def _reel_dims(aspect: str) -> tuple[int, int]:
     return {"16:9": (1600, 900), "9:16": (900, 1600), "1:1": (1280, 1280)}.get(aspect, (1600, 900))
 
 
+@dataclass
+class VideoProgress:
+    """Structured progress event for video generation pipelines.
+
+    Consumed by the frontend (video studio / films gallery) and mobile
+    clients (films screen) to render live render-state cards."""
+    stage: str         # e.g. storyboard | scenes | fetching | stitching | compositing | done
+    done: int          # completed sub-items (scenes rendered, frames stitched, etc.)
+    total: int         # expected sub-items
+    note: str | None = None  # human-readable context (optional)
+
+    def to_dict(self) -> dict:
+        return {
+            "stage": self.stage,
+            "done": self.done,
+            "total": self.total,
+            "note": self.note,
+        }
+
+
 class VideoService:
     """Video generation with professional-grade provider cascade, retry/backoff,
     graceful degradation, and structured progress reporting."""
@@ -354,20 +374,20 @@ class VideoService:
         narration: str | None = None
         if settings.REEL_STORYBOARD:
             if on_progress:
-                on_progress({"stage": "storyboard", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="storyboard", done=0, total=1).to_dict())
             sb_scenes, narration = await self._storyboard(prompt, scenes)
             if sb_scenes:
                 beat_prompts = sb_scenes
                 scenes = len(beat_prompts)
             if on_progress:
-                on_progress({"stage": "storyboard", "done": 1, "total": 1})
+                on_progress(VideoProgress(stage="storyboard", done=1, total=1, note="scenes planned").to_dict())
         if not beat_prompts:
             beat_prompts = [
                 f"{prompt.strip()}, {REEL_BEATS[i % len(REEL_BEATS)]}, {STYLE_PRESETS.get(opts.style, STYLE_PRESETS['cinematic'])}"
                 for i in range(scenes)
             ]
         if on_progress:
-            on_progress({"stage": "scenes", "done": 0, "total": scenes})
+            on_progress(VideoProgress(stage="scenes", done=0, total=scenes).to_dict())
 
         async def _fetch(i: int, p: str) -> bytes | None:
             import secrets
@@ -390,7 +410,7 @@ class VideoService:
         shots = await asyncio.gather(*(_fetch(i, p) for i, p in enumerate(beat_prompts)))
         got = [(i, b) for i, b in enumerate(shots) if b]
         if on_progress:
-            on_progress({"stage": "scenes", "done": len(got), "total": scenes})
+            on_progress(VideoProgress(stage="scenes", done=len(got), total=scenes, note=f"{len(got)}/{scenes} scenes fetched").to_dict())
         if not got:
             raise VideoGenerationError("Scene renders all came back short — try again in a moment.")
         # 🛟 Solo-scene rescue: a single good frame still makes a reel — mirror it
@@ -406,10 +426,10 @@ class VideoService:
         voice: tuple[bytes, str] | None = None
         if settings.REEL_NARRATION and narration:
             if on_progress:
-                on_progress({"stage": "voice", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="voice", done=0, total=1).to_dict())
             voice = await self._narrate(narration)
             if on_progress:
-                on_progress({"stage": "voice", "done": 1 if voice else 0, "total": 1})
+                on_progress(VideoProgress(stage="voice", done=1 if voice else 0, total=1, note="voiceover recorded" if voice else "silent").to_dict())
 
         os.makedirs(settings.MEDIA_DIR, exist_ok=True)
         fade = REEL_FADE_S
@@ -456,7 +476,7 @@ class VideoService:
             out_name = f"reel-{_uuid.uuid4().hex}.mp4"
             out_path = os.path.join(settings.MEDIA_DIR, out_name)
             if on_progress:
-                on_progress({"stage": "compositing", "done": 0, "total": 1})
+                on_progress(VideoProgress(stage="compositing", done=0, total=1, note="muxing film").to_dict())
             cmd = [
                 exe, "-y", *inputs,
                 "-filter_complex", graph,
@@ -480,7 +500,7 @@ class VideoService:
                 log.warning("reel ffmpeg failed: %s", (err or b"")[-400:])
                 raise VideoGenerationError("Reel compositing failed — ffmpeg rejected the graph.")
             if on_progress:
-                on_progress({"stage": "compositing", "done": 1, "total": 1})
+                on_progress(VideoProgress(stage="compositing", done=1, total=1, note="film finished").to_dict())
         base = settings.BACKEND_PUBLIC_URL.rstrip("/")
         return f"{base}/api/v1/media/files/{out_name}", False
 
