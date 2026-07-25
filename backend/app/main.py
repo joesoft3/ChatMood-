@@ -139,33 +139,47 @@ async def healthz():
 
 @app.get("/readyz")
 async def readyz():
-    """Readiness probe: are dependencies (postgres, redis, qdrant) reachable?"""
-    checks: dict[str, str] = {}
+    """Readiness probe: are dependencies (postgres, redis, qdrant) reachable?
+
+    Returns structured JSON with per-service status + latency in ms so ops
+    tooling can pinpoint which dependency is slow or down.
+    """
+    checks: dict[str, dict[str, str]] = {}
     ok = True
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(text("SELECT 1"))
-        checks["postgres"] = "ok"
-    except Exception as e:
-        ok = False
-        checks["postgres"] = f"fail: {e}"
-    try:
-        r = await get_redis()
-        await r.ping()
-        checks["redis"] = "ok"
-    except Exception as e:
-        ok = False
-        checks["redis"] = f"fail: {e}"
-    try:
-        await qdrant().get_collections()
-        checks["qdrant"] = "ok"
-    except Exception as e:
-        ok = False
-        checks["qdrant"] = f"fail: {e}"
-    return JSONResponse(
-        {"status": "ok" if ok else "degraded", "checks": checks},
-        status_code=200 if ok else 503,
-    )
+
+    async def _probe(name: str, factory):
+        nonlocal ok
+        t0 = time.perf_counter()
+        try:
+            await factory()
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            checks[name] = {"status": "ok", "ms": str(ms)}
+        except Exception as e:
+            ok = False
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            checks[name] = {"status": "fail", "error": str(e)[:200], "ms": str(ms)}
+
+    await _probe("postgres", lambda: _pg_ping())
+    await _probe("redis", lambda: _redis_ping())
+    await _probe("qdrant", lambda: qdrant().get_collections())
+
+    payload = {
+        "status": "ok" if ok else "degraded",
+        "version": app.version,
+        "checks": checks,
+        "timestamp": time.time(),
+    }
+    return JSONResponse(payload, status_code=200 if ok else 503)
+
+
+async def _pg_ping():
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))
+
+
+async def _redis_ping():
+    r = await get_redis()
+    await r.ping()
 
 
 @app.get("/metrics", include_in_schema=False)

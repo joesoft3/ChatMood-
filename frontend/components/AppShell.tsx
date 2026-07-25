@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { AudioLines, Brush, Clapperboard, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
+import ErrorBoundary from "./ErrorBoundary";
 import { API, apiFetch, token } from "@/lib/api";
 import { applyAccent, applyFavicon, BrandMark } from "@/lib/brand";
 
@@ -281,8 +282,11 @@ export default function AppShell({
           </header>
         )}
 
-        {/* Page content */}
-        <div className="flex-1 min-h-0 flex flex-col">{children}</div>
+        {/* Page content — wrapped in an error boundary so one broken page
+            never takes down the entire shell (sidebar, tab bar, header survive). */}
+        <div className="flex-1 min-h-0 flex flex-col">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </div>
 
         {/* 👑 Owner panel floating button — owner email only, hidden while inside /admin.
             Mobile: compact circle, lifted clear above the quick-chips/model-picker/composer
