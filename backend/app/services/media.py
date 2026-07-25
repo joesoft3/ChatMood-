@@ -95,15 +95,57 @@ def _storyboard_prompt(prompt: str, scenes: int) -> str:
 
 def _extract_json(text: str) -> dict | None:
     import json
-    import re
 
-    m = re.search(r"\{.*\}", text or "", re.DOTALL)
-    if not m:
+    def try_parse(start: int) -> dict | None:
+        depth = 0
+        in_str = False
+        escape = False
+        for i, ch in enumerate(text[start:], start):
+            if in_str:
+                if escape:
+                    escape = False
+                    continue
+                if ch == "\\":
+                    escape = True
+                    continue
+                if ch == '"':
+                    in_str = False
+                    continue
+                continue
+            if ch == '"':
+                in_str = True
+                continue
+            if ch == "{":
+                depth += 1
+                continue
+            if ch == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(text[start : i + 1])
+                    except Exception:
+                        return None
         return None
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return None
+
+    text = (text or "").strip()
+    # Try the first object first; fall back to scanning for any object.
+    for start in range(len(text)):
+        if text[start] == "{":
+            result = try_parse(start)
+            if result is not None:
+                return result
+    # Defensive: if no object found but there's an array, return an array wrapper
+    # (the caller can still recover scenes from it).
+    array_start = text.find("[")
+    array_end = text.rfind("]")
+    if array_start != -1 and array_end > array_start:
+        try:
+            arr = json.loads(text[array_start : array_end + 1])
+            if isinstance(arr, list):
+                return {"scenes": arr}
+        except Exception:
+            pass
+    return None
 
 
 @dataclass
@@ -314,7 +356,12 @@ class VideoService:
             if r.status_code >= 400:
                 log.info("storyboard brain hiccup (%s): %s", r.status_code, r.text[:120])
                 return None, None
-            data = _extract_json(r.json()["choices"][0]["message"]["content"])
+            msg = r.json()["choices"][0]["message"] if r.json().get("choices") else {}
+            raw_content = msg.get("content") if isinstance(msg, dict) else None
+            if not raw_content or not isinstance(raw_content, str):
+                log.info("storyboard brain returned non-string content: %s", type(raw_content))
+                return None, None
+            data = _extract_json(raw_content)
             if not data:
                 return None, None
             raw = data.get("scenes")
