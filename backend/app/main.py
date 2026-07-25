@@ -139,9 +139,15 @@ async def healthz():
 
 @app.get("/readyz")
 async def readyz():
-    """Readiness probe: are dependencies (postgres, redis, qdrant) reachable?"""
+    """Readiness probe for required dependencies plus optional Redis observability.
+
+    Rate limiting and domain analytics fail open when Redis is not configured, so
+    a default localhost Redis URL on a single-machine deployment must not make
+    the whole API report unhealthy.
+    """
     checks: dict[str, str] = {}
     ok = True
+    redis_required = bool(os.getenv("REDIS_URL")) or settings.REDIS_URL not in ("", "redis://localhost:6379/0")
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
@@ -154,8 +160,11 @@ async def readyz():
         await r.ping()
         checks["redis"] = "ok"
     except Exception as e:
-        ok = False
-        checks["redis"] = f"fail: {e}"
+        if redis_required:
+            ok = False
+            checks["redis"] = f"fail: {e}"
+        else:
+            checks["redis"] = f"optional-unavailable: {e}"
     try:
         await qdrant().get_collections()
         checks["qdrant"] = "ok"
