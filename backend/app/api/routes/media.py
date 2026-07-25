@@ -304,31 +304,6 @@ def _film_out(f: Film) -> dict:
         "scenes": scenes,
         "created_at": f.created_at.isoformat() if f.created_at else None,
     }
-    try:
-        scenes = json.loads(f.scenes_json or "[]")
-    except json.JSONDecodeError:
-        scenes = []
-    return {
-        "id": f.id,
-        "prompt": f.prompt,
-        "status": f.status,
-        "progress": f.progress,
-        "scene_count": f.scene_count,
-        "scene_seconds": f.scene_seconds,
-        "aspect_ratio": f.aspect,
-        "quality": f.quality,
-        "style": f.style,
-        "audio": f.audio,
-        "voice": f.voice_id,
-        "music": f.music,
-        "tempo": f.tempo,
-        "subtitles": bool(f.subtitles),
-        "url": url,
-        "script": f.script or None,
-        "note": f.note or None,
-        "scenes": scenes,
-        "created_at": f.created_at.isoformat() if f.created_at else None,
-    }
 
 
 def _film_kwargs(f: Film) -> dict:
