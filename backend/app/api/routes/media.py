@@ -272,16 +272,30 @@ async def enhance_prompt(req: VideoEnhanceRequest, user: User = Depends(get_curr
 
 
 def _film_out(f: Film) -> dict:
+    """Serialize a Film row for API responses (gallery, poll, public read).
+
+    Guards against malformed filenames and missing references — the
+    gallery must never 404 because of a bad database row."""
     url = ""
     if f.filename:
-        url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.filename}"
+        # Only serve filenames that match the unguessable 128-bit hex pattern
+        if soundtrack.MEDIA_NAME_RE.match(f.filename) or f.filename.endswith(".mp4"):
+            url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.filename}"
     elif f.fallback_url:
         url = f.fallback_url
-    poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}" if f.poster else ""
+
+    poster = ""
+    if f.poster:
+        if soundtrack.MEDIA_POSTER_RE.match(f.poster) or f.poster.endswith("_p.jpg"):
+            poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}"
+
     try:
         scenes = json.loads(f.scenes_json or "[]")
+        if not isinstance(scenes, list):
+            scenes = []
     except json.JSONDecodeError:
         scenes = []
+
     return {
         "id": f.id,
         "prompt": f.prompt,
