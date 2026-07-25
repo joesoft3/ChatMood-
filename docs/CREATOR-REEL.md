@@ -89,6 +89,9 @@ queries also order by `id` as a deterministic tiebreak.
 Captured against a running stack seeded with 8 sample clips across 4 creators
 (`docs/screenshots/`):
 
+`reel-all-screens.png` is a single contact sheet of all eight, grouped by
+entry points / feed / composer — the quickest way to see everything at once.
+
 | Shot | What it shows |
 |---|---|
 | `reel-07-chat-home-tabs.png` | **Reel** tab at the top of the app home, beside *Ask* / *Imagine* |
