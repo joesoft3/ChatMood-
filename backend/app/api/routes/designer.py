@@ -40,6 +40,11 @@ def _row(d: Design) -> dict:
         "transparent": d.transparent,
         "width": d.width,
         "height": d.height,
+        # print tier + which exports make sense, straight from the kind preset
+        "print_width": kp.print_w if (kp := dzn.KIND_PRESETS.get(d.kind)) else d.width,
+        "print_height": kp.print_h if kp else d.height,
+        "dpi": kp.print_dpi if kp else 300,
+        "exports": dzn.exports_for_kind(d.kind),
         "note": d.note or None,
         "created_at": d.created_at.isoformat() if d.created_at else None,
     }
@@ -55,6 +60,10 @@ async def design_presets(user: User = Depends(get_current_user)):
                 "label": p.label,
                 "web": [p.web_w, p.web_h],
                 "print": [p.print_w, p.print_h],
+                "dpi": p.print_dpi,
+                "fit": p.fit,
+                "transparent_ok": p.transparent_ok,
+                "exports": dzn.exports_for_kind(k),
                 "hint": p.hint,
             }
             for k, p in dzn.KIND_PRESETS.items()
@@ -124,7 +133,7 @@ async def create_design(
         req.style = "minimal"
     if req.palette not in dzn.PALETTES:
         req.palette = "auto"
-    if req.transparent and req.kind != "logo":
+    if req.transparent and req.kind not in dzn.TRANSPARENT_KINDS:
         req.transparent = False
 
     brand = None
@@ -204,6 +213,12 @@ async def export_design(
     d = await db.get(Design, design_id)
     if not d or d.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Design not found")
+    if preset not in dzn.exports_for_kind(d.kind):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"'{preset}' needs cut-out artwork — available for this {d.kind}: "
+            f"{', '.join(dzn.exports_for_kind(d.kind))}",
+        )
     dst = Path(settings.MEDIA_DIR) / dzn.export_filename(design_id, preset)
     if not dst.exists():
         await record_usage(user.id, "design_export", "ffmpeg")
@@ -244,7 +259,9 @@ async def brand_icon(
 @router.get("/designs/exports")
 async def export_presets(user: User = Depends(get_current_user)):
     return {"presets": [{"id": k, "label": p.label,
-                         "trim": [p.trim_w, p.trim_h], "bleed_px": p.bleed_px}
+                         "trim": [p.trim_w, p.trim_h], "bleed_px": p.bleed_px,
+                         "sheet": list(p.tile) if p.tile else None,
+                         "transparent": p.keep_alpha}
                         for k, p in dzn.EXPORT_PRESETS.items()]}
 
 

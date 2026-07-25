@@ -14,6 +14,7 @@ interface ExploreItem {
 /** Studios surfaced in the landing "Explore" dropdown. */
 const EXPLORE_ITEMS: ExploreItem[] = [
   { icon: "💬", label: "Chat", hint: "Streaming answers with memory", href: "/chat" },
+  { icon: "📺", label: "Reel", hint: "The creator feed — watch & post videos", href: "/reel" },
   { icon: "🔭", label: "Deep research", hint: "Multi-source reports, live citations", href: "/deepsearch" },
   { icon: "🎬", label: "Films", hint: "Storyboarded video with voice & sound", href: "/films" },
   { icon: "🖼️", label: "Images", hint: "Generate and iterate visuals", href: "/images" },
@@ -104,6 +105,14 @@ export default function LandingNav() {
             </div>
           )}
         </div>
+
+        {/* 📺 Creator Reel — a first-class destination, not buried in Explore */}
+        <Link
+          href="/reel"
+          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/[0.07] hover:text-white"
+        >
+          📺 Reel
+        </Link>
 
         <div className="ml-auto flex items-center gap-2">
           <Link

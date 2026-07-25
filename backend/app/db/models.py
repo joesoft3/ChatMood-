@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -370,3 +370,82 @@ class DesignOrder(Base):
     design_id: Mapped[str] = mapped_column(String(36), default="")
     note: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Reel(Base):
+    """📺 Creator Reel — the shared public feed of creator videos.
+
+    A post is either an UPLOAD (creator's own clip, stored under `filename`
+    in MEDIA_DIR) or a SHARE of something Mood already generated (a Film or an
+    in-chat video), in which case `source_url` points at the existing media and
+    no bytes are copied.
+
+    Reel posts are keepsakes: unlike muxed films they use the `_r.mp4` suffix
+    so the 24h media janitor never sweeps them out from under the feed. Rows
+    are visible to every signed-in user while `status == "live"`; the author
+    can unpost (status="hidden") or delete outright.
+    """
+
+    __tablename__ = "reels"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    author_name: Mapped[str] = mapped_column(String(80), default="")   # denormalized for the feed
+    caption: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(12), default="upload")  # upload|film|chat|duet|repost
+    film_id: Mapped[str] = mapped_column(String(36), default="")       # set when shared from a film
+    filename: Mapped[str] = mapped_column(String(48), default="")      # <uuid>_r.mp4 in MEDIA_DIR
+    source_url: Mapped[str] = mapped_column(String(600), default="")   # shared (already-hosted) media
+    poster: Mapped[str] = mapped_column(String(48), default="")        # <uuid>_rp.jpg cover frame
+    # 🎬 Studio lineage — a duet/repost credits the reel it came from, so the
+    # feed can show "duet with @x" and the original author keeps attribution.
+    parent_id: Mapped[str] = mapped_column(String(36), default="", index=True)
+    parent_author: Mapped[str] = mapped_column(String(80), default="")
+    effect: Mapped[str] = mapped_column(String(16), default="")         # key into reel_studio.EFFECTS
+    captioned: Mapped[bool] = mapped_column(Boolean, default=False)     # captions burned in
+    status: Mapped[str] = mapped_column(String(12), default="live", index=True)  # live|hidden
+    # Denormalized engagement counters — the feed reads them straight off the
+    # row instead of running three COUNT(*)s per card. `likes` and `saves` are
+    # reconcilable from their join tables; `views`/`shares` are pure tallies.
+    views: Mapped[int] = mapped_column(Integer, default=0)
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    shares: Mapped[int] = mapped_column(Integer, default=0)
+    saves: Mapped[int] = mapped_column(Integer, default=0)
+    reposts: Mapped[int] = mapped_column(Integer, default=0)
+    # Python-side default (microseconds) in ADDITION to the server default:
+    # SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so two posts in
+    # the same second would tie and the paginated feed could skip or repeat
+    # rows. Feed queries still add `id` as a deterministic tiebreak.
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        index=True,
+    )
+
+
+class ReelLike(Base):
+    """❤️ One row per (reel, user) — the unique PK makes liking idempotent."""
+
+    __tablename__ = "reel_likes"
+
+    reel_id: Mapped[str] = mapped_column(ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReelSave(Base):
+    """🔖 Saved/bookmarked reels — one row per (reel, user), same idempotent
+    composite PK as likes. Powers the viewer's private "Saved" tab, which is
+    why it carries its own timestamp: saves are listed newest-saved-first, not
+    in the order the reels were posted."""
+
+    __tablename__ = "reel_saves"
+
+    reel_id: Mapped[str] = mapped_column(ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )

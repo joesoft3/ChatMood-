@@ -24,6 +24,8 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 - ✉️ Team invites & domain gating — shareable join links (emailed via the owner's Gmail) ; bind a domain and only `@company.com` emails can join
 - ✋ Human-in-the-loop — write actions (send email, create event/issue) wait for in-chat approval
 - 🎬 **Professional video studio with 🎙 Cinema Sound + Storyboard films** — duration/aspect/quality/style presets, negative prompts, ✨ prompt enhancer, templates (xAI video, provider seam), **AI voiceovers (10 voices, ▶ preview, tempo control) + 4 procedural music moods, loudness-polished ffmpeg mixing; async storyboard jobs split one idea into 2–4 directed scenes rendered 2-wide, stitched + voiced into a continuous film with optional burned-in subtitles, tracked in the 🎞 **Films** gallery (poll, resume, re-mix, share) — see [docs/VIDEO-SOUND.md](docs/VIDEO-SOUND.md)** · 🐍 Python sandbox tool
+- 🎬 **Ambient video landing + Explore nav** — procedural hero video loop in the Arena palette with instant-paint poster & reduced-motion respect, sticky landing nav with an accessible Explore dropdown, all wrapped in an error boundary
+- 🛡 **Resilient by default** — React error-boundary recovery UI around every screen, atomic Lua-scripted rate limiting, structured `/readyz` (per-dependency latency), and Docker/Compose health checks
 - 📱 Flutter mobile client (login + streaming chat) in `mobile/`
 - 🔗 Share conversations via revocable public links · 📊 usage dashboard (tokens vs. plan tiers)
 - 🔒 JWT auth, Redis rate limiting, Stripe subscription hooks
@@ -45,6 +47,9 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 > 🔁 **Auto-deploys on push**: `deploy-netlify` (web) + `deploy-vercel` (API) workflows →
 > production on every `main` push (each skips cleanly until connected) ·
 > `mobile-apk` workflow → tagged releases get an installable Android APK attached.
+>
+> 📋 **What's new?** Every fix & feature that ships to `main` is logged in
+> **[CHANGELOG.md](CHANGELOG.md)**.
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/joesoft3/moodai)
 > custom domain + HTTPS + Stripe Pro in ~45 min.

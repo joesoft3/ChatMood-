@@ -231,20 +231,26 @@ class VideoProgress:
     note: str | None = None  # human-readable context (optional)
 
     def to_dict(self) -> dict:
-        return {
-            "stage": self.stage,
-            "done": self.done,
-            "total": self.total,
-            "note": self.note,
-        }
+        """Wire payload. `note` is omitted when absent so progress events stay a
+        stable 3-key contract (stage/done/total) for SSE consumers that diff
+        terminal events; a note is purely additive context when present."""
+        d: dict = {"stage": self.stage, "done": self.done, "total": self.total}
+        if self.note is not None:
+            d["note"] = self.note
+        return d
 
 
 class VideoService:
     """Video generation with professional-grade provider cascade, retry/backoff,
     graceful degradation, and structured progress reporting."""
 
-    # Configurable: full cascade retries (default 3, env-overridable via VIDEO_MAX_CASCADE_ATTEMPTS)
-    MAX_CASCADE_ATTEMPTS: int = settings.VIDEO_MAX_CASCADE_ATTEMPTS
+    # Configurable: full cascade retries (default 3, env-overridable via
+    # VIDEO_MAX_CASCADE_ATTEMPTS). Read live off settings rather than snapshotted
+    # at import time, so runtime overrides (env reload, tests, admin tuning) take
+    # effect on the very next generate() instead of needing a process restart.
+    @property
+    def MAX_CASCADE_ATTEMPTS(self) -> int:  # noqa: N802 - constant-style public API
+        return max(1, int(getattr(settings, "VIDEO_MAX_CASCADE_ATTEMPTS", 3) or 1))
 
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=90.0))
@@ -270,16 +276,18 @@ class VideoService:
         if not chain:
             chain = ["reel"]
 
+        # snapshot once so a mid-flight settings change can't skew the loop math
+        max_attempts = self.MAX_CASCADE_ATTEMPTS
         last_err: Exception | None = None
-        for attempt in range(self.MAX_CASCADE_ATTEMPTS):
+        for attempt in range(max_attempts):
             log.info(
                 "cascade attempt %d/%d starting chain: %s",
-                attempt + 1, self.MAX_CASCADE_ATTEMPTS, chain,
+                attempt + 1, max_attempts, chain,
             )
             for name in chain:
                 log.info(
                     "cascade step attempt %d/%d provider '%s'",
-                    attempt + 1, self.MAX_CASCADE_ATTEMPTS, name,
+                    attempt + 1, max_attempts, name,
                 )
                 try:
                     if name == "reel":
@@ -302,7 +310,7 @@ class VideoService:
                     last_err = exc
                     log.info(
                         "video provider '%s' unavailable at cascade attempt %d/%d (%s): %s",
-                        name, attempt + 1, self.MAX_CASCADE_ATTEMPTS, exc.CATEGORY, exc,
+                        name, attempt + 1, max_attempts, exc.CATEGORY, exc,
                     )
                     # Cascade to next provider; if this is the last provider,
                     # break out to raise the final error cleanly.
@@ -311,25 +319,25 @@ class VideoService:
                     continue
             # If we exhausted the chain without success, retry the full chain
             # (up to MAX_CASCADE_ATTEMPTS) before giving up.
-            if attempt < self.MAX_CASCADE_ATTEMPTS - 1:
+            if attempt < max_attempts - 1:
                 sleep_s = 0.8 * (attempt + 1)
                 log.info(
                     "cascade chain exhausted at attempt %d/%d — backoff %.2fs before retry %d/%d",
-                    attempt + 1, self.MAX_CASCADE_ATTEMPTS,
-                    sleep_s, attempt + 2, self.MAX_CASCADE_ATTEMPTS,
+                    attempt + 1, max_attempts,
+                    sleep_s, attempt + 2, max_attempts,
                 )
                 await asyncio.sleep(sleep_s)
 
         if last_err:
             log.error(
                 "cascade failed after %d/%d attempts across providers %s — last error (%s): %s",
-                self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+                max_attempts, max_attempts, chain,
                 last_err.CATEGORY, last_err,
             )
             raise last_err
         log.error(
             "cascade failed after %d/%d attempts across providers %s — empty chain",
-            self.MAX_CASCADE_ATTEMPTS, self.MAX_CASCADE_ATTEMPTS, chain,
+            max_attempts, max_attempts, chain,
         )
         raise VideoNotConfigured("VIDEO_PROVIDER chain is empty.")
 
@@ -585,7 +593,9 @@ class VideoService:
                 log.warning("reel ffmpeg failed: %s", (err or b"")[-400:])
                 raise VideoGenerationError("Reel compositing failed — ffmpeg rejected the graph.")
             if on_progress:
-                on_progress(VideoProgress(stage="compositing", done=1, total=1, note="film finished").to_dict())
+                # terminal event: canonical 3-key completion marker (no note) so
+                # clients can detect "film finished" by done == total alone.
+                on_progress(VideoProgress(stage="compositing", done=1, total=1).to_dict())
         base = settings.BACKEND_PUBLIC_URL.rstrip("/")
         return f"{base}/api/v1/media/files/{out_name}", False
 
