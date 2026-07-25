@@ -398,8 +398,13 @@ class Reel(Base):
     source_url: Mapped[str] = mapped_column(String(600), default="")   # shared (already-hosted) media
     poster: Mapped[str] = mapped_column(String(48), default="")        # <uuid>_rp.jpg cover frame
     status: Mapped[str] = mapped_column(String(12), default="live", index=True)  # live|hidden
+    # Denormalized engagement counters — the feed reads them straight off the
+    # row instead of running three COUNT(*)s per card. `likes` and `saves` are
+    # reconcilable from their join tables; `views`/`shares` are pure tallies.
     views: Mapped[int] = mapped_column(Integer, default=0)
-    likes: Mapped[int] = mapped_column(Integer, default=0)             # denormalized counter
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    shares: Mapped[int] = mapped_column(Integer, default=0)
+    saves: Mapped[int] = mapped_column(Integer, default=0)
     # Python-side default (microseconds) in ADDITION to the server default:
     # SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so two posts in
     # the same second would tie and the paginated feed could skip or repeat
@@ -420,3 +425,20 @@ class ReelLike(Base):
     reel_id: Mapped[str] = mapped_column(ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReelSave(Base):
+    """🔖 Saved/bookmarked reels — one row per (reel, user), same idempotent
+    composite PK as likes. Powers the viewer's private "Saved" tab, which is
+    why it carries its own timestamp: saves are listed newest-saved-first, not
+    in the order the reels were posted."""
+
+    __tablename__ = "reel_saves"
+
+    reel_id: Mapped[str] = mapped_column(ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )

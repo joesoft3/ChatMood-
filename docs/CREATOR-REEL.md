@@ -38,13 +38,49 @@ already know from Reels/TikTok/Shorts:
 | `GET /api/v1/reels` | feed, newest first, 20 per page (`?mine=true`, `?offset=`) |
 | `POST /api/v1/reels/upload` | multipart `file` + `caption` → new post |
 | `POST /api/v1/reels/share` | `{film_id}` or `{url}` + `caption` → new post |
+| `GET /api/v1/reels?saved=true` | 🔖 your saved collection, newest **save** first |
+| `GET /api/v1/reels/stats` | 📊 profile totals across everything you've posted |
 | `POST /api/v1/reels/{id}/like` | idempotent toggle → `{liked, likes}` |
+| `POST /api/v1/reels/{id}/save` | idempotent bookmark toggle → `{saved, saves}` |
+| `POST /api/v1/reels/{id}/share` | tally + the link to copy → `{shares, url}` |
 | `POST /api/v1/reels/{id}/view` | bump the view counter |
 | `POST /api/v1/reels/{id}/visibility` | `{"live": false}` unposts; author only |
 | `DELETE /api/v1/reels/{id}` | deletes the row **and** uploaded bytes; author only |
 | `GET /api/v1/reels/files/{name}` | public streaming (see below) |
 
 Uploads: MP4/MOV/WebM, ≤ 100 MB, rate-limited 4/min (×4 on pro).
+
+## 📊 Engagement counters
+
+Every card carries four numbers, denormalised onto the `reels` row so the feed
+never runs three `COUNT(*)`s per card:
+
+| Counter | Semantics |
+|---|---|
+| 👁 **views** | pure tally, counted once per card per mount when it first becomes visible |
+| ❤️ **likes** | per-user **toggle** — `(reel_id, user_id)` PK makes a double-tap idempotent |
+| 🔖 **saves** | per-user **toggle**, and the row that powers your private Saved tab |
+| ➤ **shares** | pure **tally** — sharing the same reel twice really is two shares, so it deliberately does *not* toggle |
+
+Likes and saves are reconcilable from their join tables; views and shares are
+counters only. The UI updates optimistically and then reconciles against the
+server's authoritative number, rolling back if the request fails.
+
+**Share** uses the native share sheet where the browser has one
+(`navigator.share`) and falls back to copying the link. A dismissed share sheet
+is *not* counted — only a completed share or a successful copy increments.
+
+## 🔖 Saved & 🎬 profile
+
+- **Saved tab** (`?saved=true`) lists your bookmarks ordered by *when you saved
+  them*, not when they were posted — a save is its own event with its own
+  timestamp. Un-saving from inside the tab removes the card immediately.
+- Unposting a reel drops it out of everyone's Saved tab too (the join filters
+  on `status == "live"`), and deleting clears both join tables explicitly:
+  SQLite doesn't honour `ON DELETE CASCADE` unless `PRAGMA foreign_keys` is on,
+  so orphan likes/saves would otherwise break other users' Saved tabs.
+- **My reels** shows a stats strip — posts · live · views · likes · shares —
+  from `GET /reels/stats`, plus per-card **unpost** and **delete**.
 
 ## Two details worth knowing
 

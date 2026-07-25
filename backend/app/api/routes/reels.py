@@ -23,7 +23,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
-from ...db.models import Film, Reel, ReelLike, User
+from ...db.models import Film, Reel, ReelLike, ReelSave, User
 from ...db.session import get_db
 from ...services import soundtrack
 from ...services.metering import plan_rate_mult, record_usage
@@ -57,7 +57,7 @@ def _media_url(name: str) -> str:
     return f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/reels/files/{name}"
 
 
-def _reel_out(r: Reel, *, liked: bool = False, mine: bool = False) -> dict:
+def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool = False) -> dict:
     """Serialize a reel for the feed.
 
     Defensive about filenames for the same reason the films gallery is: one
@@ -82,7 +82,10 @@ def _reel_out(r: Reel, *, liked: bool = False, mine: bool = False) -> dict:
         "poster": poster,
         "views": r.views or 0,
         "likes": r.likes or 0,
+        "shares": r.shares or 0,
+        "saves": r.saves or 0,
         "liked": liked,
+        "saved": saved,
         "mine": mine,
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -103,41 +106,76 @@ async def _liked_ids(db: AsyncSession, user_id: str, reel_ids: list[str]) -> set
     return set(rows)
 
 
+async def _saved_ids(db: AsyncSession, user_id: str, reel_ids: list[str]) -> set[str]:
+    """Which of these reels the viewer has bookmarked (one query, not N)."""
+    if not reel_ids:
+        return set()
+    rows = (
+        await db.execute(
+            select(ReelSave.reel_id).where(
+                ReelSave.user_id == user_id, ReelSave.reel_id.in_(reel_ids)
+            )
+        )
+    ).scalars().all()
+    return set(rows)
+
+
 # --------------------------------------------------------------------- feed
 @router.get("")
 async def list_reels(
     mine: bool = False,
+    saved: bool = False,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """The shared creator feed, newest first. `mine=true` → only your posts
-    (including ones you've unposted, so you can put them back)."""
-    offset = max(0, min(offset, 5000))
-    q = select(Reel)
-    if mine:
-        q = q.where(Reel.user_id == user.id)
-    else:
-        q = q.where(Reel.status == "live")
-    # `id` breaks ties deterministically: without it, posts sharing a timestamp
-    # could shuffle between pages and the reader would skip or re-see one.
-    rows = (
-        await db.execute(
-            q.order_by(Reel.created_at.desc(), Reel.id.desc()).offset(offset).limit(FEED_PAGE)
-        )
-    ).scalars().all()
+    """The shared creator feed, newest first.
 
-    liked = await _liked_ids(db, user.id, [r.id for r in rows])
-    total = int(
-        await db.scalar(
-            select(func.count(Reel.id)).where(
-                Reel.user_id == user.id if mine else Reel.status == "live"
-            )
+    `mine=true`  → only your posts (including unposted ones, so you can
+                   restore them from your profile).
+    `saved=true` → only reels you bookmarked, newest *save* first (not newest
+                   post — a save is its own event with its own timestamp).
+    """
+    offset = max(0, min(offset, 5000))
+
+    if saved:
+        # Join through the bookmark table and sort by when it was saved.
+        q = (
+            select(Reel)
+            .join(ReelSave, ReelSave.reel_id == Reel.id)
+            .where(ReelSave.user_id == user.id, Reel.status == "live")
+            .order_by(ReelSave.created_at.desc(), Reel.id.desc())
         )
-        or 0
-    )
+        count_q = (
+            select(func.count(Reel.id))
+            .select_from(Reel)
+            .join(ReelSave, ReelSave.reel_id == Reel.id)
+            .where(ReelSave.user_id == user.id, Reel.status == "live")
+        )
+    else:
+        q = select(Reel)
+        if mine:
+            q = q.where(Reel.user_id == user.id)
+            count_q = select(func.count(Reel.id)).where(Reel.user_id == user.id)
+        else:
+            q = q.where(Reel.status == "live")
+            count_q = select(func.count(Reel.id)).where(Reel.status == "live")
+        # `id` breaks ties deterministically: without it, posts sharing a
+        # timestamp could shuffle between pages and the reader would skip or
+        # re-see one.
+        q = q.order_by(Reel.created_at.desc(), Reel.id.desc())
+
+    rows = (await db.execute(q.offset(offset).limit(FEED_PAGE))).scalars().all()
+
+    ids = [r.id for r in rows]
+    liked = await _liked_ids(db, user.id, ids)
+    saved_set = await _saved_ids(db, user.id, ids)
+    total = int(await db.scalar(count_q) or 0)
     return {
-        "reels": [_reel_out(r, liked=r.id in liked, mine=r.user_id == user.id) for r in rows],
+        "reels": [
+            _reel_out(r, liked=r.id in liked, saved=r.id in saved_set, mine=r.user_id == user.id)
+            for r in rows
+        ],
         "total": total,
         "next_offset": offset + len(rows) if offset + len(rows) < total else None,
     }
@@ -323,6 +361,84 @@ async def toggle_like(
     return {"liked": liked, "likes": r.likes}
 
 
+@router.post("/{reel_id}/save")
+async def toggle_save(
+    reel_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """🔖 Idempotent bookmark toggle — saves land in your private Saved tab.
+
+    You can save your own reel: creators bookmark their own work as a shortlist,
+    and blocking it would be a surprising rule with no upside.
+    """
+    r = await db.get(Reel, reel_id)
+    if not r or r.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    existing = await db.get(ReelSave, {"reel_id": reel_id, "user_id": user.id})
+    if existing:
+        await db.delete(existing)
+        r.saves = max(0, (r.saves or 0) - 1)
+        saved = False
+    else:
+        db.add(ReelSave(reel_id=reel_id, user_id=user.id))
+        r.saves = (r.saves or 0) + 1
+        saved = True
+    await db.commit()
+    return {"saved": saved, "saves": r.saves}
+
+
+@router.post("/{reel_id}/share")
+async def count_share(
+    reel_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """🔗 Record that a viewer shared this reel, and hand back the link to copy.
+
+    Unlike likes/saves this is a pure tally, not a per-user toggle: sharing the
+    same reel twice really is two shares.
+    """
+    r = await db.get(Reel, reel_id)
+    if not r or r.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    await enforce_rate_limit(f"reelshr:{user.id}", 30 * plan_rate_mult(user.plan))
+    r.shares = (r.shares or 0) + 1
+    await db.commit()
+    return {"shares": r.shares, "url": _reel_out(r)["url"]}
+
+
+@router.get("/stats")
+async def my_stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """📊 Totals across everything you've posted — the profile header numbers."""
+    row = (
+        await db.execute(
+            select(
+                func.count(Reel.id),
+                func.coalesce(func.sum(Reel.views), 0),
+                func.coalesce(func.sum(Reel.likes), 0),
+                func.coalesce(func.sum(Reel.shares), 0),
+                func.coalesce(func.sum(Reel.saves), 0),
+            ).where(Reel.user_id == user.id)
+        )
+    ).one()
+    live = int(
+        await db.scalar(
+            select(func.count(Reel.id)).where(Reel.user_id == user.id, Reel.status == "live")
+        )
+        or 0
+    )
+    saved_count = int(
+        await db.scalar(select(func.count(ReelSave.reel_id)).where(ReelSave.user_id == user.id))
+        or 0
+    )
+    return {
+        "posts": int(row[0] or 0),
+        "live": live,
+        "views": int(row[1] or 0),
+        "likes": int(row[2] or 0),
+        "shares": int(row[3] or 0),
+        "saves": int(row[4] or 0),
+        "saved_by_me": saved_count,
+    }
+
+
 @router.post("/{reel_id}/view")
 async def count_view(
     reel_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
@@ -365,7 +481,11 @@ async def delete_reel(
             os.remove(os.path.join(settings.MEDIA_DIR, name))
         except OSError:
             pass
+    # Clear both join tables explicitly: SQLite doesn't enforce ON DELETE
+    # CASCADE unless PRAGMA foreign_keys is on, so a deleted reel could
+    # otherwise leave orphan likes/saves that break other users' Saved tabs.
     await db.execute(delete(ReelLike).where(ReelLike.reel_id == r.id))
+    await db.execute(delete(ReelSave).where(ReelSave.reel_id == r.id))
     await db.delete(r)
     await db.commit()
 
