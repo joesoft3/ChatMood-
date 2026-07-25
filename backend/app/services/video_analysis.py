@@ -145,6 +145,12 @@ def build_sample_filter(
             f"trim=duration={max(1, max_frames * 5)}"
         )
     if strategy == SAMPLING_KEYFRAME:
-        return f"select='eq(pict_type,I)',scale=768:-2,fps=1/{interval_sec}"
+        # I-frame only: use select with interval throttle to avoid flooding
+        # The throttle ensures we don't grab every I-frame (e.g., every GOP)
+        return (
+            f"select='eq(pict_type,I)',"
+            f"scale=768:-2,"
+            f"fps=1/{max(1, interval_sec)}"
+        )
     # uniform default
     return f"fps=1/{max(1, interval_sec)},scale=768:-2"
