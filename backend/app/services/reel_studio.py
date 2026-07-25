@@ -293,3 +293,233 @@ def new_reel_name() -> tuple[str, str]:
 
 def media_path(name: str) -> Path:
     return Path(settings.MEDIA_DIR) / name
+
+
+# =========================================================== 🎞 timeline edit
+# The reel editor is a small non-linear timeline: an ordered list of video
+# clips (each trimmable, with its own effect and volume) plus one optional
+# audio bed and one optional picture-in-picture overlay. Everything renders in
+# a SINGLE ffmpeg pass — chaining passes would re-encode the footage once per
+# operation and visibly soften it.
+
+MAX_CLIPS = 10               # keeps the filtergraph (and render time) sane
+MAX_TOTAL_SECONDS = 180
+OVERLAY_CORNERS = ("tr", "tl", "br", "bl")
+FPS = 30
+SR = 48000                   # one sample rate everywhere: concat needs it uniform
+
+
+@dataclass
+class Clip:
+    """One segment on the timeline."""
+    path: str
+    start: float = 0.0            # trim in-point, seconds
+    end: float | None = None      # trim out-point (None → to the end)
+    effect: str = "none"
+    speed: float = 1.0
+    volume: float = 1.0           # 0 = muted, 1 = as recorded
+    has_audio: bool = True
+
+    @property
+    def duration(self) -> float | None:
+        if self.end is None:
+            return None
+        return max(0.05, self.end - self.start) / max(0.5, min(self.speed, 2.0))
+
+
+@dataclass
+class Overlay:
+    """Picture-in-picture clip pinned to a corner."""
+    path: str
+    corner: str = "tr"
+    scale: float = 0.30           # fraction of canvas width
+    volume: float = 0.0           # silent by default — PiP audio usually clashes
+    has_audio: bool = False
+
+
+@dataclass
+class AudioBed:
+    """A music/voiceover track laid under the whole timeline."""
+    path: str
+    volume: float = 0.8
+    start: float = 0.0
+
+
+def _clamp(v: float, lo: float, hi: float) -> float:
+    try:
+        return max(lo, min(float(v), hi))
+    except (TypeError, ValueError):
+        return lo
+
+
+def _overlay_xy(corner: str, pad: int = 40) -> str:
+    return {
+        "tr": f"W-w-{pad}:{pad}",
+        "tl": f"{pad}:{pad}",
+        "br": f"W-w-{pad}:H-h-{pad}",
+        "bl": f"{pad}:H-h-{pad}",
+    }.get(corner, f"W-w-{pad}:{pad}")
+
+
+def build_timeline_cmd(
+    clips: list[Clip],
+    dst: str,
+    *,
+    bed: AudioBed | None = None,
+    overlay: Overlay | None = None,
+    original_volume: float = 1.0,
+) -> list[str]:
+    """Render the whole timeline in one pass (pure argv builder).
+
+    Video: each clip is trimmed → normalised to the reel canvas → graded →
+    speed-shifted, then all clips are concatenated.
+
+    Audio is the fiddly part. `concat` demands every segment carry an audio
+    stream, but a screen recording or a muted clip may have none — so silent
+    clips get an `anullsrc` input of matching length. Without that the filter
+    fails with "Stream specifier ':a' matches no streams" and the whole render
+    dies (the same class of bug that broke duets on silent clips).
+    """
+    if not clips:
+        raise StudioError("a timeline needs at least one clip")
+    if len(clips) > MAX_CLIPS:
+        raise StudioError(f"a reel can hold at most {MAX_CLIPS} clips")
+
+    exe = ffmpeg_path() or "ffmpeg"
+    inputs: list[str] = []
+    silent_slots: list[tuple[int, float]] = []   # (input index, seconds)
+    idx = 0
+    clip_inputs: list[int] = []
+
+    for c in clips:
+        inputs += ["-i", c.path]
+        clip_inputs.append(idx)
+        idx += 1
+
+    overlay_idx = None
+    if overlay:
+        inputs += ["-i", overlay.path]
+        overlay_idx = idx
+        idx += 1
+
+    bed_idx = None
+    if bed:
+        inputs += ["-i", bed.path]
+        bed_idx = idx
+        idx += 1
+
+    # Silent stand-ins are appended last so clip indices stay stable.
+    silent_for: dict[int, int] = {}
+    for n, c in enumerate(clips):
+        if c.has_audio:
+            continue
+        secs = c.duration or 10.0
+        inputs += ["-f", "lavfi", "-t", f"{secs:.3f}",
+                   "-i", f"anullsrc=channel_layout=stereo:sample_rate={SR}"]
+        silent_for[n] = idx
+        silent_slots.append((idx, secs))
+        idx += 1
+
+    parts: list[str] = []
+    vlabels: list[str] = []
+    alabels: list[str] = []
+
+    for n, c in enumerate(clips):
+        i = clip_inputs[n]
+        speed = _clamp(c.speed, 0.5, 2.0)
+        # -- video
+        v = f"[{i}:v]"
+        seg = []
+        if c.start or c.end is not None:
+            trim = f"trim=start={c.start:.3f}"
+            if c.end is not None:
+                trim += f":end={c.end:.3f}"
+            seg.append(trim)
+            seg.append("setpts=PTS-STARTPTS")
+        seg.append(f"scale={REEL_W}:{REEL_H}:force_original_aspect_ratio=increase")
+        seg.append(f"crop={REEL_W}:{REEL_H}")
+        seg.append("setsar=1")
+        look = EFFECTS.get(c.effect or "none", EFFECTS["none"]).vf
+        if look:
+            seg.append(look)
+        if speed != 1.0:
+            seg.append(f"setpts={1 / speed:.4f}*PTS")
+        seg.append(f"fps={FPS}")
+        parts.append(f"{v}{','.join(seg)}[v{n}]")
+        vlabels.append(f"[v{n}]")
+
+        # -- audio (real stream, or the silent stand-in)
+        src = f"[{silent_for[n]}:a]" if n in silent_for else f"[{i}:a]"
+        aseg = []
+        if n not in silent_for and (c.start or c.end is not None):
+            at = f"atrim=start={c.start:.3f}"
+            if c.end is not None:
+                at += f":end={c.end:.3f}"
+            aseg.append(at)
+        aseg.append(f"aresample={SR}")
+        if speed != 1.0 and n not in silent_for:
+            aseg.append(f"atempo={speed:.4f}")
+        vol = _clamp(c.volume, 0.0, 2.0) * _clamp(original_volume, 0.0, 2.0)
+        if vol != 1.0:
+            aseg.append(f"volume={vol:.3f}")
+        aseg.append("asetpts=N/SR/TB")
+        parts.append(f"{src}{','.join(aseg)}[a{n}]")
+        alabels.append(f"[a{n}]")
+
+    n_clips = len(clips)
+    if n_clips > 1:
+        parts.append("".join(f"{v}{a}" for v, a in zip(vlabels, alabels))
+                     + f"concat=n={n_clips}:v=1:a=1[vcat][acat]")
+        vout, aout = "[vcat]", "[acat]"
+    else:
+        vout, aout = vlabels[0], alabels[0]
+
+    # -- picture-in-picture
+    if overlay and overlay_idx is not None:
+        ow = max(80, int(REEL_W * _clamp(overlay.scale, 0.15, 0.6)))
+        parts.append(f"[{overlay_idx}:v]scale={ow}:-2,setsar=1[ovl]")
+        # shortest=0 → the base keeps playing after a short overlay ends
+        parts.append(f"{vout}[ovl]overlay={_overlay_xy(overlay.corner)}:shortest=0[vpip]")
+        vout = "[vpip]"
+        if overlay.has_audio and overlay.volume > 0:
+            parts.append(f"[{overlay_idx}:a]aresample={SR},"
+                         f"volume={_clamp(overlay.volume, 0.0, 2.0):.3f},asetpts=N/SR/TB[ovla]")
+            parts.append(f"{aout}[ovla]amix=inputs=2:duration=first:dropout_transition=0"
+                         f",aresample={SR}[amixed]")
+            aout = "[amixed]"
+
+    # -- audio bed under everything (the "volume split")
+    if bed and bed_idx is not None:
+        bseg = [f"aresample={SR}"]
+        if bed.start:
+            bseg.insert(0, f"atrim=start={bed.start:.3f}")
+        bseg.append(f"volume={_clamp(bed.volume, 0.0, 2.0):.3f}")
+        bseg.append("asetpts=N/SR/TB")
+        parts.append(f"[{bed_idx}:a]{','.join(bseg)}[bed]")
+        # duration=first → the bed is trimmed to the video, never extends it
+        parts.append(f"{aout}[bed]amix=inputs=2:duration=first:dropout_transition=0"
+                     f",aresample={SR}[aout]")
+        aout = "[aout]"
+
+    cmd = [exe, "-y", *inputs, "-filter_complex", ";".join(parts),
+           "-map", vout, "-map", aout, "-c:a", "aac", "-b:a", "128k"]
+    cmd += _tail(dst)
+    return cmd
+
+
+def probe_duration(path: str) -> float:
+    """Clip length in seconds (0.0 when unknown) — parsed from `ffmpeg -i`
+    because imageio-ffmpeg ships no ffprobe."""
+    exe = ffmpeg_path()
+    if not exe:
+        return 0.0
+    try:
+        out = subprocess.run([exe, "-hide_banner", "-i", path],
+                             capture_output=True, text=True, timeout=30).stderr
+    except Exception:  # noqa: BLE001
+        return 0.0
+    m = re.search(r"Duration: (\d+):(\d\d):(\d\d\.\d+)", out)
+    if not m:
+        return 0.0
+    h, mi, sec = int(m.group(1)), int(m.group(2)), float(m.group(3))
+    return h * 3600 + mi * 60 + sec

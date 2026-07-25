@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import ReelEditor from "@/components/ReelEditor";
 import { SHARE_TARGETS } from "@/components/SocialIcons";
 import { StudioEmptyState } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
@@ -466,6 +467,7 @@ export default function ReelPage() {
   const [msg, setMsg] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [shareFor, setShareFor] = useState<Reel | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [duetFor, setDuetFor] = useState<Reel | null>(null);
   const [duetFile, setDuetFile] = useState<File | null>(null);
   const [duetLayout, setDuetLayout] = useState("side");
@@ -709,12 +711,24 @@ export default function ReelPage() {
   );
 
   const postButton = (
-    <button
-      onClick={() => setComposerOpen(true)}
-      className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-[#0b0f14] transition hover:brightness-110"
-    >
-      <Plus size={14} /> Post
-    </button>
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => {
+          setComposerTab("share");
+          setComposerOpen(true);
+        }}
+        title="Share a film you already made"
+        className="rounded-xl border border-line px-2.5 py-2 text-xs text-gray-300 transition hover:border-accent/50"
+      >
+        <Clapperboard size={14} />
+      </button>
+      <button
+        onClick={() => setEditorOpen(true)}
+        className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-[#0b0f14] transition hover:brightness-110"
+      >
+        <Plus size={14} /> Post
+      </button>
+    </div>
   );
 
   const TABS: [Tab, string][] = [
@@ -794,7 +808,7 @@ export default function ReelPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => setComposerOpen(true)}
+                  onClick={() => setEditorOpen(true)}
                   className="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-[#0b0f14] hover:brightness-110"
                 >
                   <Plus size={13} className="mr-1 inline" /> Post to the reel
@@ -827,6 +841,22 @@ export default function ReelPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* ------------------------------------------------ 🎞 editor */}
+      {editorOpen && (
+        <ReelEditor
+          effects={catalog?.effects ?? []}
+          speeds={catalog?.speeds ?? { "1x": 1 }}
+          flash={flash}
+          onClose={() => setEditorOpen(false)}
+          onPublished={(reel) => {
+            setEditorOpen(false);
+            if (tab !== "saved") setReels((rs) => [reel as Reel, ...(rs ?? [])]);
+            loadStats();
+            flash("🚀 Published to the reel");
+          }}
+        />
       )}
 
       {/* ------------------------------------------------ share sheet */}

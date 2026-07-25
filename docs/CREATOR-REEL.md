@@ -116,6 +116,57 @@ This ffmpeg build ships **no `drawtext` filter**, so text goes through
 `subtitles=` — which wraps, outlines and times text better anyway. Set
 `REEL_FONTS_DIR` on hosts with no system fonts.
 
+## 🎞 The editor — record, arrange, publish
+
+Tapping **Post** opens a full editor instead of a bare file picker.
+
+**Record** — `getUserMedia` + `MediaRecorder` capture straight in the browser
+(front camera, 1080×1920 preferred). Codec support differs per browser, so we
+probe `isTypeSupported` and let the UA choose rather than throwing
+`NotSupportedError`. The stream is always released on close — a page that keeps
+the camera light on after you leave is the fastest way to lose trust.
+
+**Timeline** — up to 10 clips, each with its own trim, effect, speed and
+volume. `+ Video`, `+ Audio` and `+ Overlay` stage more sources.
+
+| Control | What it does |
+|---|---|
+| ✂️ **Split** | cuts the selected clip at the preview playhead into two clips |
+| ⧉ **Duplicate** | repeats a clip in place (a beat-repeat, without re-uploading) |
+| 🗑 **Remove** | drops it, and unstages the asset if nothing else references it |
+| **Trim** | in/out sliders per clip |
+| 🔊 **Clip volume** | the *volume split* — duck a clip under the music bed |
+
+**+ Audio** lays a music/voiceover bed under the whole timeline with its own
+volume, so "clip at 30%, track at 85%" is two sliders. **+ Overlay** pins a
+second video picture-in-picture to any corner at 15–60% width, previewed live
+in the editor at the exact corner and size it will render.
+
+**Publish** renders the entire timeline in a **single ffmpeg pass**. Chaining
+one pass per operation would re-encode the footage each time and visibly soften
+it. Staged assets are cleaned up once the render lands.
+
+### Staging & safety
+Assets upload to `_ra` names — deliberately outside the `_r.mp4` serving
+pattern, so an unpublished draft is never in anyone's feed (nothing links to it:
+no `Reel` row ever references an `_ra` name). They *are* served, because the
+editor has to play back what you just recorded.
+
+`publish` resolves every clip name through a strict `DRAFT_RE` allowlist.
+Client-supplied filenames are hostile input: without it, a caller could pass
+`../../etc/passwd` and have ffmpeg read arbitrary files into a published video.
+
+The timeline builder also generates an `anullsrc` track for silent clips —
+`concat` demands audio on *every* segment, and a screen recording with no audio
+would otherwise fail the whole graph with "Stream specifier ':a' matches no
+streams".
+
+| Endpoint | Notes |
+|---|---|
+| `POST /api/v1/reels/assets` | stage a clip or audio track (`kind=video\|audio`) |
+| `DELETE /api/v1/reels/assets/{name}` | discard a staged asset |
+| `POST /api/v1/reels/publish` | render the timeline → a published reel |
+
 ## 🔁 Repost & 📣 social share
 
 **Repost** (`POST /reels/{id}/repost`) copies no bytes — the new row points at

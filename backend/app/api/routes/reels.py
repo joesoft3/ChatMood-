@@ -42,7 +42,23 @@ REEL_NAME_RE = re.compile(r"^[a-f0-9]{32}_r\.mp4$")
 REEL_POSTER_RE = re.compile(r"^[a-f0-9]{32}_rp\.jpg$")
 
 REEL_MIMES = {"video/mp4": "mp4", "video/quicktime": "mp4", "video/webm": "mp4"}
+# Camera captures arrive as webm from MediaRecorder; audio adds are music beds
+# or voiceovers recorded in-browser.
+# Browsers disagree on audio MIME strings for the SAME file: Chrome reports
+# .m4a as audio/x-m4a, Python's mimetypes says audio/mp4, Safari sends
+# audio/aac. Accept every spelling or the picker rejects valid tracks.
+REEL_AUDIO_MIMES = {
+    "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/x-mpeg": "mp3",
+    "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/m4a": "m4a", "audio/aac": "m4a",
+    "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/vnd.wave": "wav",
+    "audio/webm": "webm", "audio/ogg": "ogg", "audio/vorbis": "ogg", "audio/opus": "ogg",
+    "audio/flac": "flac", "audio/x-flac": "flac",
+}
 REEL_MAX_BYTES = 100 * 1024 * 1024
+REEL_AUDIO_MAX_BYTES = 25 * 1024 * 1024
+# Draft assets staged in MEDIA_DIR before publish. `_ra` keeps them outside the
+# reel-serving namespace so a half-finished edit is never publicly playable.
+DRAFT_RE = re.compile(r"^[a-f0-9]{32}_ra\.(mp4|webm|mov|mp3|m4a|wav|ogg|flac)$")
 CAPTION_MAX = 300
 FEED_PAGE = 20
 
@@ -417,6 +433,196 @@ async def share_to_reel(
     return {"reel": _reel_out(row, mine=True)}
 
 
+# ------------------------------------------------------------ 🎞 editor
+@router.post("/assets", status_code=status.HTTP_201_CREATED)
+async def upload_asset(
+    file: UploadFile = File(...),
+    kind: str = Form(default="video"),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """📥 Stage one clip (camera capture or file) or audio track for the editor.
+
+    Assets live in MEDIA_DIR under `_ra` names — deliberately OUTSIDE the reel
+    serving pattern, so an unpublished draft can never be played from the feed.
+    They're cleaned up when the edit is published or discarded.
+    """
+    await enforce_rate_limit(f"reelasset:{user.id}", 20 * plan_rate_mult(user.plan))
+    mime = (file.content_type or "").split(";")[0].strip().lower()
+    is_audio = kind == "audio"
+    table = REEL_AUDIO_MIMES if is_audio else REEL_MIMES
+    cap = REEL_AUDIO_MAX_BYTES if is_audio else REEL_MAX_BYTES
+    if mime not in table:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            "Upload an MP3, M4A, WAV or OGG track" if is_audio
+            else "Upload an MP4, MOV or WebM video",
+        )
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
+    if len(raw) > cap:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            f"Must be ≤ {cap // (1024 * 1024)} MB")
+
+    ext = table[mime]
+    aid = uuid.uuid4().hex
+    name = f"{aid}_ra.{ext}"
+    os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+    path = os.path.join(settings.MEDIA_DIR, name)
+    with open(path, "wb") as fh:
+        fh.write(raw)
+
+    return {
+        "asset": {
+            "id": aid,
+            "name": name,
+            "kind": "audio" if is_audio else "video",
+            "url": _media_url(name),
+            "duration": studio.probe_duration(path),
+            "has_audio": True if is_audio else studio.probe_has_audio(path),
+        }
+    }
+
+
+def _asset_path(name: str) -> str:
+    """Resolve a staged asset name to a path, refusing anything else.
+
+    Never trust a client-supplied filename: without this an attacker could
+    pass `../../etc/passwd` and have ffmpeg read it into a published video.
+    """
+    if not name or not DRAFT_RE.match(name):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown asset: {name}")
+    path = os.path.join(settings.MEDIA_DIR, name)
+    if not os.path.exists(path):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That clip is no longer staged — re-add it")
+    return path
+
+
+@router.post("/publish", status_code=status.HTTP_201_CREATED)
+async def publish_edit(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """🚀 Render the edited timeline and publish it as a reel.
+
+    Body:
+      clips:   [{name, start, end, effect, speed, volume}]  (1..MAX_CLIPS, ordered)
+      audio:   {name, volume, start}          — optional bed ("+ audio")
+      overlay: {name, corner, scale, volume}  — optional picture-in-picture
+      caption, captions (bool), caption_style, original_volume
+    """
+    await enforce_rate_limit(f"reelpub:{user.id}", 3 * plan_rate_mult(user.plan))
+
+    # Validate the timeline BEFORE checking the renderer: a malformed request
+    # deserves "your overlay corner is wrong", not a misleading 503 that sends
+    # the creator hunting for an outage that isn't there.
+    raw_clips = body.get("clips") or []
+    if not isinstance(raw_clips, list) or not raw_clips:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Add at least one clip")
+    if len(raw_clips) > studio.MAX_CLIPS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            f"A reel can hold at most {studio.MAX_CLIPS} clips")
+
+    clips: list[studio.Clip] = []
+    for c in raw_clips:
+        if not isinstance(c, dict):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "malformed clip")
+        path = _asset_path(str(c.get("name") or ""))
+        end = c.get("end")
+        clips.append(studio.Clip(
+            path=path,
+            start=max(0.0, float(c.get("start") or 0.0)),
+            end=float(end) if end not in (None, "") else None,
+            effect=str(c.get("effect") or "none"),
+            speed=float(c.get("speed") or 1.0),
+            volume=float(c.get("volume") if c.get("volume") is not None else 1.0),
+            has_audio=studio.probe_has_audio(path),
+        ))
+
+    total = sum(c.duration or studio.probe_duration(c.path) for c in clips)
+    if total > studio.MAX_TOTAL_SECONDS:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"That edit is {int(total)}s — reels are capped at {studio.MAX_TOTAL_SECONDS}s",
+        )
+
+    bed = None
+    if isinstance(body.get("audio"), dict) and body["audio"].get("name"):
+        a = body["audio"]
+        bed = studio.AudioBed(path=_asset_path(str(a["name"])),
+                              volume=float(a.get("volume", 0.8)),
+                              start=max(0.0, float(a.get("start") or 0.0)))
+
+    ov = None
+    if isinstance(body.get("overlay"), dict) and body["overlay"].get("name"):
+        o = body["overlay"]
+        opath = _asset_path(str(o["name"]))
+        corner = str(o.get("corner") or "tr")
+        if corner not in studio.OVERLAY_CORNERS:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                f"corner must be one of {', '.join(studio.OVERLAY_CORNERS)}")
+        ov = studio.Overlay(path=opath, corner=corner,
+                            scale=float(o.get("scale", 0.3)),
+                            volume=float(o.get("volume") or 0.0),
+                            has_audio=studio.probe_has_audio(opath))
+
+    # Everything the caller sent is valid — now we need the renderer.
+    if not soundtrack.ffmpeg_path():
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
+                            "The video renderer is unavailable on this host")
+
+    uid = uuid.uuid4().hex
+    name = f"{uid}_r.mp4"
+    out_path = os.path.join(settings.MEDIA_DIR, name)
+    try:
+        studio.run(studio.build_timeline_cmd(
+            clips, out_path, bed=bed, overlay=ov,
+            original_volume=float(body.get("original_volume", 1.0)),
+        ), timeout=600)
+    except studio.StudioError as e:
+        _unlink(out_path)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)[:200])
+
+    captioned = False
+    if bool(body.get("captions")):
+        captioned = await _apply_captions(out_path, uid, str(body.get("caption_style") or "clean"))
+    poster = await _make_poster(out_path, uid)
+
+    # The edit is rendered — staged assets have served their purpose.
+    for c in raw_clips:
+        _unlink(os.path.join(settings.MEDIA_DIR, str(c.get("name") or "")))
+    for key in ("audio", "overlay"):
+        blob = body.get(key)
+        if isinstance(blob, dict) and blob.get("name"):
+            _unlink(os.path.join(settings.MEDIA_DIR, str(blob["name"])))
+
+    row = Reel(
+        id=uid,
+        user_id=user.id,
+        author_name=_author_label(user),
+        caption=str(body.get("caption") or "").strip()[:CAPTION_MAX],
+        source="upload",
+        filename=name,
+        poster=poster,
+        effect=(clips[0].effect if clips[0].effect != "none" else ""),
+        captioned=captioned,
+    )
+    db.add(row)
+    await db.commit()
+    await record_usage(user.id, "reel", "publish")
+    return {"reel": _reel_out(row, mine=True)}
+
+
+@router.delete("/assets/{name}", status_code=status.HTTP_204_NO_CONTENT)
+async def discard_asset(name: str, user: User = Depends(get_current_user)):
+    """🗑 Drop a staged asset when the creator removes it from the timeline."""
+    if not DRAFT_RE.match(name):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    _unlink(os.path.join(settings.MEDIA_DIR, name))
+
+
 # --------------------------------------------------------------------- duet
 @router.get("/effects")
 async def list_effects(user: User = Depends(get_current_user)):
@@ -759,11 +965,26 @@ async def delete_reel(
 @router.get("/files/{name}")
 async def serve_reel_file(name: str):
     """Stream reel media. Public like /media/files so <video> tags and mobile
-    players work without auth headers; names are 128-bit random hex."""
-    if not (REEL_NAME_RE.match(name) or REEL_POSTER_RE.match(name)):
+    players work without auth headers; names are 128-bit random hex.
+
+    Staged editor assets (`_ra`) are served too — the editor has to play back
+    what you just recorded before you publish it. They stay out of the feed
+    because nothing links to them: no Reel row ever references an `_ra` name.
+    """
+    is_draft = bool(DRAFT_RE.match(name))
+    if not (REEL_NAME_RE.match(name) or REEL_POSTER_RE.match(name) or is_draft):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     path = os.path.join(settings.MEDIA_DIR, name)
     if not os.path.exists(path):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That reel is no longer available")
-    media_type = "image/jpeg" if name.endswith("_rp.jpg") else "video/mp4"
+    if name.endswith("_rp.jpg"):
+        media_type = "image/jpeg"
+    elif is_draft:
+        ext = name.rsplit(".", 1)[-1]
+        media_type = {
+            "mp4": "video/mp4", "webm": "video/webm", "mov": "video/quicktime",
+            "mp3": "audio/mpeg", "m4a": "audio/mp4", "wav": "audio/wav", "ogg": "audio/ogg",
+        }.get(ext, "application/octet-stream")
+    else:
+        media_type = "video/mp4"
     return FileResponse(path, media_type=media_type)
