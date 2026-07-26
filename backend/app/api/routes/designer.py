@@ -8,6 +8,7 @@ serving of design files (logos/brand assets shouldn't leak by URL guessing)."""
 import re
 import secrets
 import uuid
+from enum import IntEnum
 from pathlib import Path
 
 from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
@@ -24,6 +25,14 @@ from ...services import designer as dzn
 from ...services.llm import friendly_ai_error
 from ...services.metering import PLAN_LIMITS, count_today, record_usage
 from ..deps import enforce_rate_limit, get_current_user
+
+
+class IconSize(IntEnum):
+    """App-icon tiles offered by the Brand Kit (PWA/Play-listing sizes)."""
+
+    small = 192
+    large = 512
+
 
 router = APIRouter()
 
@@ -243,7 +252,13 @@ async def export_design(
 
 @router.get("/brand/icon")
 async def brand_icon(
-    size: int = Query(default=512, pattern="^(192|512)$"),
+    # `pattern` is a *string* constraint — applying it to an int raised
+    # TypeError on EVERY request (including the default), so this route was a
+    # guaranteed 500. An IntEnum keeps the same 192/512 whitelist, still
+    # coerces the "192" that actually arrives on the query string, and returns
+    # a clean 422 for anything else. (A bare Literal[192, 512] does NOT coerce
+    # the string form, so every real request would 422.)
+    size: IconSize = Query(default=IconSize.large),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):

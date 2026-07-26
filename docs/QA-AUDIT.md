@@ -45,6 +45,32 @@ Both are now locked by `tests/test_wiring_audit.py`, which scans every route
 module for **undefined `settings.*` attributes** and **undefined SCREAMING_CASE
 constants**. Re-introducing either bug fails the suite — verified.
 
+### Round 2 — `GET /media/brand/icon` (500 on every request)
+
+A later authenticated sweep found a third live 500 of a different class:
+
+| Bug | Impact | Fix |
+| --- | --- | --- |
+| `size: int = Query(pattern="^(192|512)$")` — `pattern` is a **string** constraint | pydantic raises `TypeError` while *building* the validator, so the route 500'd on **every** request, including the default. The Design studio's ⭐ app-icon download never worked | `IconSize(IntEnum)` — same whitelist, but it coerces the `"192"` a query string actually delivers |
+
+**Why the earlier gates missed it.** The route is authenticated, so an
+unauthenticated sweep only ever sees `401`. And `check-wiring.mjs` proves a path
+*exists* — not that it *succeeds*. Dead-button checking and live-response
+checking are different jobs.
+
+**The near-miss.** The first fix used `Literal[192, 512]`. It satisfies the type
+checker, the OpenAPI schema and the constraint scanner — but `Literal` does not
+coerce, so every real `?size=192` would have 422'd. A fix that swaps a 500 for a
+422 is still broken. Only an end-to-end request asserting real PNG bytes caught
+it, which is why one now exists.
+
+**The guards had bugs too.** While mutation-testing them, two silent
+false-negatives surfaced: FastAPI stores constraints in pydantic's `.metadata`
+rather than as plain attributes, and `app.routes` exposes only 3 of 153 routes
+because `include_router` mounts `_IncludedRouter` wrappers that must be walked
+via `original_router`. Both made the scan pass everything. A guard is not
+trustworthy until you have watched it fail.
+
 ## Runtime sweep
 
 30 signed-in surfaces + 9 admin surfaces exercised end-to-end against a real

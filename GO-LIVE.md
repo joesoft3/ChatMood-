@@ -1,15 +1,7 @@
-# Go Live — `arena/019f9b4e-moodai`
+# Go Live
 
-This document captures the go-live path for the `arena/019f9b4e-moodai` branch.
-
-## Current state
-
-- Branch `arena/019f9b4e-moodai` started identical to `main` (base commit
-  `97317a44` — "Creator Reel + Reel button visibility everywhere (#18)").
-- This commit is a **setup commit** to open the merge-to-production PR. It
-  intentionally contains no feature/fix changes — it only documents the
-  go-live procedure.
-- Real changes should land on this branch as additional commits before merge.
+The go-live path for ChatMood, and the verification gate a branch must clear
+before it is merged.
 
 ## How production deploys
 
@@ -22,8 +14,44 @@ ChatMood auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
 | API     | Fly.io     | `fly deploy`             | `fly.toml`, `Dockerfile.fly`, `deploy-fly.yml` |
 | Backend | Render     | Blueprint `autoDeploy`   | `render.yaml`                |
 
-So the canonical "go live" step is: **merge this branch into `main`**, which
-triggers the Netlify + Vercel production deploys.
+So the canonical "go live" step is: **merge to `main`**, which triggers the
+Netlify + Vercel production deploys.
+
+## The pre-merge gate
+
+Run all of it locally; CI (`test.yml`) enforces the first three.
+
+```bash
+# backend — every module must import, every test must pass
+find backend/app -name "*.py" -exec python -m py_compile {} +
+cd backend && pytest tests -q                 # 618 passed, 3 skipped
+
+# web — types must resolve and the production build must succeed
+cd frontend && npx tsc --noEmit && npm run build
+
+# no dead buttons, no 404 links, no phantom API paths
+cd backend && DATABASE_URL='sqlite+aiosqlite:///:memory:' python -c \
+  "import json; from app.main import app; \
+   json.dump(sorted(app.openapi()['paths']), open('../.routes.json','w'))"
+node scripts/check-wiring.mjs                 # 68 files · 23 pages · 153 API routes
+node scripts/check-docs.mjs                   # 46 markdown files
+```
+
+Current status: **all green, 0 problems.**
+
+### What the gate does *not* cover
+
+Worth knowing, because a real 500 slipped through exactly here (see
+[docs/QA-AUDIT.md](docs/QA-AUDIT.md)):
+
+- `check-wiring.mjs` proves an API path **exists**, not that it **succeeds**.
+- An unauthenticated sweep stops at `401` on any authenticated route, so a
+  handler that always throws looks identical to one that works.
+- Unit tests that never issue a request miss errors raised while *building* a
+  request validator.
+
+For risky surfaces, drive a real authenticated request and assert on the
+response body — not just the status code.
 
 ## Required environment (all hosts)
 
@@ -35,18 +63,21 @@ triggers the Netlify + Vercel production deploys.
 - `CORS_ORIGINS`, `FRONTEND_URL`
 - `APP_PASSWORD`, `ADMIN_BOOTSTRAP_PASSWORD` — **change before any public deploy**
 
-See `.env.example` and `docs/DEPLOY-WALKTHROUGH.md` for the full setup.
+See `.env.example` and [docs/DEPLOY-WALKTHROUGH.md](docs/DEPLOY-WALKTHROUGH.md)
+for the full setup.
 
-## Smoke test after deploy
+## After deploy
 
-Run `scripts/live-smoke.sh` (or the `live-smoke.yml` workflow) against the
-live URL to verify chat, search, memory, and `/readyz`.
+Run `scripts/live-smoke.sh` (or the `live-smoke.yml` workflow) against the live
+URL to verify chat, search, memory and `/readyz`.
 
-## Steps to ship a real change
+`/readyz` returns **503 whenever Redis or Qdrant is unreachable** — that is the
+designed signal, not a fault. It reports per-dependency status, so read the body
+before assuming the deploy is broken.
 
-1. Implement the change on `arena/019f9b4e-moodai`, commit, and `git push`.
+## Shipping a change
+
+1. Implement it on your working branch, commit, push.
 2. Open / update the PR against `main`.
 3. Merge to `main` → production auto-deploys.
 4. Run the live smoke test.
-
-> Generated via Arena.ai Agent Mode to establish the go-live PR path.

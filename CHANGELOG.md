@@ -7,6 +7,40 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🎨 Brand Kit app-icon download was a guaranteed 500 — fixed
+
+A full A–Z re-verification (backend compile · 618 tests · web typecheck ·
+production build · wiring gate · docs gate · authenticated runtime sweep) turned
+up one **live production bug** the existing gates could not see.
+
+- `GET /media/brand/icon` declared `size: int = Query(default=512,
+  pattern="^(192|512)$")`. `pattern` is a **string** constraint; pydantic raises
+  `TypeError` while *building* the validator, so the route returned **500 on
+  every single request — including the default**, with no input that could
+  succeed. The ⭐ "app icon" download in the Design studio had never worked.
+- Fixed with an `IconSize(IntEnum)` (192 / 512). It keeps the original
+  whitelist, **coerces the `"192"` string a real query string delivers**, and
+  returns a clean 422 for anything else.
+- **A near-miss worth recording:** the first fix used `Literal[192, 512]`. That
+  passes static checks and the OpenAPI schema assertion, but `Literal` does
+  **not** coerce — so every genuine `?size=192` request would have 422'd. Only
+  driving a real authenticated request to actual PNG bytes exposed it.
+- **Why no gate caught it:** the route is authenticated, so the unauthenticated
+  sweep saw 401 and moved on. `check-wiring.mjs` verifies the path *exists*, not
+  that it returns successfully.
+- **Tests: +3** (618 total), each mutation-verified:
+  - a **generic** scan flagging string-only constraints (`pattern` /
+    `min_length` / `max_length`) on numeric params and the mirrored mistake —
+    this whole bug class, not just one route;
+  - a schema guard on the 192/512 whitelist;
+  - an **end-to-end render test** that signs in, saves a Brand Kit and asserts
+    real PNG bytes at both sizes — the only check that catches the `Literal`
+    trap.
+  - Two bugs in the guards themselves were found and fixed while validating
+    them: constraints live in pydantic's `.metadata` (not attributes), and
+    `app.routes` only exposes 3 of 153 routes because routers mount as
+    `_IncludedRouter` wrappers. Both made the scan silently pass everything.
+
 ### ⬇✏️🗑 Generated images & videos are downloadable, editable and deletable
 
 Every generation was already archived as a `FileAsset` — but the id was thrown
