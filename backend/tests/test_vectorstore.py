@@ -436,7 +436,7 @@ def test_persist_archives_to_r2_and_files_it(monkeypatch):
     monkeypatch.setattr(chatmod.httpx, "AsyncClient", lambda **kw: http)
     _patch_storage(monkeypatch, remote=True)
     db = _DB()
-    url, stored = run(chatmod._persist_generated_image(db, _User(), "https://image.pollinations.ai/prompt/x"))
+    url, stored, file_id = run(chatmod._persist_generated_image(db, _User(), "https://image.pollinations.ai/prompt/x"))
     assert stored == "r2"
     assert url == "https://signed.example/img.jpg"
     row = db.rows[0]
@@ -451,7 +451,7 @@ def test_persist_falls_back_to_hotlink_on_fetch_failure(monkeypatch):
     http = _FakeHTTP([_Resp(500)])
     monkeypatch.setattr(chatmod.httpx, "AsyncClient", lambda **kw: http)
     db = _DB()
-    url, stored = run(chatmod._persist_generated_image(db, _User(), "https://provider.example/img.png"))
+    url, stored, file_id = run(chatmod._persist_generated_image(db, _User(), "https://provider.example/img.png"))
     assert (url, stored) == ("https://provider.example/img.png", "hotlink")
     assert db.rows == []
 
@@ -465,7 +465,7 @@ def test_persist_handles_data_url(monkeypatch):
     monkeypatch.setattr(chatmod.httpx, "AsyncClient", lambda **kw: http)
     _patch_storage(monkeypatch, remote=True)
     db = _DB()
-    url, stored = run(chatmod._persist_generated_image(db, _User(), f"data:image/png;base64,{payload}"))
+    url, stored, file_id = run(chatmod._persist_generated_image(db, _User(), f"data:image/png;base64,{payload}"))
     assert stored == "r2" and url == "https://signed.example/img.jpg"
     assert db.rows[0].mime == "image/png" and db.rows[0].filename.endswith(".png")
     assert http.posts == []
@@ -476,5 +476,5 @@ def test_persist_disabled_returns_hotlink(monkeypatch):
 
     monkeypatch.setattr(settings, "IMAGE_PERSIST", False)
     db = _DB()
-    url, stored = run(chatmod._persist_generated_image(db, _User(), "https://provider.example/img.png"))
+    url, stored, file_id = run(chatmod._persist_generated_image(db, _User(), "https://provider.example/img.png"))
     assert (url, stored) == ("https://provider.example/img.png", "hotlink")

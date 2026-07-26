@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Sparkles, Wand2, X } from "lucide-react";
+import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
+import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice } from "@/components/StudioChrome";
 import { API, apiFetch, token } from "@/lib/api";
@@ -11,6 +12,8 @@ interface ImgItem {
   id: string;
   url: string;
   prompt: string;
+  /** FileAsset id — enables the stable download route and delete. */
+  file_id?: string;
   pending?: boolean;
   meta?: {
     duration?: number;
@@ -286,12 +289,16 @@ export default function ImagesPage() {
     const tmpId = "pending-" + Date.now();
     setItems((it) => [{ id: tmpId, url: "", prompt: p, pending: true }, ...it]);
     try {
-      const res = await apiFetch<{ url: string }>("/chat/image", {
+      const res = await apiFetch<{ url: string; file_id?: string }>("/chat/image", {
         method: "POST",
         body: JSON.stringify({ prompt: p }),
       });
       setItems((it) => {
-        const next = it.map((i) => (i.id === tmpId ? { id: tmpId.replace("pending", "img"), url: res.url, prompt: p } : i));
+        const next = it.map((i) =>
+          i.id === tmpId
+            ? { id: tmpId.replace("pending", "img"), url: res.url, prompt: p, file_id: res.file_id }
+            : i,
+        );
         persist(next);
         return next;
       });
@@ -299,6 +306,54 @@ export default function ImagesPage() {
       setItems((it) => it.filter((i) => i.id !== tmpId));
       setError(e.message ?? "Generation failed");
     }
+  }
+
+  /** ⬇ Save a generation. Uses the stable /files route when the item was
+   *  archived — the visible URL is a presigned link that eventually expires. */
+  async function saveImage(img: ImgItem) {
+    const name = mediaFilename(img.prompt, "image");
+    if (img.file_id) await downloadFile(img.file_id, name);
+    else await downloadUrl(img.url, name);
+  }
+
+  async function saveVideo(v: ImgItem) {
+    const name = mediaFilename(v.prompt, "video");
+    if (v.file_id) await downloadFile(v.file_id, name);
+    else await downloadUrl(v.url, name);
+  }
+
+  /** ✨ Remix — seed the prompt box with this generation's prompt to iterate on. */
+  function remixImage(img: ImgItem) {
+    setPrompt(img.prompt);
+    document.getElementById("main-generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setInfo("✨ Prompt loaded — tweak it and generate a new version.");
+  }
+
+  /** 🗑 Remove from the gallery, and from the server library when archived. */
+  async function removeImage(img: ImgItem) {
+    if (!window.confirm("Delete this image?")) return;
+    if (img.file_id) {
+      // Best-effort: a stale/missing asset shouldn't block clearing the tile.
+      await apiFetch(`/files/${img.file_id}`, { method: "DELETE" }).catch(() => {});
+    }
+    setItems((it) => {
+      const next = it.filter((i) => i.id !== img.id);
+      persist(next);
+      return next;
+    });
+    setZoom((z) => (z && z.id === img.id ? null : z));
+  }
+
+  async function removeVideo(v: ImgItem) {
+    if (!window.confirm("Delete this video?")) return;
+    if (v.file_id) {
+      await apiFetch(`/files/${v.file_id}`, { method: "DELETE" }).catch(() => {});
+    }
+    setVideos((it) => {
+      const next = it.filter((i) => i.id !== v.id);
+      persistVideos(next);
+      return next;
+    });
   }
 
   function finishTile(tmpId: string, p: string, meta: ImgItem["meta"], url: string, note?: string | null) {
@@ -922,7 +977,23 @@ export default function ImagesPage() {
                         className={`w-full bg-black ${v.meta?.aspect_ratio === "9:16" ? "aspect-[9/16] max-h-[480px] mx-auto" : v.meta?.aspect_ratio === "1:1" ? "aspect-square" : "aspect-video"}`}
                       />
                       <div className="p-2 space-y-1.5">
-                        <p className="text-[11px] text-gray-400 line-clamp-2">{v.prompt}</p>
+                        <div className="flex items-start gap-2">
+                          <p className="flex-1 text-[11px] text-gray-400 line-clamp-2">{v.prompt}</p>
+                          <button
+                            onClick={() => saveVideo(v)}
+                            title="Download"
+                            className="shrink-0 rounded-lg border border-line p-1.5 text-gray-400 transition hover:text-white"
+                          >
+                            <Download size={12} />
+                          </button>
+                          <button
+                            onClick={() => removeVideo(v)}
+                            title="Delete"
+                            className="shrink-0 rounded-lg border border-line p-1.5 text-gray-500 transition hover:border-red-400/40 hover:text-red-400"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                         {v.meta && (
                           <div className="flex gap-1.5 flex-wrap">
                             {[v.meta.aspect_ratio, v.meta.duration ? `${v.meta.duration}s` : "", v.meta.quality, v.meta.style?.replace("_", " ")]
@@ -978,17 +1049,48 @@ export default function ImagesPage() {
                     <Loader2 size={22} className="animate-spin text-accent" />
                   </div>
                 ) : (
-                  <button
+                  // A div, not a button: the hover actions below are buttons,
+                  // and nesting interactive elements is invalid HTML (it also
+                  // breaks keyboard focus order and screen readers).
+                  <div
                     key={img.id}
-                    onClick={() => setZoom(img)}
                     className="group relative aspect-square rounded-xl overflow-hidden border border-line bg-panel"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
+                    <button
+                      onClick={() => setZoom(img)}
+                      title="View full size"
+                      className="block h-full w-full"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    </button>
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
                       {img.prompt}
                     </span>
-                  </button>
+                    <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition group-hover:opacity-100">
+                      <button
+                        onClick={() => saveImage(img)}
+                        title="Download"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-white"
+                      >
+                        <Download size={12} />
+                      </button>
+                      <button
+                        onClick={() => remixImage(img)}
+                        title="Edit / remix"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-accent"
+                      >
+                        <Wand2 size={12} />
+                      </button>
+                      <button
+                        onClick={() => removeImage(img)}
+                        title="Delete"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-red-400"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
                 )
               )}
             </div>
@@ -1011,14 +1113,18 @@ export default function ImagesPage() {
             <img src={zoom.url} alt={zoom.prompt} className="w-full max-h-[75vh] object-contain rounded-xl" />
             <div className="flex items-center gap-3">
               <p className="flex-1 text-xs text-gray-400 line-clamp-2">{zoom.prompt}</p>
-              <a
-                href={zoom.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                onClick={() => saveImage(zoom)}
                 className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition"
               >
-                <Download size={13} /> Original
-              </a>
+                <Download size={13} /> Download
+              </button>
+              <button
+                onClick={() => removeImage(zoom)}
+                className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 px-3 py-2 transition hover:bg-red-400/20 hover:text-red-300"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
               <button onClick={() => setZoom(null)} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
                 <X size={13} /> Close
               </button>

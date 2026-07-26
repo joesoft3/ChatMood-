@@ -514,13 +514,16 @@ async def chat_stream(
     )
 
 
-async def _persist_generated_media(db: AsyncSession, user: User, url: str, expect: str) -> tuple[str, str]:
+async def _persist_generated_media(
+    db: AsyncSession, user: User, url: str, expect: str
+) -> tuple[str, str, str]:
     """Archive generated media (image|video): download the bytes → durable storage
     (R2/local) → FileAsset row so it lives in the user's library. Returns
-    (render_url, stored_kind) — falls back to the provider link on ANY hiccup
-    (a generation never fails because archiving did)."""
+    (render_url, stored_kind, file_id) — falls back to the provider link on ANY
+    hiccup (a generation never fails because archiving did), in which case
+    file_id is "" and the client hides the manage actions."""
     if not settings.IMAGE_PERSIST:
-        return url, "hotlink"
+        return url, "hotlink", ""
     max_mb = settings.MAX_UPLOAD_MB if expect == "image" else settings.VIDEO_MAX_DOWNLOAD_MB
     exts = (
         {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif"}
@@ -558,7 +561,7 @@ async def _persist_generated_media(db: AsyncSession, user: User, url: str, expec
                 mime = (r.headers.get("content-type") or ("image/jpeg" if expect == "image" else "video/mp4")).split(";")[0].strip()
                 data = r.content
         if not data or not mime.startswith(f"{expect}/") or len(data) > max_mb * 1024 * 1024:
-            return url, "hotlink"
+            return url, "hotlink", ""
         ext = exts.get(mime, "jpg" if expect == "image" else "mp4")
 
         # 🏷 Free tier: bake the badge into the ARCHIVED bytes, so the durable
@@ -574,13 +577,17 @@ async def _persist_generated_media(db: AsyncSession, user: User, url: str, expec
                 data = await _watermark_video_bytes(data, ext)
         fname = f"mood-gen-{uuid.uuid4().hex[:12]}.{ext}"
         marker = await storage.put_upload(user.id, fname, data)
-        db.add(FileAsset(user_id=user.id, filename=fname, mime=mime, path=marker, size_bytes=len(data)))
+        asset = FileAsset(user_id=user.id, filename=fname, mime=mime, path=marker, size_bytes=len(data))
+        db.add(asset)
         await db.commit()
         fresh = await storage.presigned_url(marker, settings.IMAGE_PERSIST_TTL_S)
-        return (fresh or url), ("r2" if storage.is_remote(marker) else "local")
+        # The asset id is what makes a generation MANAGEABLE: a presigned URL
+        # expires (IMAGE_PERSIST_TTL_S), but /files/{id}/download never does,
+        # and /files/{id} DELETE lets the user remove it.
+        return (fresh or url), ("r2" if storage.is_remote(marker) else "local"), asset.id
     except Exception as e:
         log.warning("%s persistence skipped (serving provider link): %s", expect, e)
-        return url, "hotlink"
+        return url, "hotlink", ""
 
 
 async def _watermark_video_bytes(data: bytes, ext: str) -> bytes:
@@ -616,7 +623,7 @@ async def _watermark_video_bytes(data: bytes, ext: str) -> bytes:
                 pass
 
 
-async def _persist_generated_image(db: AsyncSession, user: User, url: str) -> tuple[str, str]:
+async def _persist_generated_image(db: AsyncSession, user: User, url: str) -> tuple[str, str, str]:
     return await _persist_generated_media(db, user, url, "image")
 
 
@@ -788,7 +795,7 @@ async def _media_stream(
                 if not url:
                     raise VideoGenerationError("Image provider returned no image")
                 async with SessionLocal() as ps:  # fresh session — request db may be closed mid-stream
-                    render_url, stored = await _persist_generated_image(ps, user, url)
+                    render_url, stored, file_id = await _persist_generated_image(ps, user, url)
             else:
                 q: asyncio.Queue = asyncio.Queue()
 
@@ -826,9 +833,9 @@ async def _media_stream(
                     if not task.done():
                         task.cancel()
                 async with SessionLocal() as ps:  # fresh session — request db may be closed mid-stream
-                    render_url, stored = await _persist_generated_media(ps, user, provider_url, "video")
+                    render_url, stored, file_id = await _persist_generated_media(ps, user, provider_url, "video")
 
-            media_obj = {"kind": kind, "url": render_url, "prompt": resolved_prompt, "stored": stored}
+            media_obj = {"kind": kind, "url": render_url, "prompt": resolved_prompt, "stored": stored, "file_id": file_id}
             if intent.refine:
                 caption = (
                     f"🎨 **Remixed it** — *\"{resolved_prompt}\"*" if kind == "image"
@@ -899,6 +906,6 @@ async def generate_image(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, friendly_ai_error(e))
     if not url:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Image provider returned no image")
-    render_url, stored = await _persist_generated_image(db, user, url)
+    render_url, stored, file_id = await _persist_generated_image(db, user, url)
     await record_usage(user.id, "image", settings.MODEL_IMAGE)
-    return {"url": render_url, "prompt": req.prompt, "stored": stored, "source_url": url}
+    return {"url": render_url, "prompt": req.prompt, "stored": stored, "file_id": file_id, "source_url": url}

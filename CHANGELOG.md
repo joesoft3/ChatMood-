@@ -7,6 +7,35 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### ⬇✏️🗑 Generated images & videos are downloadable, editable and deletable
+
+Every generation was already archived as a `FileAsset` — but the id was thrown
+away, so the client only ever held a **presigned URL that expires after 7 days**
+(`IMAGE_PERSIST_TTL_S`). Download quietly rotted, and there was no way to delete
+a generation at all.
+
+- `_persist_generated_media()` now returns `(url, stored, file_id)`, and that id
+  reaches the client on the SSE media event and `POST /chat/image`.
+- **⬇ Download** uses the stable `GET /files/{id}/download` route instead of the
+  expiring render link. Implemented via `lib/download.ts`, not `<a download>`:
+  the route is cross-origin and Bearer-authenticated, so an anchor would 401 or
+  silently navigate instead of saving. Blob-fetch + synthetic click gives a real
+  file with a prompt-derived name, and falls back to a new tab if CORS blocks it.
+- **✏️ Edit** prefills the composer (chat) or reloads the prompt (studio),
+  routing through the existing media-refine intent.
+- **🗑 Delete** calls `DELETE /files/{id}` — row, bytes and vector chunks — and
+  drops the card locally so the thread matches reality without a reload.
+- Available on chat media cards, Images studio tiles, the lightbox, and video
+  cards. Gallery tiles were restructured from `<button>` to `<div>` because
+  nesting the new action buttons inside one is invalid HTML and breaks keyboard
+  focus order.
+- **Fail-open preserved:** when archiving fails, `file_id` is `""`, the
+  generation still renders, and the UI hides the manage actions rather than
+  showing buttons that 404.
+- **Tests: +8** (615 total). Ownership is enforced — a second account gets 404 on
+  both download and delete. Mutation-tested: discarding the `file_id` fails 6
+  tests, and dropping the ownership check fails the cross-tenant test.
+
 ### ✅ A–Z wiring audit — two live 500s fixed, Play Store readiness
 
 Audited every interactive control (344 `onClick`/`href` sites, 57 distinct API

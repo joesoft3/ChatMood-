@@ -8,7 +8,7 @@ import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
 import { OPEN_CONV_KEY, useConversations } from "@/lib/conversations";
 import AppShell from "@/components/AppShell";
-import MessageBubble, { ChatMsg } from "@/components/MessageBubble";
+import MessageBubble, { ChatMedia, ChatMsg } from "@/components/MessageBubble";
 import Composer, { FileChip } from "@/components/Composer";
 import ArenaPanel, { ArenaEvt } from "@/components/ArenaPanel";
 import ThinkingPanel, { ThinkEvt } from "@/components/ThinkingPanel";
@@ -445,6 +445,33 @@ export default function ChatPage() {
     }
   }
 
+  /** 🎨 Edit a generation — prefill the composer with a remix instruction.
+   *  The chat media router already treats "change the sky to sunset" as a
+   *  refine of the previous generation, so this just seeds the phrasing. */
+  function editMedia(m: ChatMedia) {
+    const verb = m.kind === "image" ? "Edit this image" : "Edit this video";
+    setDraft({ text: `${verb}: `, nonce: Date.now() });
+  }
+
+  /** 🗑 Delete a generation from the library, and drop its card from the thread. */
+  async function deleteMedia(m: ChatMedia) {
+    if (!m.file_id) return;
+    if (!window.confirm("Delete this generation from your library? This can't be undone.")) return;
+    try {
+      await apiFetch(`/files/${m.file_id}`, { method: "DELETE" });
+      // Remove the card locally so the thread matches reality without a reload.
+      setMsgs((prev) =>
+        prev.map((msg) =>
+          msg.media?.some((x) => x.file_id === m.file_id)
+            ? { ...msg, media: msg.media.filter((x) => x.file_id !== m.file_id) }
+            : msg,
+        ),
+      );
+    } catch (e: any) {
+      setTransportError(e?.message ?? "Couldn't delete that file");
+    }
+  }
+
   /** ⚔️ Rematch: rerun the arena — drafters are shown this winner and asked to beat it. */
   async function rematch() {
     if (busy) return;
@@ -798,6 +825,8 @@ export default function ChatPage() {
                 onRematch={
                   !busy && i === msgs.length - 1 && m.role === "assistant" && m.arena ? rematch : undefined
                 }
+                onEditMedia={editMedia}
+                onDeleteMedia={deleteMedia}
               />
             </div>
           ))}

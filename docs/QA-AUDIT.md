@@ -57,6 +57,30 @@ Three endpoints return 503 in the sandbox **by design**, not as faults:
 `/readyz` and `/memory` need Redis/Qdrant, and `/media/films/resumable` uses the
 app's own session factory. All three behave correctly against a real deployment.
 
+## Generated media is now manageable
+
+Every AI generation (chat images/videos, the Images studio) is archived as a
+`FileAsset` — but the id was **discarded**, so the only handle the client had was
+a presigned URL that expires after `IMAGE_PERSIST_TTL_S` (7 days). Download
+silently rotted, and delete didn't exist at all.
+
+`_persist_generated_media()` now returns `(url, stored, file_id)`, and that id
+reaches the client on both the SSE media event and `POST /chat/image`. With it:
+
+| Action | Route | Notes |
+| --- | --- | --- |
+| ⬇ Download | `GET /files/{id}/download` | stable — never expires, unlike the presigned render URL |
+| ✏️ Edit | composer prefill / prompt reload | remixes via the existing media-refine router |
+| 🗑 Delete | `DELETE /files/{id}` | removes the row, the bytes and the vector chunks |
+
+Downloads go through `lib/download.ts` rather than `<a download>`: the stable
+route is cross-origin and Bearer-authenticated, so a plain anchor would 401 or
+silently *navigate* instead of saving. It fetches to a Blob, names the file from
+the prompt, and falls back to opening a tab if the fetch is blocked.
+
+When archiving fails the generation still succeeds — `file_id` is `""` and the
+UI hides the manage actions rather than showing buttons that 404.
+
 ---
 
 ## 📱 Play Store readiness
