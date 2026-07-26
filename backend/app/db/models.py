@@ -67,6 +67,10 @@ class Conversation(Base):
     workspace_id: Mapped[str | None] = mapped_column(
         ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True
     )  # set → shared with all workspace members
+    project_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )  # 🗂 filed under a Project (instructions + pinned files apply). No FK: projects
+    # is created by a later migration, and a plain column keeps create_all order-free.
     title: Mapped[str] = mapped_column(String(200), default="New chat")
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)  # rolling cross-chat recall summary
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -135,7 +139,7 @@ class UsageEvent(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(24), index=True)  # chat | agent | deepsearch | voice | image
+    kind: Mapped[str] = mapped_column(String(24), index=True)  # chat | agent | deepsearch | voice | image | task | api
     model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
@@ -449,3 +453,127 @@ class ReelSave(Base):
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
+
+
+class Project(Base):
+    """🗂 Project — a durable container for related chats, files and instructions.
+
+    Grok/ChatGPT-style Projects: a persistent workspace with its OWN system
+    instructions and its OWN document set, so every chat inside it starts with
+    the same brief and can retrieve from the same library. Conversations point
+    here via Conversation.project_id (nullable → the chat is loose/unfiled).
+    """
+
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[str | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # set → the whole project is visible to the team
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")  # prepended to every chat in the project
+    emoji: Mapped[str] = mapped_column(String(8), default="🗂")
+    accent: Mapped[str | None] = mapped_column(String(9), nullable=True)  # #rrggbb card tint
+    archived: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProjectFile(Base):
+    """📎 A file pinned to a project (the project's own knowledge base).
+
+    The upload itself stays a normal FileAsset — this is only the membership
+    edge, so the same file can be pinned to several projects and unpinning
+    never destroys the user's upload.
+    """
+
+    __tablename__ = "project_files"
+
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    file_id: Mapped[str] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduledTask(Base):
+    """⏰ Scheduled task — a saved prompt Mood runs on a schedule, unattended.
+
+    Grok Tasks parity: "every weekday at 07:00, brief me on AI news". The
+    scheduler (services/scheduler.py) claims due tasks atomically, runs the
+    prompt through the chosen mode (chat / deepsearch / agent), appends the
+    result to a dedicated conversation and pushes a notification.
+
+    Scheduling is intentionally cron-free: kind + hour/minute + weekday mask is
+    enough for the product, trivially explainable in the UI, and computable
+    without a cron parser dependency.
+    """
+
+    __tablename__ = "scheduled_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )  # results are appended here, so a task reads as one growing thread
+    title: Mapped[str] = mapped_column(String(160))
+    prompt: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(16), default="chat")  # chat | deepsearch | agent
+    search: Mapped[bool] = mapped_column(default=True)  # ground the run in live web results
+    schedule_kind: Mapped[str] = mapped_column(String(12), default="daily")  # once | hourly | daily | weekly
+    hour_utc: Mapped[int] = mapped_column(Integer, default=8)     # 0-23, UTC
+    minute_utc: Mapped[int] = mapped_column(Integer, default=0)   # 0-59, UTC
+    weekdays: Mapped[str] = mapped_column(String(20), default="")  # "0,1,2,3,4" (Mon=0); "" = every day
+    enabled: Mapped[bool] = mapped_column(default=True)
+    notify: Mapped[bool] = mapped_column(default=True)  # push when the run finishes
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(16), default="")  # ok | failed | running
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    run_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskRun(Base):
+    """📜 One execution of a ScheduledTask — the audit trail behind the Tasks page."""
+
+    __tablename__ = "task_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    task_id: Mapped[str] = mapped_column(ForeignKey("scheduled_tasks.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | failed
+    summary: Mapped[str] = mapped_column(Text, default="")  # first ~600 chars of the answer
+    error: Mapped[str] = mapped_column(Text, default="")
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ApiKey(Base):
+    """🔑 Developer API key — programmatic access to the same Grok-class brain.
+
+    Only a SHA-256 hash is stored; the plaintext `mk_live_…` secret is shown
+    once at creation and can never be recovered. `prefix` is the first 11
+    characters, kept in the clear purely so the UI can label rows ("mk_live_a1b…")
+    without weakening the secret.
+    """
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80), default="API key")
+    prefix: Mapped[str] = mapped_column(String(16), index=True)  # display label, e.g. mk_live_a1b
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # sha256 hex of the secret
+    scopes: Mapped[str] = mapped_column(String(200), default="chat")  # csv: chat,search,images
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    revoked: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

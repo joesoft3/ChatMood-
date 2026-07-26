@@ -84,6 +84,7 @@ async def get_or_create_conversation(
     conversation_id: str | None,
     seed_text: str,
     workspace_id: str | None = None,
+    project_id: str | None = None,
 ) -> tuple[Conversation, bool]:
     if conversation_id:
         conv = await db.get(Conversation, conversation_id)
@@ -101,7 +102,17 @@ async def get_or_create_conversation(
         from .workspaces import require_member
 
         await require_member(db, workspace_id, user.id)  # 403 if not a member
-    conv = Conversation(user_id=user.id, title=(seed_text[:60] or "New chat"), workspace_id=workspace_id)
+    if project_id:  # 🗂 filing into a project requires owning it
+        from ...services.projects import get_readable
+
+        if not await get_readable(db, user, project_id):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+    conv = Conversation(
+        user_id=user.id,
+        title=(seed_text[:60] or "New chat"),
+        workspace_id=workspace_id,
+        project_id=project_id,
+    )
     db.add(conv)
     await db.flush()
     return conv, True
@@ -155,6 +166,7 @@ async def build_messages(
     file_ids: list[str],
     use_search: bool,
     created: bool = False,
+    project_id: str | None = None,
 ) -> tuple[list[dict], str, bool]:
     """Returns (messages, model, enable_live_search). Reused by the voice pipeline."""
     persona = SYSTEM_PROMPT.format(date=date.today())
@@ -164,6 +176,13 @@ async def build_messages(
             "with being truthful and safe):\n" + user.custom_instructions[:2000]
         )
     msgs: list[dict] = [{"role": "system", "content": persona}]
+
+    # 0) 🗂 Project brief + pinned documents — placed directly after the persona so
+    #    the standing instructions outrank retrieved context and chat history.
+    if project_id and settings.PROJECTS_ENABLED:
+        from ...services.projects import context_messages
+
+        msgs += await context_messages(db, user, project_id)
 
     # 1) Long-term memory + 1b) past-chat recall — CONCURRENT, each under a hard
     #    budget (they share the vector store; serialized dead-endpoint attempts
@@ -338,7 +357,7 @@ async def chat_stream(
         req.files = []
 
     conv, created = await get_or_create_conversation(
-        db, user, req.conversation_id, req.message, req.workspace_id
+        db, user, req.conversation_id, req.message, req.workspace_id, req.project_id
     )
     db.add(
         Message(conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files})
@@ -396,7 +415,9 @@ async def chat_stream(
                 return await _media_stream(req, db, user, conv, created, intent, bg)
 
     messages, model, live_search = await build_messages(
-        db, user, conv.id, req.message, req.files, req.search, created
+        db, user, conv.id, req.message, req.files, req.search, created,
+        project_id=conv.project_id,  # the CONVERSATION's project wins — a filed chat
+        # keeps its brief on every turn, not only the one that created it
     )
     # 🚀 Premium picker: honor the requested model (vision threads stay on the vision model).
     if model != settings.MODEL_VISION and req.model in MODEL_CHOICES:

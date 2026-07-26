@@ -47,6 +47,7 @@ class RenameRequest(BaseModel):
 class ChatRequest(BaseModel):
     conversation_id: str | None = None
     workspace_id: str | None = None  # create/share this conversation in a team workspace
+    project_id: str | None = None    # 🗂 file this chat under a Project (brief + pinned docs apply)
     message: str = ""
     files: list[str] = []
     search: bool = False

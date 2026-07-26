@@ -50,6 +50,7 @@ deploy path that matches your host.
 | [DESIGN-STUDIO.md](DESIGN-STUDIO.md) | 🖨 Flyers, stickers, banners and logos at print resolution. |
 | [BATCH-AND-BEATS.md](BATCH-AND-BEATS.md) | 🔁 Batch Studio + 🎵 Beat-Sync. |
 | [TEAMS-WALKTHROUGH.md](TEAMS-WALKTHROUGH.md) | 👥 Team workspaces walkthrough + test checklist. |
+| [TASKS-PROJECTS-API.md](TASKS-PROJECTS-API.md) | ⏰ Scheduled tasks · 🗂 Projects · 🔑 the OpenAI-compatible developer API. |
 | [PLUGIN-OAUTH.md](PLUGIN-OAUTH.md) | 🔑 Gmail, Google Calendar and GitHub OAuth for real. |
 | [ADMIN-ANALYTICS.md](ADMIN-ANALYTICS.md) | 📊 Admin analytics & engagement surfaces. |
 

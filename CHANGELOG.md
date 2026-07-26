@@ -7,6 +7,59 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### ⏰🗂🔑 Scheduled tasks · Projects · OpenAI-compatible developer API
+
+Three Grok-parity surfaces that turn Mood from *something you ask* into *something
+that works for you*. Full guide: [docs/TASKS-PROJECTS-API.md](docs/TASKS-PROJECTS-API.md).
+
+- **⏰ Scheduled tasks (`/tasks`).** Save a prompt once and Mood runs it unattended —
+  `once` / `hourly` / `daily` / `weekly` (weekday mask), all in UTC with the local
+  equivalent shown as you pick. A task runs through `chat`, `deepsearch` or `agent`
+  mode, appends its answer to a dedicated conversation (so a recurring task reads as
+  one growing briefing thread rather than littering the sidebar), and pushes a
+  notification. **Run now** tests a task *without* consuming its next scheduled slot.
+  - Correctness by construction: due tasks are **claimed atomically**
+    (`UPDATE … WHERE last_status != 'running'`), so multiple Fly machines can never
+    double-run one; `next_run_at` advances **at claim time**, so a crash mid-run
+    resumes on the next slot instead of hot-looping on an overdue row; runs are capped
+    by `SCHEDULER_RUN_TIMEOUT_S` and metered as `task` usage events; a failing task
+    records the error, keeps its schedule, and never kills the loop.
+  - Schedule arithmetic is **cron-free and pure** (`services/schedule.py`) — four
+    shapes cover the product, and being I/O-free is what makes it testable without a
+    clock. `/healthz` now reports scheduler state for operators.
+- **🗂 Projects (`/projects`).** Durable containers for work spanning many chats: a
+  **standing brief** plus **pinned documents** that every chat inside inherits, on
+  every turn. Project context is injected directly after the persona so it outranks
+  memory, recall and doc-RAG; budgets are bounded so a long-lived project can't push
+  the actual conversation out of the window; the whole path is fail-open. Injection
+  keys off the *conversation's* project, so a filed chat keeps its brief forever, not
+  just on the turn that created it. **Deleting a project deletes nothing real** — its
+  chats and uploads simply unfile.
+- **🔑 Developer API (`/api/v1/public`).** OpenAI-compatible, so `openai-python`, the
+  Vercel AI SDK, LangChain and existing curl snippets work by changing two strings.
+  `/chat/completions` (streaming `chat.completion.chunk` frames + `[DONE]`),
+  `/search` (grounded answer + structured citations), `/images`, `/models`, `/usage`.
+  Stable `mood-*` aliases decouple callers from the backing models, and an unknown
+  alias falls back to the flagship rather than breaking a pinned integration.
+  - Keys are `mk_live_…`, stored as **SHA-256 only** — the plaintext appears exactly
+    once, in the response that mints it. Scoped (`chat`/`search`/`images`),
+    per-key rate-limited, soft-revocable (immediate, but the audit row survives).
+    Session JWTs are rejected on the developer surface and vice-versa, so revoking a
+    key genuinely revokes that integration. Every call meters as an `api` event and
+    counts against the same plan and dashboard.
+- **Plumbing.** Migration `0024_projects_tasks_keys` (existence-guarded, re-runnable,
+  verified up → down → up); `conversations.project_id`; `task`/`api` meters added to
+  both plan tiers; Tasks + Projects in the app nav; the API-key manager in Settings;
+  `/chat?project=…` and `/chat?c=…` deep links.
+- **Fixed along the way:** the `?billing=` cleanup in chat rewrote the URL with only
+  `?ws=`, silently discarding every other query param — it now preserves them, which
+  is what makes the new `?project=` / `?c=` deep links survive a Stripe return.
+- **Tests: +62** (482 total, all passing) covering schedule arithmetic and DST-free
+  UTC edges, the atomic claim under a simulated race, unattended run/failure/metering
+  paths, project context injection and non-destructive deletion, cross-tenant access
+  on every new route, key hashing/scope enforcement/revocation, and the OpenAI
+  envelope + streaming frame shapes.
+
 ### 📚 Docs index + automated housekeeping gate (PR #21)
 
 - **`docs/README.md` — a real documentation index.** All 33 guides in `docs/` are now

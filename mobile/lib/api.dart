@@ -56,6 +56,18 @@ class Api {
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  /// PATCH with a JSON body (⏰ task pause/resume/edit).
+  static Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body,
+      {Duration timeout = const Duration(seconds: 30)}) async {
+    final token = await getToken();
+    final res = await _client
+        .patch(Uri.parse('$baseUrl$path'), headers: _headers(token), body: jsonEncode(body))
+        .timeout(timeout);
+    if (res.statusCode >= 400) throw Exception(_error(res));
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+  }
+
   /// Binary download with auth header (Design Studio PNG tiers, etc.).
   static Future<Uint8List> getBytes(String path,
       {Duration timeout = const Duration(seconds: 60)}) async {

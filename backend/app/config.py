@@ -280,6 +280,26 @@ class Settings(BaseSettings):
     SANDBOX_TIMEOUT: int = 8        # seconds
     SANDBOX_MAX_OUTPUT: int = 6000  # chars captured from stdout/stderr each
 
+    # 🗂 Projects — durable chat/file containers with standing instructions
+    PROJECTS_ENABLED: bool = True
+    PROJECT_MAX_FILES: int = 40        # pinned documents per project
+    PROJECT_MAX_PER_USER: int = 100
+
+    # ⏰ Scheduled tasks — saved prompts Mood runs unattended
+    TASKS_ENABLED: bool = True
+    SCHEDULER_ENABLED: bool = True     # false on extra replicas if you ever want a single runner
+    SCHEDULER_TICK_S: float = 60.0     # how often the loop looks for due tasks
+    SCHEDULER_BATCH: int = 10          # max tasks claimed per tick
+    SCHEDULER_RUN_TIMEOUT_S: int = 300  # hard cap on one unattended run
+    TASK_MAX_PER_USER_FREE: int = 3
+    TASK_MAX_PER_USER_PRO: int = 30
+    TASK_RUNS_KEEP: int = 50           # audit rows retained per task
+
+    # 🔑 Developer API — programmatic access with `mk_live_…` keys
+    PUBLIC_API_ENABLED: bool = True
+    API_KEY_MAX_PER_USER: int = 10
+    API_KEY_RATE_PER_MIN: int = 60     # per-key request budget (plan multiplier applies)
+
     # Limits
     CHAT_RATE_LIMIT_PER_MIN: int = 30
     HISTORY_WINDOW: int = 20

@@ -36,6 +36,9 @@ export default function ChatPage() {
   const [shareMsg, setShareMsg] = useState("");
   const [wsId, setWsId] = useState<string | null>(null);
   const [wsName, setWsName] = useState("");
+  // 🗂 Project mode via /chat?project=<id> — the chat inherits the project brief
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
   const [billingNote, setBillingNote] = useState("");
   const [billingCta, setBillingCta] = useState<"" | "upgrade">("");
   const [teamConvs, setTeamConvs] = useState<{ id: string; title: string; author: string }[] | null>(null);
@@ -99,7 +102,25 @@ export default function ChatPage() {
           setBillingCta("");
         }, 9000);
       }
-      window.history.replaceState({}, "", window.location.pathname + (id ? `?ws=${id}` : ""));
+      // Preserve every other param when scrubbing ?billing — dropping them here
+      // was silently discarding ?project= / ?c= deep links.
+      q.delete("billing");
+      const rest = q.toString();
+      window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
+    }
+    // 🗂 /chat?project=<id> — file this conversation under a project
+    const proj = q.get("project");
+    if (proj) {
+      setProjectId(proj);
+      apiFetch<{ name: string; emoji: string }>(`/projects/${proj}`)
+        .then((p) => setProjectName(`${p.emoji ?? "🗂"} ${p.name}`))
+        .catch(() => setProjectId(null));
+    }
+    // 🔗 /chat?c=<id> — deep link straight to a conversation (task threads, project lists)
+    const openConv = q.get("c");
+    if (openConv) {
+      pendingOpenRef.current = true;
+      setActiveId(openConv);
     }
     if (!id) return;
     setWsId(id);
@@ -276,6 +297,7 @@ export default function ChatPage() {
         {
           conversation_id: activeId,
           workspace_id: wsId,
+          project_id: projectId,
           message: text,
           files: fileIds,
           search,
@@ -661,6 +683,21 @@ export default function ChatPage() {
         </div>
       </div>
         </>
+      )}
+      {/* 🗂 Project mode — the standing brief is applied server-side; say so plainly
+          so the user knows why answers differ from a loose chat. */}
+      {projectId && (
+        <div className="shrink-0 border-b border-line bg-accent/5 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-[11px]">
+          <span className="truncate text-gray-300">
+            {projectName || "🗂 Project"} — this chat follows the project brief &amp; pinned files
+          </span>
+          <button
+            onClick={() => router.push(`/projects`)}
+            className="ml-auto shrink-0 text-accent hover:underline"
+          >
+            manage
+          </button>
+        </div>
       )}
       {showTeam && wsId && (
         <div className="border-b border-line bg-panel px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">

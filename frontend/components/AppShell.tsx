@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AudioLines, Brush, Clapperboard, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
+import { AlarmClock, AudioLines, Brush, Clapperboard, FolderKanban, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
 import ErrorBoundary from "./ErrorBoundary";
@@ -26,6 +26,8 @@ const NAV = [
   { href: "/reel", label: "Reel", icon: Tv },
   { href: "/films", label: "Films", icon: Clapperboard },
   { href: "/design", label: "Design", icon: Brush },
+  { href: "/tasks", label: "Tasks", icon: AlarmClock },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/deepsearch", label: "Research", icon: Telescope },

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from .api.deps import get_redis
-from .api.routes import admin, agents, auth, billing, chat, conversations, deepsearch, designer, devices, domains, files, media, memory, plugins, reels, share, usage, voice, voice_ws, workspaces
+from .api.routes import admin, agents, apikeys, auth, billing, chat, conversations, deepsearch, designer, devices, domains, files, media, memory, plugins, projects, public_api, reels, share, tasks, usage, voice, voice_ws, workspaces
 from .config import settings
 from .core.metrics import REQ_COUNT, REQ_LAT, metrics_response
 from .db.session import engine, init_db
@@ -42,11 +42,15 @@ async def lifespan(app: FastAPI):
     from .services.keepwarm import start_keep_warm, stop_keep_warm
 
     start_keep_warm()  # 💓 keep the Neon compute hot (idle wake-ups measured at 4-15s)
+    from .services.scheduler import start_scheduler, stop_scheduler
+
+    start_scheduler()  # ⏰ run users' scheduled tasks unattended
     try:
         yield
     finally:
         watchdog.cancel()
         await stop_keep_warm()
+        await stop_scheduler()
 
 
 app = FastAPI(title="Mood AI API", version="1.9.8", lifespan=lifespan)
@@ -123,18 +127,24 @@ app.include_router(voice_ws.router, prefix="/api/v1/voice", tags=["voice-ws"])
 app.include_router(workspaces.router, prefix="/api/v1/workspaces", tags=["workspaces"])
 app.include_router(domains.router, prefix="/api/v1/domains", tags=["domains"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
+app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
+app.include_router(apikeys.router, prefix="/api/v1/keys", tags=["api-keys"])
+app.include_router(public_api.router, prefix="/api/v1/public", tags=["public-api"])
 
 
 @app.get("/healthz")
 async def healthz():
     """Liveness probe + operator-visible heartbeat state (version, DB keep-warm)."""
     from .services.keepwarm import keep_warm_status
+    from .services.scheduler import scheduler_status
 
     return {
         "status": "ok",
         "app": settings.APP_NAME,
         "version": app.version,
         "keep_warm": keep_warm_status(),
+        "scheduler": scheduler_status(),
     }
 
 

@@ -14,6 +14,7 @@ import 'design_screen.dart';
 import 'edit_screen.dart';
 import 'orders_screen.dart';
 import 'films_screen.dart';
+import 'tasks_screen.dart';
 
 import 'api.dart';
 import 'arena_view.dart';
@@ -1117,6 +1118,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
               const Divider(height: 1, color: MoodColors.line),
+              ListTile(
+                leading: const Icon(Icons.alarm, size: 18),
+                title: const Text('⏰ Tasks', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Prompts Mood runs on a schedule',
+                    style: TextStyle(fontSize: 10, color: Colors.grey)),
+                onTap: () {
+                  Navigator.of(context).maybePop();
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TasksScreen()));
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.movie_creation_outlined, size: 18),
                 title: const Text('🎞 Films'),

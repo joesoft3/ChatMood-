@@ -14,6 +14,9 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 - 🧠 **Think mode** — live reasoning traces from Grok-4 streamed into a collapsible panel, 2-sentence digest of the reasoning, elapsed time + tokens; persisted and restored with the message
 - 🧰 **Pro perks enforced server-side** — 50 MB uploads (vs 25), 365-day memory retention (vs 30), 4× rate-limit throughput, plan-aware errors that always point at the upgrade
 - 🔭 DeepSearch — multi-round agentic web research with citations
+- ⏰ **Scheduled tasks** — save a prompt once and Mood runs it unattended (`once`/hourly/daily/weekly, UTC), in chat · DeepSearch · or agent mode; results append to a dedicated thread + push notification. Atomic multi-replica claim, bounded runs, metered like any other action — see [docs/TASKS-PROJECTS-API.md](docs/TASKS-PROJECTS-API.md)
+- 🗂 **Projects** — durable containers with a **standing brief** + **pinned documents** that every chat inside inherits on every turn (no re-explaining, no re-attaching); deleting a project never deletes your chats or files
+- 🔑 **Developer API** — **OpenAI-compatible** programmatic access (`mk_live_…` keys): point any existing SDK at `/api/v1/public`, streaming supported, plus `/search` (grounded + citations), `/images` and `/usage`. Scoped, per-key rate-limited, revocable; only a SHA-256 hash is ever stored
 - 🧩 Plugins — Gmail, Google Calendar & GitHub via OAuth (encrypted tokens, function calling)
 - 🔀 Multi-provider router — Gemini/OpenAI(/Claude via gateway) per task, env-driven, xAI default
 - 👥 Team workspaces — shared conversations with authors + per-seat usage (owners)
