@@ -19,7 +19,7 @@ from ...db.session import get_db
 from ...schemas import SocialDraftRequest, StoryboardRequest, VideoEnhanceRequest, VideoRequest
 from ...services import editor_jobs, film_jobs, soundtrack, storyboard
 from ...services.llm import friendly_ai_error, llm
-from ...services.media import STYLE_PRESETS, VideoGenerationError, VideoNotConfigured, VideoOptions, video
+from ...services.media import NEGATIVE_DEFAULT, STYLE_PRESETS, VideoGenerationError, VideoNotConfigured, VideoOptions, video
 from ...services.metering import PLAN_LIMITS, count_today, record_usage
 from ...services.watermark import should_watermark
 from ...services.voice import VoiceNotConfigured
@@ -242,7 +242,7 @@ async def generate_video_grok(
     req: VideoRequest, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
     """🎬 Explicit Grok video generation using the configured xAI video model
-    (grok-video-1 / settings.MODELS_VIDEO). Same professional payload and
+    (grok-video-1 / settings.MODEL_VIDEO). Same professional payload and
     cascade behavior as /videos, but directly targets the Grok provider."""
     await enforce_rate_limit(f"video_grok:{user.id}", 2)
     cap = PLAN_LIMITS.get(user.plan, PLAN_LIMITS["free"])["video_day"]
@@ -264,10 +264,10 @@ async def generate_video_grok(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
     except VideoGenerationError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
-    await record_usage(user.id, "video", settings.MODELS_VIDEO)
+    await record_usage(user.id, "video", settings.MODEL_VIDEO)
     return {
         "url": url,
-        "model": settings.MODELS_VIDEO,
+        "model": settings.MODEL_VIDEO,
         "provider": "xai",
         "prompt": req.prompt,
         "audio": "none",
@@ -281,7 +281,7 @@ async def grok_video_info(user: User = Depends(get_current_user)):
     provider, and supported professional payload features."""
     return {
         "provider": "xai",
-        "model": settings.MODELS_VIDEO,
+        "model": settings.MODEL_VIDEO,
         "base_url": settings.XAI_BASE_URL,
         "features": {
             "video_generation": True,
