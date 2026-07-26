@@ -1,4 +1,4 @@
-"""⏰ Scheduled Tasks API — saved prompts Mood runs unattended.
+"""⏰ Scheduled Tasks API — saved prompts ChatMood runs unattended.
 
     GET    /tasks              list (with cadence descriptions + next run)
     POST   /tasks              create

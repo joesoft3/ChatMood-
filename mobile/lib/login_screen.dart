@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text('✦', textAlign: TextAlign.center, style: TextStyle(fontSize: 44, color: MoodColors.accent)),
                   const SizedBox(height: 8),
                   Text(
-                    _register ? 'Create your Mood account' : 'Welcome back to Mood',
+                    _register ? 'Create your ChatMood account' : 'Welcome back to ChatMood',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                   ),

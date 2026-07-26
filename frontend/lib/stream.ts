@@ -114,7 +114,7 @@ async function* streamSSE(
     });
   } catch (e) {
     if (e instanceof TypeError) {
-      throw new Error("Can't reach the Mood AI server — it may be starting up or your connection dropped. Try again in a few seconds.");
+      throw new Error("Can't reach the ChatMood server — it may be starting up or your connection dropped. Try again in a few seconds.");
     }
     throw e;
   }

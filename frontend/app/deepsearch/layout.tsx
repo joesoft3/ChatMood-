@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Deep research",
-  description: "Private deep research workspace for Mood AI.",
+  description: "Private deep research workspace for ChatMood.",
   robots: { index: false, follow: false },
 };
 

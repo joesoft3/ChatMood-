@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
         await stop_scheduler()
 
 
-app = FastAPI(title="Mood AI API", version="1.9.8", lifespan=lifespan)
+app = FastAPI(title="ChatMood API", version="1.9.8", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

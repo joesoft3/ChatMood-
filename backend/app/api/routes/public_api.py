@@ -68,7 +68,7 @@ class ChatCompletionRequest(BaseModel):
     stream: bool = False
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1, le=32_000)
-    search: bool = False  # Mood extension: ground this completion in live web results
+    search: bool = False  # ChatMood extension: ground this completion in live web results
 
 
 class SearchRequest(BaseModel):

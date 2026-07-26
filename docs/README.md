@@ -1,4 +1,4 @@
-# 📚 Mood AI documentation index
+# 📚 ChatMood documentation index
 
 Every guide in `docs/`, grouped by what you're trying to do. Start with
 **[ARCHITECTURE.md](ARCHITECTURE.md)** for the technical blueprint, or jump to the

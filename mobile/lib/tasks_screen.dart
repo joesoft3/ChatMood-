@@ -1,4 +1,4 @@
-// ⏰ Tasks — saved prompts Mood runs unattended, on a schedule.
+// ⏰ Tasks — saved prompts ChatMood runs unattended, on a schedule.
 //
 // Mobile parity for the web /tasks page. This is arguably the surface that
 // matters MOST on a phone: a scheduled run finishes while the app is closed and
@@ -197,7 +197,7 @@ class _TasksScreenState extends State<TasksScreen> {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 24),
                             child: Text(
-                              'Tasks turn Mood from something you ask into something that shows up — '
+                              'Tasks turn ChatMood from something you ask into something that shows up — '
                               'a morning briefing, a weekly scan, any prompt you\'d otherwise retype.',
                               textAlign: TextAlign.center,
                               style: TextStyle(fontSize: 11, color: Colors.grey),

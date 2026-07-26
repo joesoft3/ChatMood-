@@ -146,7 +146,7 @@ class AdminFlagUpdate(BaseModel):
 
 
 class AdminPushTest(BaseModel):
-    title: str = Field(default="🔔 Mood AI push test", max_length=80)
+    title: str = Field(default="🔔 ChatMood push test", max_length=80)
     body: str = Field(default="If you can read this, push is wired end-to-end. 🎉", max_length=240)
 
 

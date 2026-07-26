@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         return v
 
     # Core
-    APP_NAME: str = "Mood AI"
+    APP_NAME: str = "ChatMood"
     DEBUG: bool = False
     DATABASE_URL: str = "postgresql+asyncpg://mood:mood@localhost:5432/mood"
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -237,7 +237,7 @@ class Settings(BaseSettings):
     NOTIFY_COOLDOWN_SECONDS: int = 300  # per user+kind, process-local
 
     # Video generation — comma-chain of providers, first that succeeds wins:
-    #   "reel"        = zero-key Mood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
+    #   "reel"        = zero-key ChatMood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
     #   "pollinations"= gen.pollinations.ai video models (needs POLLINATIONS_API_KEY)
     #   "xai"         = Grok video when credits exist
     # Default ships "reel" so chat video works TODAY with no keys; "xai,reel" once funded.
@@ -247,7 +247,7 @@ class Settings(BaseSettings):
     POLLINATIONS_VIDEO_URL: str = "https://gen.pollinations.ai/video"
     POLLINATIONS_VIDEO_MODEL: str = "wan-fast"
     VIDEO_MAX_WAIT_SECONDS: int = 240
-    # 🎬 Mood Reel composer (ffmpeg present in both deploy images — verified)
+    # 🎬 ChatMood Reel composer (ffmpeg present in both deploy images — verified)
     REEL_ENABLED: bool = True
     REEL_MAX_SCENES: int = 5
     # 🎞️ v1.9.8 richer reels: LLM storyboard (free Groq brain, fail-open to
@@ -260,7 +260,7 @@ class Settings(BaseSettings):
     TTS_TIMEOUT_S: int = 45
 
     # 🎨🎬 In-chat creation (v1.9.7): type "create an image of…" / "make a video of…"
-    # in any chat and Mood generates inline. Zero-cost heuristic router (no LLM spent).
+    # in any chat and ChatMood generates inline. Zero-cost heuristic router (no LLM spent).
     CHAT_MEDIA: bool = True
     CHAT_IMAGE_RATE_PER_MIN: int = 8
     CHAT_VIDEO_RATE_PER_MIN: int = 2
@@ -291,7 +291,7 @@ class Settings(BaseSettings):
     PROJECT_MAX_FILES: int = 40        # pinned documents per project
     PROJECT_MAX_PER_USER: int = 100
 
-    # ⏰ Scheduled tasks — saved prompts Mood runs unattended
+    # ⏰ Scheduled tasks — saved prompts ChatMood runs unattended
     TASKS_ENABLED: bool = True
     SCHEDULER_ENABLED: bool = True     # false on extra replicas if you ever want a single runner
     SCHEDULER_TICK_S: float = 60.0     # how often the loop looks for due tasks

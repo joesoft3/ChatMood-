@@ -387,7 +387,7 @@ class Reel(Base):
     """📺 Creator Reel — the shared public feed of creator videos.
 
     A post is either an UPLOAD (creator's own clip, stored under `filename`
-    in MEDIA_DIR) or a SHARE of something Mood already generated (a Film or an
+    in MEDIA_DIR) or a SHARE of something ChatMood already generated (a Film or an
     in-chat video), in which case `source_url` points at the existing media and
     no bytes are copied.
 
@@ -506,7 +506,7 @@ class ProjectFile(Base):
 
 
 class ScheduledTask(Base):
-    """⏰ Scheduled task — a saved prompt Mood runs on a schedule, unattended.
+    """⏰ Scheduled task — a saved prompt ChatMood runs on a schedule, unattended.
 
     Grok Tasks parity: "every weekday at 07:00, brief me on AI news". The
     scheduler (services/scheduler.py) claims due tasks atomically, runs the

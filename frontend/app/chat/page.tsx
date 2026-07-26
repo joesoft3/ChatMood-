@@ -505,9 +505,9 @@ export default function ChatPage() {
 
   function exportChat() {
     const title = convs.find((c) => c.id === activeId)?.title || "mood-conversation";
-    const md: string[] = [`# ${title}`, "", `_Exported from Mood AI · ${new Date().toLocaleString()}_`, ""];
+    const md: string[] = [`# ${title}`, "", `_Exported from ChatMood · ${new Date().toLocaleString()}_`, ""];
     for (const m of msgs) {
-      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ Mood", "", m.content, "");
+      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ ChatMood", "", m.content, "");
     }
     const blob = new Blob([md.join("\n")], { type: "text/markdown" });
     const a = document.createElement("a");
@@ -625,7 +625,7 @@ export default function ChatPage() {
   );
 
   return (
-    <AppShell title={activeTitle || "Mood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
+    <AppShell title={activeTitle || "ChatMood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
       {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
       {!emptyHome && (
         <>
@@ -761,10 +761,10 @@ export default function ChatPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/icon.png"
-                  alt="Mood AI"
+                  alt="ChatMood"
                   className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
                 />
-                <p className="text-base font-semibold tracking-tight text-gray-200">Mood AI</p>
+                <p className="text-base font-semibold tracking-tight text-gray-200">ChatMood</p>
               </div>
               <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
               <div className="w-full max-w-xl">{composerEl(true)}</div>

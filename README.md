@@ -1,6 +1,6 @@
-# Mood AI — a Grok-class assistant built on xAI + FastAPI + Next.js
+# ChatMood — a Grok-class assistant built on xAI + FastAPI + Next.js
 
-Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
+ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
 **orchestrating existing frontier models and tools** instead of training anything from scratch.
 
 - 💬 Streaming AI chat (Grok models via the xAI API)
@@ -17,7 +17,7 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 - ⏰ **Scheduled tasks** — save a prompt once and Mood runs it unattended (`once`/hourly/daily/weekly, UTC), in chat · DeepSearch · or agent mode; results append to a dedicated thread + push notification. Atomic multi-replica claim, bounded runs, metered like any other action — see [docs/TASKS-PROJECTS-API.md](docs/TASKS-PROJECTS-API.md)
 - 🗂 **Projects** — durable containers with a **standing brief** + **pinned documents** that every chat inside inherits on every turn (no re-explaining, no re-attaching); deleting a project never deletes your chats or files
 - 🔑 **Developer API** — **OpenAI-compatible** programmatic access (`mk_live_…` keys): point any existing SDK at `/api/v1/public`, streaming supported, plus `/search` (grounded + citations), `/images` and `/usage`. Scoped, per-key rate-limited, revocable; only a SHA-256 hash is ever stored
-- 🏷 **Free-tier watermarking** — generated designs, films, edits and in-chat media carry a subtle "Made with Mood AI" badge on the free plan; **Pro and admins render clean**. Pillow-drawn (no `drawtext` dependency), baked in at render time so every export path inherits it, and fail-open so a badge failure never costs a render — see [docs/WATERMARKING.md](docs/WATERMARKING.md)
+- 🏷 **Free-tier watermarking** — generated designs, films, edits and in-chat media carry a subtle "Made with ChatMood" badge on the free plan; **Pro and admins render clean**. Pillow-drawn (no `drawtext` dependency), baked in at render time so every export path inherits it, and fail-open so a badge failure never costs a render — see [docs/WATERMARKING.md](docs/WATERMARKING.md)
 - 🧩 Plugins — Gmail, Google Calendar & GitHub via OAuth (encrypted tokens, function calling)
 - 🔀 Multi-provider router — Gemini/OpenAI(/Claude via gateway) per task, env-driven, xAI default
 - 👥 Team workspaces — shared conversations with authors + per-seat usage (owners)

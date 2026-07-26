@@ -149,7 +149,7 @@ class _EditScreenState extends State<EditScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Upload a clip · tell Mood what to do in plain English',
+          const Text('Upload a clip · tell ChatMood what to do in plain English',
               style: TextStyle(fontSize: 12, color: Colors.grey)),
           const SizedBox(height: 12),
           OutlinedButton.icon(
@@ -293,7 +293,7 @@ class _EditPlayerState extends State<_EditPlayer> {
                   icon: const Icon(Icons.ios_share, size: 20),
                   onPressed: () => Share.shareXFiles(
                       [XFile(widget.path, mimeType: 'video/mp4')],
-                      text: 'Edited with Mood AI ✂️')),
+                      text: 'Edited with ChatMood ✂️')),
               IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
             ]),
             const SizedBox(height: 8),

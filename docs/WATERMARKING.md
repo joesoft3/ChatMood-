@@ -1,6 +1,6 @@
 # 🏷 Watermarking
 
-Free-tier renders carry a small "Made with Mood AI" badge. **Paid plans and
+Free-tier renders carry a small "Made with ChatMood" badge. **Paid plans and
 admins render clean.** This is the conversion lever for the creation surfaces:
 every free flyer, film and generated image quietly advertises the product, and
 removing the badge is a concrete reason to upgrade.
@@ -126,3 +126,10 @@ input, and end-to-end wiring through the design, film and in-chat routes.
 
 Both regression directions were verified by mutation: breaking the paid-user
 exemption fails 6 tests, and disabling badging for free users fails 6 tests.
+
+---
+
+## Brand note
+
+The badge text follows `APP_NAME` (**ChatMood**), so it rebrands automatically.
+`WATERMARK_TEXT` still overrides it for white-label deployments.

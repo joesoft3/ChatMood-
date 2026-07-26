@@ -13,7 +13,7 @@ This document captures the go-live path for the `arena/019f9b4e-moodai` branch.
 
 ## How production deploys
 
-Mood AI auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
+ChatMood auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
 
 | Surface | Host       | Trigger                  | Config                       |
 | ------- | ---------- | ------------------------ | ---------------------------- |

@@ -1,4 +1,4 @@
-# Edge proxy for Mood AI custom domains (optional — run with `--profile edge`).
+# Edge proxy for ChatMood custom domains (optional — run with `--profile edge`).
 #
 # - The platform's own base domain gets an automatic public cert.
 # - CUSTOM domains (connected/purchased by users) get on-demand TLS: before

@@ -171,7 +171,7 @@ export default function TasksPage() {
       setTitle("");
       setPrompt("");
       setShowForm(false);
-      setMsg("⏰ Task scheduled — Mood will run it for you.");
+      setMsg("⏰ Task scheduled — ChatMood will run it for you.");
       await load({ silent: true });
     } catch (e: any) {
       setErr(e.message || "Couldn't create the task");
@@ -258,7 +258,7 @@ export default function TasksPage() {
         <StudioHero
           icon={<AlarmClock size={20} />}
           title="⏰ Scheduled tasks"
-          subtitle="Save a prompt once and Mood runs it on a schedule — unattended. Every result lands in its own chat thread and pings your phone."
+          subtitle="Save a prompt once and ChatMood runs it on a schedule — unattended. Every result lands in its own chat thread and pings your phone."
           actions={
             <>
               <StudioActionButton onClick={() => setShowForm((v) => !v)} tone="accent">
@@ -314,7 +314,7 @@ export default function TasksPage() {
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="What should Mood do each time? e.g. Summarize the most important AI news from the last 24 hours, with sources."
+              placeholder="What should ChatMood do each time? e.g. Summarize the most important AI news from the last 24 hours, with sources."
               rows={3}
               maxLength={4000}
               className="w-full resize-y rounded-xl border border-line bg-base px-3 py-2 text-sm text-gray-100 outline-none focus:border-accent/50"
@@ -446,7 +446,7 @@ export default function TasksPage() {
           <StudioEmptyState
             emoji="⏰"
             title="No scheduled tasks yet"
-            description="Tasks turn Mood from something you ask into something that shows up. Schedule a morning briefing, a weekly competitor scan, or any prompt you'd otherwise retype."
+            description="Tasks turn ChatMood from something you ask into something that shows up. Schedule a morning briefing, a weekly competitor scan, or any prompt you'd otherwise retype."
             actions={<StudioActionButton onClick={() => setShowForm(true)} tone="accent">Create your first task</StudioActionButton>}
           />
         ) : (

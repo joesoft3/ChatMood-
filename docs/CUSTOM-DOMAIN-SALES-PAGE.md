@@ -6,7 +6,7 @@ Two different "custom domain" stories — don't mix them:
 |---|---|---|
 | **Your platform API** | `api.yourdomain.com` | Railway/Render/VPS (A/CNAME to the host) |
 | **Your platform app** | `app.yourdomain.com` | Netlify (Site settings → Domain management → points at Netlify) |
-| **White-label sales domains** | e.g. `acme-ai.com` | Your **Caddy edge** (VPS path) — Mood AI issues TLS on-demand and serves the customer's branding + arena |
+| **White-label sales domains** | e.g. `acme-ai.com` | Your **Caddy edge** (VPS path) — ChatMood issues TLS on-demand and serves the customer's branding + arena |
 
 Story 1 & 2 are in [BACKEND-HOSTING.md](BACKEND-HOSTING.md) §Path A step 4 and
 [NETLIFY-DEPLOY.md](NETLIFY-DEPLOY.md) §Custom domain. Story 3 below.

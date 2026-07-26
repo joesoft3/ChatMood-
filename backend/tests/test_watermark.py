@@ -102,8 +102,8 @@ def test_entitlement_is_fail_safe_when_the_admin_check_explodes(monkeypatch):
 # ------------------------------------------------------------------- wording
 
 def test_badge_text_defaults_to_the_app_name(monkeypatch):
-    monkeypatch.setattr(settings, "APP_NAME", "Mood AI")
-    assert wm.watermark_text() == "Made with Mood AI"
+    monkeypatch.setattr(settings, "APP_NAME", "ChatMood")
+    assert wm.watermark_text() == "Made with ChatMood"
 
 
 def test_badge_text_is_overridable_and_bounded(monkeypatch):
@@ -119,7 +119,7 @@ def test_badge_renders_a_real_transparent_png(tmp_path):
     from PIL import Image
 
     dst = tmp_path / "badge.png"
-    assert wm.render_badge("Made with Mood AI", 1280, dst) is True
+    assert wm.render_badge("Made with ChatMood", 1280, dst) is True
     with Image.open(dst) as im:
         assert im.mode == "RGBA"
         assert im.width > 40 and im.height > 10
@@ -131,8 +131,8 @@ def test_badge_scales_with_output_width(tmp_path):
     from PIL import Image
 
     small, large = tmp_path / "s.png", tmp_path / "l.png"
-    wm.render_badge("Made with Mood AI", 640, small)
-    wm.render_badge("Made with Mood AI", 3000, large)
+    wm.render_badge("Made with ChatMood", 640, small)
+    wm.render_badge("Made with ChatMood", 3000, large)
     with Image.open(small) as a, Image.open(large) as b:
         # a print-tier export gets a proportionally bigger badge, not a speck
         assert b.width > a.width

@@ -431,7 +431,7 @@ export default function SettingsPage() {
   useEffect(() => {
     // OAuth callback lands here as /settings?plugin=connected|error (no Suspense needed)
     const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plugin") : null;
-    if (q === "connected") setPluginMsg("✅ App connected — Mood can now act on it in chat (🧩 toggle).");
+    if (q === "connected") setPluginMsg("✅ App connected — ChatMood can now act on it in chat (🧩 toggle).");
     if (q === "error") setPluginMsg("⚠️ Connection failed — please try again.");
     if (q) window.history.replaceState({}, "", window.location.pathname);
 
@@ -857,7 +857,7 @@ export default function SettingsPage() {
   }
 
   async function disconnectPlugin(provider: string) {
-    if (!confirm("Disconnect this app? Mood will lose access immediately.")) return;
+    if (!confirm("Disconnect this app? ChatMood will lose access immediately.")) return;
     setPlugins((p) => (p ? p.map((x) => (x.provider === provider ? { ...x, connected: false, account: null } : x)) : p));
     await apiFetch(`/plugins/${provider}`, { method: "DELETE" }).catch(loadPlugins);
   }
@@ -879,7 +879,7 @@ export default function SettingsPage() {
   }
 
   async function clearAll() {
-    if (!confirm("Delete ALL of Mood’s memories about you?")) return;
+    if (!confirm("Delete ALL of ChatMood’s memories about you?")) return;
     await apiFetch("/memory", { method: "DELETE" }).catch(() => {});
     loadMemories();
   }
@@ -1014,7 +1014,7 @@ export default function SettingsPage() {
             {me ? (
               <div className="space-y-4 text-sm">
                 <div className="space-y-1">
-                  <p className="text-gray-200 font-medium">{me.display_name || "Mood user"}</p>
+                  <p className="text-gray-200 font-medium">{me.display_name || "ChatMood user"}</p>
                   <p className="text-gray-500 break-all">{me.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1112,7 +1112,7 @@ export default function SettingsPage() {
               <li>🔢 5M tokens/mo · 🔭 200 deep searches/day · 🎬 60 videos/day</li>
               <li>📎 50 MB uploads (vs 25) · 🧠 365-day memory (vs 30)</li>
               <li>⏫ 4× rate-limit throughput</li>
-              <li>🏷 <span className="text-gray-200">Watermark-free exports</span> — free renders carry a small Mood AI badge</li>
+              <li>🏷 <span className="text-gray-200">Watermark-free exports</span> — free renders carry a small ChatMood badge</li>
             </ul>
             <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
               Upgrade instantly to unlock higher daily quotas, faster throughput and premium creation workflows.
@@ -1178,7 +1178,7 @@ export default function SettingsPage() {
           {/* Plugins */}
           <Card icon={<Puzzle size={16} />} title="Connected apps">
             <p className="text-xs text-gray-500">
-              Let Mood read &amp; act in your apps. In chat, turn on the 🧩 toggle and ask —
+              Let ChatMood read &amp; act in your apps. In chat, turn on the 🧩 toggle and ask —
               e.g. <i>“Check my unread emails”</i> or <i>“Create a GitHub issue for the login bug.”</i>
             </p>
             <div className="flex flex-wrap gap-2">
@@ -1393,7 +1393,7 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <Card icon={<Globe size={16} />} title="Custom domains">
               <p className="text-xs text-gray-500">
-                Run Mood on your own domain for your business (white-label), or buy a new domain in real time —
+                Run ChatMood on your own domain for your business (white-label), or buy a new domain in real time —
                 availability, pricing, secure checkout and auto-connection included.
                 {domProviders?.registrar_env === "ote" && domProviders.registrar && (
                   <span className="text-yellow-500/90"> Registrar is in SANDBOX mode (no real registration/charge).</span>
@@ -1934,7 +1934,7 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <Card icon={<SlidersHorizontal size={16} />} title="Custom instructions">
               <p className="text-xs text-gray-500">
-                Tell Mood how to behave in <b>every</b> conversation — tone, format, language, expertise level
+                Tell ChatMood how to behave in <b>every</b> conversation — tone, format, language, expertise level
                 (e.g. “Answer like a senior engineer; keep answers concise; always show code in Python”).
               </p>
               <textarea
@@ -1942,7 +1942,7 @@ export default function SettingsPage() {
                 onChange={(e) => setInstructions(e.target.value)}
                 rows={4}
                 maxLength={2000}
-                placeholder="How should Mood respond to you?"
+                placeholder="How should ChatMood respond to you?"
                 className="w-full rounded-xl bg-base border border-line px-4 py-3 text-sm outline-none focus:border-accent/60 placeholder-gray-600 resize-y"
               />
               <div className="flex items-center gap-3">
@@ -1963,7 +1963,7 @@ export default function SettingsPage() {
             <div className="md:col-span-2">
               <Card
                 icon={<KeyRound size={16} />}
-                title="🔑 Developer API — build on Mood"
+                title="🔑 Developer API — build on ChatMood"
                 action={
                   <span className="text-[10px] text-gray-500">
                     {keys.keys.filter((k) => !k.revoked).length}/{keys.limit} active
@@ -2082,11 +2082,11 @@ client.chat.completions.create(
           <div className="md:col-span-2">
             <Card
               icon={<Brain size={16} />}
-              title={`What Mood remembers ${mems ? `(${mems.length})` : ""}`}
+              title={`What ChatMood remembers ${mems ? `(${mems.length})` : ""}`}
             >
               <p className="text-xs text-gray-500">
-                Mood remembers durable facts about you and what your past conversations were about — that&apos;s how
-                it picks up where you left off in new chats. Delete anything you don&apos;t want Mood to know.
+                ChatMood remembers durable facts about you and what your past conversations were about — that&apos;s how
+                it picks up where you left off in new chats. Delete anything you don&apos;t want ChatMood to know.
               </p>
               <div className="flex gap-2">
                 <button
@@ -2152,7 +2152,7 @@ client.chat.completions.create(
             <Card icon={<Trash2 size={16} className="text-red-400" />} title="Danger zone">
               <div className="space-y-3">
                 <p className="text-xs text-gray-400">
-                  Permanently delete your Mood AI account — chats, uploads, designs, films, edits, orders, memory,
+                  Permanently delete your ChatMood account — chats, uploads, designs, films, edits, orders, memory,
                   plugin tokens, and teams you own. <span className="font-semibold text-red-300">This is instant and cannot be undone.</span>{" "}
                   Details at <a href="/account-deletion" className="inline-block py-1 text-accent underline underline-offset-2">/account-deletion</a>.
                 </p>

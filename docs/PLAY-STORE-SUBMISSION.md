@@ -1,4 +1,4 @@
-# 🏪 Play Store submission run — Mood AI (internal track → production)
+# 🏪 Play Store submission run — ChatMood (internal track → production)
 
 End-to-end runbook: every form answer pre-written, every click in order.
 Pair with [PLAY-CONSOLE.md](PLAY-CONSOLE.md) (listing copy + store assets) — this
@@ -15,7 +15,7 @@ set (→ every `v*` tag CI attaches a **signed** `app-release.aab` to the releas
 
 | Field | Answer |
 |---|---|
-| App name | **Mood AI** |
+| App name | **ChatMood** |
 | Default language | English (United States) |
 | App or game | App |
 | Free or paid | Free |

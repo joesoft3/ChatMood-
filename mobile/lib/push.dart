@@ -21,7 +21,7 @@ class PushService {
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
     'mood_core',
-    'Mood AI',
+    'ChatMood',
     description: 'Approvals, ⚔️ arena verdicts and workspace alerts',
     importance: Importance.high,
   );
@@ -98,7 +98,7 @@ class PushService {
   /// Foreground messages have no OS tray entry — paint one locally.
   static Future<void> _showLocalWhenForeground(RemoteMessage message) async {
     final n = message.notification;
-    final title = n?.title ?? 'Mood AI';
+    final title = n?.title ?? 'ChatMood';
     final body = n?.body ?? '';
     if (body.isEmpty) return;
     try {

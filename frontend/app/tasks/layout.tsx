@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Tasks",
-  description: "Scheduled prompts Mood runs for you, unattended.",
+  description: "Scheduled prompts ChatMood runs for you, unattended.",
   robots: { index: false, follow: false },
 };
 

@@ -1,16 +1,16 @@
-# Mood AI — Terms of Service
+# ChatMood — Terms of Service
 
 **Effective date:** 18 July 2026 · **Last updated:** 18 July 2026
 
-These Terms of Service (“**Terms**”) are an agreement between you and the operator of Mood AI
-(“**we**, **us**”, see Contact for the operating entity) covering your use of the Mood AI apps,
+These Terms of Service (“**Terms**”) are an agreement between you and the operator of ChatMood
+(“**we**, **us**”, see Contact for the operating entity) covering your use of the ChatMood apps,
 APIs, websites and connected arenas (the “**Service**”). By creating an account or using the
 Service you accept these Terms. If you use the Service for an organization, you accept on its
 behalf and warrant you have authority to do so.
 
 ## 1. The Service
 
-Mood AI is an AI super-app: streaming chat with multiple model options (including ⚔️ Arena
+ChatMood is an AI super-app: streaming chat with multiple model options (including ⚔️ Arena
 multi-model drafts, blind ballots and an AI judge verdict), 🧠 think mode with visible reasoning
 traces, live web search, long-term memory and cross-conversation recall, file and vision analysis,
 voice and realtime conversations, image/video generation, plugin actions (Gmail, Google Calendar,
@@ -107,7 +107,7 @@ courts in Accra have exclusive jurisdiction unless mandatory consumer law says o
 
 ## 14. Contact
 
-Legal entity: **Joesoft — Mood AI** · reach us via the address published in-app (owner panel)
+Legal entity: **Joesoft — ChatMood** · reach us via the address published in-app (owner panel)
 or the support inbox listed on [joesoft3/moodai](https://github.com/joesoft3/moodai).
 
 ---

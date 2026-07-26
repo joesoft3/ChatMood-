@@ -455,7 +455,7 @@ async def _send_renewal_reminders() -> None:
                             f"Your domain {d.domain} expires on {d.expires_at.date().isoformat()} "
                             f"and registrar auto-renew is OFF.\n\n"
                             f"Renew it in one click: {link} (Custom domains → 🔁 Renew now).\n\n"
-                            f"— Mood AI"
+                            f"— ChatMood"
                         ),
                     )
                     if ok:

@@ -44,7 +44,7 @@ export default function SharedConversationPage() {
   }, [shareToken]);
 
   useEffect(() => {
-    if (data) document.title = `${data.title} · ${brand?.brand_name ?? "Mood AI"}`;
+    if (data) document.title = `${data.title} · ${brand?.brand_name ?? "ChatMood"}`;
   }, [data, brand]);
 
   return (
@@ -54,7 +54,7 @@ export default function SharedConversationPage() {
           <BrandMark brand={brand} />
           <span className="font-semibold text-sm truncate">{data?.title ?? "Shared conversation"}</span>
           <span className="text-[11px] text-gray-500 ml-auto shrink-0">
-            shared via {brand?.brand_name ?? "Mood AI"}
+            shared via {brand?.brand_name ?? "ChatMood"}
           </span>
         </div>
       </header>

@@ -181,7 +181,7 @@ def notify_approval_needed(user_id: str, action_name: str) -> None:
     pretty = action_name.replace("gmail_", "").replace("google_calendar_", "").replace("_", " ")
     push_later(
         user_id, "approval", "✋ Approval needed",
-        f"Mood wants to {pretty} — approve or reject in the ✋ inbox",
+        f"ChatMood wants to {pretty} — approve or reject in the ✋ inbox",
         {"kind": "approval", "screen": "/plugins"},
     )
 

@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Thin client for the Mood AI API (FastAPI, /api/v1).
+/// Thin client for the ChatMood API (FastAPI, /api/v1).
 /// Pass the API root at build/run time:
 ///   flutter run --dart-define=API_URL=http://192.168.1.10:8000/api/v1
 /// Default targets the Android emulator's host loopback.
