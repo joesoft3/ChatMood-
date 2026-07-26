@@ -7,6 +7,32 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🎙 One-command voice key setup + self-check (`scripts/set-voice-key.sh`)
+
+- **Voice is the one feature gated behind `OPENAI_API_KEY`** (Whisper STT, TTS,
+  read-aloud, the realtime voice WebSocket, and video voiceovers). Until it is set,
+  `VoiceService` raises `VoiceNotConfigured` and the routes answer **503**. Adding the
+  key previously meant hand-editing `.env` and finding out whether it worked by clicking
+  around the app.
+- **New `scripts/set-voice-key.sh`** — writes `OPENAI_API_KEY` (and optional
+  `OPENAI_BASE_URL`) into `.env`, creating it from `.env.example` first, then **proves
+  the key actually works**: auth (`GET /models`) → **TTS** (`POST /audio/speech`) →
+  **Whisper STT** (`POST /audio/transcriptions`) — it speaks a sentence and transcribes
+  its own audio back, closing the full voice loop before you deploy anything.
+- **Distinguishes "my key is bad" from "my server doesn't have the key"**:
+  `--check --api https://<host> --token <jwt>` probes the deployed backend's
+  `/voice/tts` and maps a 503 to *"the SERVER has no OPENAI_API_KEY yet — set it in your
+  host's variables + redeploy"*, with per-host instructions (Railway/Render/Fly/Vercel)
+  printed on success.
+- **Safe by construction**: hidden prompt input, the key is masked in all output
+  (`sk-proj…AbCd`), `.env` is chmod 600, writes are idempotent (replace-or-append, never
+  duplicate lines), `--check` never touches `.env`, and the script **refuses to write a
+  secret into a git-tracked file**. 429s are called out as billing/quota rather than a
+  bad key.
+- Referenced from the README quickstart + capability table, `.env.example`,
+  [docs/VIDEO-SOUND.md](docs/VIDEO-SOUND.md) and the
+  [go-live clicksheet](docs/GO-LIVE-CLICKSHEET.md).
+
 ### 📚 Docs index + automated housekeeping gate (PR #21)
 
 - **`docs/README.md` — a real documentation index.** All 33 guides in `docs/` are now

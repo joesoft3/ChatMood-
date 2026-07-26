@@ -66,6 +66,7 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 cp .env.example .env
 # Edit .env — the only required key is XAI_API_KEY (https://console.x.ai)
 # Add OPENAI_API_KEY to enable voice features + OPENAI/GEMINI keys to widen the ⚔️ arena panel.
+#   → scripts/set-voice-key.sh sk-...   sets OPENAI_API_KEY and proves voice works (TTS → Whisper round-trip)
 # .env already ships a bootstrapped owner login (ADMIN_BOOTSTRAP_*) and a sign-up
 # access code (APP_PASSWORD) — change both before deploying anywhere public!
 
@@ -198,7 +199,7 @@ mood-ai/
 | Domain analytics | ✅ real-time requests & unique users per domain (`X-Mood-Host` attribution, Redis) |
 | File analysis (PDF/DOCX/XLSX/CSV) | ✅ text extraction → context |
 | Image analysis / vision | ✅ Grok vision, auto model routing |
-| Voice STT/TTS + voice chat | ✅ needs `OPENAI_API_KEY`; 🎵 audio-file analysis in Voice page + mobile attach |
+| Voice STT/TTS + voice chat | ✅ needs `OPENAI_API_KEY` (`scripts/set-voice-key.sh` sets + verifies it); 🎵 audio-file analysis in Voice page + mobile attach |
 | Chat toolbar | ✅ always-visible bar: Share/Export (with content) · team panel · mode badges |
 | Image generation | ✅ `grok-2-image` |
 | Stripe subscriptions | ✅ optional, webhook-wired |

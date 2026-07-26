@@ -131,7 +131,7 @@ auth headers.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `OPENAI_API_KEY` | — | **Required for sound** (TTS voice). Already used for Whisper/voice mode. |
+| `OPENAI_API_KEY` | — | **Required for sound** (TTS voice). Already used for Whisper/voice mode. Set + verify with `scripts/set-voice-key.sh`. |
 | `BACKEND_PUBLIC_URL` | localhost | **Must be the API's public URL** (e.g. `https://<app>.up.railway.app`) so muxed file URLs resolve in browsers/players. |
 | `FFMPEG_PATH` | `ffmpeg` | Binary location. The backend **Dockerfile already installs ffmpeg** — nothing to do on Railway. |
 | `MEDIA_DIR` | `/tmp/mood-media` | Where muxed MP4s land (ephemeral is fine — 24 h TTL). |
