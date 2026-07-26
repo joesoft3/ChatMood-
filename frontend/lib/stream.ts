@@ -1,6 +1,6 @@
 "use client";
 
-import { API, token } from "./api";
+import { API, handleAuthExpired, token } from "./api";
 
 /** Shared SSE wire contract for every streaming surface (chat, agents, deepsearch). */
 export interface ChatPayload {
@@ -86,11 +86,39 @@ async function sseErrorMessage(res: Response): Promise<string> {
   }
 }
 
+function parseSseBlock(raw: string): ChatEvent | null {
+  const data: string[] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line || line.startsWith(":")) continue;
+    const idx = line.indexOf(":");
+    const field = idx === -1 ? line : line.slice(0, idx);
+    if (field !== "data") continue;
+    let value = idx === -1 ? "" : line.slice(idx + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+    data.push(value);
+  }
+  if (data.length === 0) return null;
+  try {
+    return JSON.parse(data.join("\n")) as ChatEvent;
+  } catch {
+    return null;
+  }
+}
+
+function abortWith(controller: AbortController, reason?: any) {
+  try {
+    controller.abort(reason);
+  } catch {
+    controller.abort();
+  }
+}
+
 /**
  * POST + incremental SSE parsing (EventSource can't POST or authorize).
- * One implementation shared by everything that streams — with auto-retry on
- * network drops mid-stream? No: generators are not idempotent, so callers own
- * retry policy; `signal` powers "stop generating".
+ * One implementation shared by everything that streams. The parser accepts the
+ * real SSE format (comments, CRLF and multi-line data), not just a single
+ * `data:` line, and applies a client timeout even on older Safari where
+ * AbortSignal.timeout is missing.
  */
 async function* streamSSE(
   endpoint: string,
@@ -99,44 +127,68 @@ async function* streamSSE(
   timeoutMs = 6 * 60_000,
 ): AsyncGenerator<ChatEvent> {
   const tk = token.get();
-  let res: Response;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = globalThis.setTimeout(() => {
+    timedOut = true;
+    abortWith(controller, new DOMException("Mood took too long to respond.", "TimeoutError"));
+  }, timeoutMs);
+  const onAbort = () => abortWith(controller, signal?.reason);
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener("abort", onAbort, { once: true });
+  }
+
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   try {
-    res = await fetch(`${API}${endpoint}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(tk ? { Authorization: `Bearer ${tk}` } : {}),
-      ...(typeof window !== "undefined" ? { "X-Mood-Host": window.location.host } : {}),
-    },
+    const res = await fetch(`${API}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(tk ? { Authorization: `Bearer ${tk}` } : {}),
+        ...(typeof window !== "undefined" ? { "X-Mood-Host": window.location.host } : {}),
+      },
       body: JSON.stringify(payload),
-      signal: signal ?? AbortSignal.timeout(timeoutMs),
+      signal: controller.signal,
     });
+    if (res.status === 401) {
+      const msg = await sseErrorMessage(res);
+      handleAuthExpired(msg || "Your session expired. Please sign in again.");
+      throw new Error(msg || "Your session expired. Please sign in again.");
+    }
+    if (!res.ok || !res.body) throw new Error(await sseErrorMessage(res));
+
+    reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        buf += decoder.decode();
+        break;
+      }
+      buf += decoder.decode(value, { stream: true });
+      const chunks = buf.split(/\r?\n\r?\n/);
+      buf = chunks.pop() ?? "";
+      for (const raw of chunks) {
+        const ev = parseSseBlock(raw);
+        if (ev) yield ev;
+      }
+    }
+    if (buf.trim()) {
+      const ev = parseSseBlock(buf);
+      if (ev) yield ev;
+    }
   } catch (e) {
+    if (timedOut) throw new Error("Mood took too long to respond. Please retry with a shorter prompt or check the server.");
     if (e instanceof TypeError) {
       throw new Error("Can't reach the Mood AI server — it may be starting up or your connection dropped. Try again in a few seconds.");
     }
     throw e;
-  }
-  if (!res.ok || !res.body) throw new Error(await sseErrorMessage(res));
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    const chunks = buf.split("\n\n");
-    buf = chunks.pop() ?? "";
-    for (const raw of chunks) {
-      const line = raw.trim();
-      if (!line.startsWith("data:")) continue;
-      try {
-        yield JSON.parse(line.slice(5).trim()) as ChatEvent;
-      } catch {
-        /* ignore malformed event */
-      }
-    }
+  } finally {
+    globalThis.clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onAbort);
+    reader?.releaseLock();
   }
 }
 

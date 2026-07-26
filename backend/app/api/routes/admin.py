@@ -124,7 +124,7 @@ async def admin_put_settings(
             await set_setting(db, KEY_APP_PASSWORD, {})  # cleared — open signup (subject to toggle)
         else:
             if len(pw) < 8:
-                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "App password must be 8+ characters")
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "App password must be 8+ characters")
             await set_setting(db, KEY_APP_PASSWORD, {"hash": hash_password(pw), "set_by": admin.email})
     return await admin_get_settings(db, admin)
 

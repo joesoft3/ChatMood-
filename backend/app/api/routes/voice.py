@@ -30,7 +30,7 @@ MAX_VOICE_BYTES = 25 * 1024 * 1024
 async def transcribe(file: UploadFile = File(...), user: User = Depends(get_current_user)):
     data = await file.read()
     if len(data) > MAX_VOICE_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Audio too large (max 25 MB)")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Audio too large (max 25 MB)")
     try:
         text = await voice.transcribe(data, file.filename or "audio.webm")
     except VoiceNotConfigured as e:
@@ -41,7 +41,7 @@ async def transcribe(file: UploadFile = File(...), user: User = Depends(get_curr
 @router.post("/tts")
 async def tts(req: TTSRequest, user: User = Depends(get_current_user)):
     if req.voice and req.voice not in NARRATION_VOICES:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Unknown voice '{req.voice}'")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unknown voice '{req.voice}'")
     try:
         audio = await voice.synthesize(req.text, req.voice, req.speed)
     except VoiceNotConfigured as e:
@@ -60,14 +60,14 @@ async def voice_chat(
     await enforce_rate_limit(f"voice:{user.id}", settings.CHAT_RATE_LIMIT_PER_MIN)
     data = await file.read()
     if len(data) > MAX_VOICE_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Audio too large (max 25 MB)")
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Audio too large (max 25 MB)")
 
     try:
         transcript = await voice.transcribe(data, file.filename or "voice.webm")
     except VoiceNotConfigured as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
     if not transcript:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Could not transcribe audio")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Could not transcribe audio")
 
     conv, created = await get_or_create_conversation(db, user, conversation_id, transcript)
     messages, model, _ = await build_messages(db, user, conv.id, transcript, [], False, created)

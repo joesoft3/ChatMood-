@@ -94,11 +94,14 @@ class _EditScreenState extends State<EditScreen> {
       final edit = (res['edit'] as Map?)?.cast<String, dynamic>();
       final id = '${edit?['id'] ?? ''}';
       if (id.isEmpty) throw Exception('no edit id returned');
+      if (!mounted) return;
       setState(() => _status = '✂️ Editing — planning stages & rendering…');
       // poll until done/failed (202-ack + poll pattern, like the web)
       for (var i = 0; i < 60; i++) {
         await Future.delayed(const Duration(seconds: 4));
+        if (!mounted) return;
         final e = await Api.get('/media/edits/$id');
+        if (!mounted) return;
         final st = '${e['status']}';
         if (st == 'done') {
           setState(() => _status = '🎬 Edit ready — see it below!');
@@ -108,13 +111,13 @@ class _EditScreenState extends State<EditScreen> {
           setState(() => _status = '⚠️ ${e['note'] ?? 'edit failed'}');
           break;
         }
-        if (mounted) setState(() => _status = '✂️ Rendering… (${i * 4}s)');
+        setState(() => _status = '✂️ Rendering… (${i * 4}s)');
       }
       _picked = null;
       _instruction.clear();
       _refresh(quiet: true);
     } catch (e) {
-      setState(() => _status = '⚠️ $e');
+      if (mounted) setState(() => _status = '⚠️ $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -127,7 +130,9 @@ class _EditScreenState extends State<EditScreen> {
       setState(() => _status = '⬇️ Fetching your edit…');
       final bytes = await Api.getBytes(url);
       final dir = await getTemporaryDirectory();
-      final path = '${dir.path}/mood-edit-${'${e['id']}'.substring(0, 8)}.mp4';
+      final eid = '${e['id']}';
+      final shortId = eid.length > 8 ? eid.substring(0, 8) : eid;
+      final path = '${dir.path}/mood-edit-$shortId.mp4';
       await File(path).writeAsBytes(bytes, flush: true);
       if (!mounted) return;
       setState(() => _status = null);
@@ -138,7 +143,7 @@ class _EditScreenState extends State<EditScreen> {
         builder: (_) => _EditPlayer(path: path),
       );
     } catch (err) {
-      setState(() => _status = '⚠️ $err');
+      if (mounted) setState(() => _status = '⚠️ $err');
     }
   }
 

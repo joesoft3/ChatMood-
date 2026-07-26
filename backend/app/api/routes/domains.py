@@ -145,7 +145,7 @@ async def search_domains(q: str = Query(..., min_length=2, max_length=60), user:
     try:
         exact = clean_domain(base_q if "." in base_q else f"{base_q}.com")
     except DomainError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     try:
         candidates = [exact]
         for s in await registrar.suggest(base_q, limit=5):
@@ -179,7 +179,7 @@ async def connect_domain(
     try:
         domain = clean_domain(req.domain)
     except DomainError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     if await db.scalar(select(Domain).where(Domain.domain == domain)):
         raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already connected to Mood")
     d = Domain(
@@ -298,7 +298,7 @@ async def update_domain(
         else:
             if len(req.logo_data) > 200_000 or not LOGO_RE.match(req.logo_data):
                 raise HTTPException(
-                    status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status.HTTP_422_UNPROCESSABLE_CONTENT,
                     "Logo must be a data:image/(png|jpeg|webp|gif);base64 URL under ~150 KB",
                 )
             d.logo_data = req.logo_data
@@ -329,7 +329,7 @@ async def update_domain(
     if req.arena_judge is not None:
         judge = req.arena_judge.strip() or None
         if judge and not JUDGE_RE.match(judge):
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Judge model id: letters, digits, . _ - / only")
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Judge model id: letters, digits, . _ - / only")
         d.arena_judge = judge
     if req.arena_panel is not None:
         if not req.arena_panel:
@@ -340,12 +340,12 @@ async def update_domain(
                 prov, model = str(p.get("provider", "")), str(p.get("model", "")).strip()
                 if prov not in ARENA_PROVIDERS or not model or not JUDGE_RE.match(model):
                     raise HTTPException(
-                        status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        status.HTTP_422_UNPROCESSABLE_CONTENT,
                         "Panel entries need provider (xai|openai|gemini) + a valid model id",
                     )
                 panel.append({"provider": prov, "model": model[:60], "label": str(p.get("label") or model)[:60]})
             if len({(p["provider"], p["model"]) for p in panel}) != len(panel):
-                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Panel entries must be unique provider+model pairs")
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Panel entries must be unique provider+model pairs")
             d.arena_panel = panel
     await db.commit()
     return _out(d)
@@ -484,7 +484,7 @@ async def purchase_domain(
     try:
         domain = clean_domain(req.domain)
     except DomainError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     if await db.scalar(select(Domain).where(Domain.domain == domain)):
         raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already taken in Mood")
     try:

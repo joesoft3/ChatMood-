@@ -303,10 +303,10 @@ async def upload_reel(
         )
     raw = await file.read()
     if not raw:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That file is empty")
     if len(raw) > REEL_MAX_BYTES:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status.HTTP_413_CONTENT_TOO_LARGE,
             f"Reels must be ≤ {REEL_MAX_BYTES // (1024 * 1024)} MB",
         )
 
@@ -409,13 +409,13 @@ async def share_to_reel(
 
     if not url:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "Pass a film_id or a url to share"
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Pass a film_id or a url to share"
         )
     # Only accept media this deployment actually serves — no arbitrary hotlinks.
     base = settings.BACKEND_PUBLIC_URL.rstrip("/")
     if not (url.startswith(f"{base}/api/v1/media/files/") or url.startswith(f"{base}/api/v1/reels/files/")):
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             "Only videos generated in Mood can be shared to the reel",
         )
 
@@ -460,9 +460,9 @@ async def upload_asset(
         )
     raw = await file.read()
     if not raw:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That file is empty")
     if len(raw) > cap:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"Must be ≤ {cap // (1024 * 1024)} MB")
 
     ext = table[mime]
@@ -492,7 +492,7 @@ def _asset_path(name: str) -> str:
     pass `../../etc/passwd` and have ffmpeg read it into a published video.
     """
     if not name or not DRAFT_RE.match(name):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"unknown asset: {name}")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"unknown asset: {name}")
     path = os.path.join(settings.MEDIA_DIR, name)
     if not os.path.exists(path):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "That clip is no longer staged — re-add it")
@@ -520,15 +520,15 @@ async def publish_edit(
     # the creator hunting for an outage that isn't there.
     raw_clips = body.get("clips") or []
     if not isinstance(raw_clips, list) or not raw_clips:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Add at least one clip")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Add at least one clip")
     if len(raw_clips) > studio.MAX_CLIPS:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             f"A reel can hold at most {studio.MAX_CLIPS} clips")
 
     clips: list[studio.Clip] = []
     for c in raw_clips:
         if not isinstance(c, dict):
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "malformed clip")
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "malformed clip")
         path = _asset_path(str(c.get("name") or ""))
         end = c.get("end")
         clips.append(studio.Clip(
@@ -544,7 +544,7 @@ async def publish_edit(
     total = sum(c.duration or studio.probe_duration(c.path) for c in clips)
     if total > studio.MAX_TOTAL_SECONDS:
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"That edit is {int(total)}s — reels are capped at {studio.MAX_TOTAL_SECONDS}s",
         )
 
@@ -561,7 +561,7 @@ async def publish_edit(
         opath = _asset_path(str(o["name"]))
         corner = str(o.get("corner") or "tr")
         if corner not in studio.OVERLAY_CORNERS:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                 f"corner must be one of {', '.join(studio.OVERLAY_CORNERS)}")
         ov = studio.Overlay(path=opath, corner=corner,
                             scale=float(o.get("scale", 0.3)),
@@ -654,10 +654,10 @@ async def create_duet(
     """
     await enforce_rate_limit(f"reelduet:{user.id}", 3 * plan_rate_mult(user.plan))
     if layout not in studio.DUET_LAYOUTS:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             f"layout must be one of {', '.join(studio.DUET_LAYOUTS)}")
     if audio not in ("both", "mine", "theirs"):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             "audio must be both, mine or theirs")
 
     parent = await db.get(Reel, reel_id)
@@ -678,9 +678,9 @@ async def create_duet(
                             "Upload an MP4, MOV or WebM video")
     raw = await file.read()
     if not raw:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That file is empty")
     if len(raw) > REEL_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"Reels must be ≤ {REEL_MAX_BYTES // (1024 * 1024)} MB")
 
     if not soundtrack.ffmpeg_path():

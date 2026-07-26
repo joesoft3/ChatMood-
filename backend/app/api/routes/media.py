@@ -76,7 +76,7 @@ async def create_edit(
                             "Upload an MP4, MOV, WebM or AVI clip")
     raw = await file.read()
     if not raw or len(raw) > _EDIT_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"Clip must be ≤ {_EDIT_MAX_BYTES // (1024 * 1024)} MB")
     brand_logo_file = ""
     if use_brand:
@@ -141,7 +141,7 @@ async def image_to_video(
                             "Upload a PNG, JPEG or WebP image")
     raw = await file.read()
     if not raw or len(raw) > _I2V_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"Image must be ≤ {_I2V_MAX_BYTES // (1024 * 1024)} MB")
     if aspect_ratio not in ("16:9", "9:16", "1:1"):
         aspect_ratio = "16:9"
@@ -457,7 +457,7 @@ async def storyboard_from_image(
                             "Upload a PNG, JPEG or WebP image")
     raw = await file.read()
     if not raw or len(raw) > _I2V_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"Image must be ≤ {_I2V_MAX_BYTES // (1024 * 1024)} MB")
     req = StoryboardRequest(
         prompt=prompt, scenes=scenes, scene_seconds=scene_seconds,

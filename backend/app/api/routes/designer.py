@@ -97,7 +97,7 @@ async def put_brand(
     if req.logo_design_id:
         d = await db.get(Design, req.logo_design_id)
         if not d or d.user_id != user.id or d.kind != "logo":
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                                 "logo_design_id must reference one of YOUR logo designs")
     b = await db.get(BrandKit, user.id)
     if not b:
@@ -208,14 +208,14 @@ async def export_design(
 ):
     """🖨 Print-shop / social export — generated on demand, cached next to the design."""
     if preset not in dzn.EXPORT_PRESETS:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
                             f"unknown preset — choose one of {sorted(dzn.EXPORT_PRESETS)}")
     d = await db.get(Design, design_id)
     if not d or d.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Design not found")
     if preset not in dzn.exports_for_kind(d.kind):
         raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
             f"'{preset}' needs cut-out artwork — available for this {d.kind}: "
             f"{', '.join(dzn.exports_for_kind(d.kind))}",
         )
@@ -346,7 +346,7 @@ async def public_order_submit(token: str, request: Request, db: AsyncSession = D
     kind = str(body.get("kind") or "flyer")
     style = str(body.get("style") or "minimal")
     if len(idea) < 5:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Describe the design you need")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Describe the design you need")
     if kind not in dzn.KIND_PRESETS:
         kind = "flyer"
     if style not in dzn.STYLE_PRESETS:
@@ -485,12 +485,12 @@ async def batch_csv_flyers(
     remaining = await _batch_budget(db, user)
     raw = await file.read()
     if not raw or len(raw) > dzn.BATCH_CSV_MAX_BYTES:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE,
                             f"CSV must be ≤ {dzn.BATCH_CSV_MAX_BYTES // 1024} KB")
     try:
         rows = dzn.parse_flyer_csv(raw, limit=min(dzn.BATCH_MAX, remaining))
     except dzn.DesignError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     made = []
     for row in rows:
         try:

@@ -76,7 +76,7 @@ async def _audio_transcript_and_analysis(
     except VoiceNotConfigured as e:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
     if not transcript:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Could not transcribe this audio — try a clearer recording.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Could not transcribe this audio — try a clearer recording.")
     usage: dict = {}
     try:
         analysis = await llm.complete(
@@ -130,7 +130,7 @@ async def upload_file(
         msg = f"File too large (max {upload_cap} MB on the {user.plan} plan)"
         if user.plan != "pro":
             msg += f" — Pro raises it to {PLAN_LIMITS['pro'].get('upload_mb', 50)} MB"
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, msg)
+        raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, msg)
 
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", file.filename or "upload")
     path = await storage.put_upload(user.id, safe, data)
@@ -189,10 +189,10 @@ async def analyze_audio_file(
     data = await file.read()
     if len(data) > settings.MAX_AUDIO_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Audio too large (max {settings.MAX_AUDIO_UPLOAD_MB} MB)"
+            status.HTTP_413_CONTENT_TOO_LARGE, f"Audio too large (max {settings.MAX_AUDIO_UPLOAD_MB} MB)"
         )
     if len(data) < 800:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That audio file looks empty or corrupt.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That audio file looks empty or corrupt.")
 
     filename = file.filename or f"audio.{fmt}"
     user_prompt = (prompt or "").strip()[:500]
@@ -276,10 +276,10 @@ async def analyze_video_upload(
     data = await file.read()
     if len(data) > settings.MAX_VIDEO_UPLOAD_MB * 1024 * 1024:
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Video too large (max {settings.MAX_VIDEO_UPLOAD_MB} MB)"
+            status.HTTP_413_CONTENT_TOO_LARGE, f"Video too large (max {settings.MAX_VIDEO_UPLOAD_MB} MB)"
         )
     if len(data) < 2048:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That video file looks empty or corrupt.")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "That video file looks empty or corrupt.")
     if not have_ffmpeg():
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "Video analysis unavailable — ffmpeg not installed on the backend image."
@@ -289,7 +289,7 @@ async def analyze_video_upload(
     try:
         extracted = await analyze_video_file(data, ext)
     except VideoAnalysisError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     captions: list[str] = extracted["captions"]
 
     transcript = ""
@@ -434,7 +434,7 @@ async def reanalyze_file(
         try:
             extracted = await analyze_video_file(data, vext)
         except VideoAnalysisError as e:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
         transcript = ""
         if extracted["audio_wav_bytes"]:
             try:
