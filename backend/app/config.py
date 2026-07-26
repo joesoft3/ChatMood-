@@ -286,6 +286,21 @@ class Settings(BaseSettings):
     WATERMARK_TEXT: str = ""        # blank → "Made with {APP_NAME}"
     WATERMARK_TIMEOUT_S: int = 90   # cap on the stamping encode; on timeout the clean render ships
 
+    # 💳 Payments — manual mobile money now, gateways when their keys land.
+    # Manual needs NO keys: admin publishes a MoMo number, the user submits a
+    # transaction reference, an admin approves, the plan activates.
+    CURRENCY: str = "GHS"
+    PRO_PRICE_MONTHLY_MINOR: int = 15_000   # 150.00 GHS in pesewas (integer minor units)
+    PRO_YEAR_MONTHS: int = 10               # yearly = 10× monthly → 2 months free
+    MANUAL_PAYMENTS_ENABLED: bool = True
+    PAYMENT_EXPIRY_SWEEP_HOURS: float = 6.0  # how often lapsed manual plans are downgraded
+    # Gateways — leave blank until you have the keys; the UI shows them as
+    # "coming soon" rather than pretending the option doesn't exist.
+    PAYSTACK_SECRET_KEY: str = ""
+    PAYSTACK_PUBLIC_KEY: str = ""
+    FLUTTERWAVE_SECRET_KEY: str = ""
+    FLUTTERWAVE_PUBLIC_KEY: str = ""
+
     # 🗂 Projects — durable chat/file containers with standing instructions
     PROJECTS_ENABLED: bool = True
     PROJECT_MAX_FILES: int = 40        # pinned documents per project

@@ -887,10 +887,12 @@ export default function SettingsPage() {
   async function upgrade() {
     setBillingMsg("");
     try {
+      // Stripe first when it's configured; otherwise fall through to the
+      // mobile-money flow rather than dead-ending on a 503.
       const r = await apiFetch<{ checkout_url: string }>("/billing/checkout", { method: "POST" });
       window.location.href = r.checkout_url;
-    } catch (e: any) {
-      setBillingMsg(e.message ?? "Billing unavailable");
+    } catch {
+      router.push("/upgrade");
     }
   }
 
@@ -1113,6 +1115,7 @@ export default function SettingsPage() {
               <li>📎 50 MB uploads (vs 25) · 🧠 365-day memory (vs 30)</li>
               <li>⏫ 4× rate-limit throughput</li>
               <li>🏷 <span className="text-gray-200">Watermark-free exports</span> — free renders carry a small ChatMood badge</li>
+              <li>📱 Pay with <span className="text-gray-200">MTN MoMo, Telecel or Vodafone Cash</span></li>
             </ul>
             <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
               Upgrade instantly to unlock higher daily quotas, faster throughput and premium creation workflows.

@@ -7,6 +7,44 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 💳 Payments — manual mobile money, admin-verified
+
+Revenue can start **today**, with no gateway contract: the admin publishes a MoMo
+number, the user pays and submits their transaction ID, the owner verifies it in
+the panel, and the plan activates. Guide: [docs/PAYMENTS.md](docs/PAYMENTS.md).
+
+- **Admin console** (owner panel → 💳 Payments): publish MoMo / bank / cash
+  destinations with payer instructions, review a queue showing payer email +
+  amount + reference + phone (everything needed to match a MoMo alert), and
+  approve or reject with a reason the user sees. Plus a **direct grant** for comps
+  and refund fixes, which still writes a zero-amount `approved` row so the audit
+  trail always explains why an account is Pro.
+- **User flow** (`/upgrade`): pick monthly or yearly, copy the number, pay, paste
+  the transaction ID. The page polls while an admin confirms. Settings' *Upgrade
+  to Pro* now falls through to this page instead of dead-ending on a Stripe 503.
+- **Rules that protect the money** — each one is a way to lose money if missed:
+  submitting **never** grants a plan (only admin approval does, or anyone could
+  self-upgrade with a made-up reference) · approval is **idempotent** (a
+  double-clicked Approve must not hand out two months) · a reference can be
+  claimed **once**, compared after normalization because refs get retyped off a
+  phone screen · **one** pending payment per user · periods **extend** rather than
+  reset, so renewing early never discards paid days · amounts are integer minor
+  units (`1.15 × 100 = 114.999…` in float — money never touches floats).
+- **Expiry sweep.** Gateways fire a webhook when a period ends; MoMo has nobody to
+  fire anything, so a background loop returns lapsed accounts to free — otherwise
+  one month of MoMo would grant Pro forever. Stripe-managed subscriptions are
+  skipped (its webhook owns that lifecycle). Visible on `/healthz`.
+- **Gateways are declared, not hidden.** Paystack, Flutterwave and Stripe appear
+  in the provider list as "needs key" until configured, and `default_provider()`
+  switches to an automatic gateway the moment one is wired. They write the same
+  `Payment` row, so nothing downstream changes when they're switched on.
+- Config: `CURRENCY`, `PRO_PRICE_MONTHLY_MINOR`, `PRO_YEAR_MONTHS` (yearly is
+  *derived* from monthly, so the discount can't drift), `MANUAL_PAYMENTS_ENABLED`,
+  `PAYSTACK_*`, `FLUTTERWAVE_*`. Migration `0026_payments`.
+- **Tests: +39** (570 total, all passing). Three money-critical mutations were
+  verified to fail the suite: removing the idempotency guard, making renewal reset
+  instead of extend, and letting a user's own submission self-approve (10 tests).
+
 ### 🏷 Rebrand: Mood AI → **ChatMood**
 
 The product is now **ChatMood** ("Smart conversations. Real connections."), since the

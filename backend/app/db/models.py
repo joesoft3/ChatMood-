@@ -584,3 +584,72 @@ class ApiKey(Base):
     calls: Mapped[int] = mapped_column(Integer, default=0)
     revoked: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PaymentMethod(Base):
+    """💳 An admin-published way to pay — a MoMo number, bank account, or cash.
+
+    These are the destinations shown on the upgrade page. They are owned by the
+    platform admin (not by users), and `active` lets a number be retired without
+    deleting it, so historical payments keep pointing at something real.
+    """
+
+    __tablename__ = "payment_methods"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    kind: Mapped[str] = mapped_column(String(12), default="momo")      # momo | bank | cash | other
+    label: Mapped[str] = mapped_column(String(80), default="")          # "MTN MoMo — main"
+    network: Mapped[str] = mapped_column(String(20), default="")        # mtn | vodafone | airteltigo | telecel
+    account_name: Mapped[str] = mapped_column(String(120), default="")  # who the money reaches
+    account_number: Mapped[str] = mapped_column(String(60), default="") # MoMo number / IBAN
+    bank_name: Mapped[str] = mapped_column(String(80), default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")         # free-text steps for the payer
+    currency: Mapped[str] = mapped_column(String(8), default="GHS")
+    active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Payment(Base):
+    """🧾 One payment attempt — the audit trail behind every plan change.
+
+    Lifecycle: `pending` (user says they paid) → `approved` (admin verified, plan
+    granted) or `rejected`. A row is never deleted, because "why does this
+    account have Pro?" must stay answerable months later.
+
+    `provider` is `manual` today; Paystack/Flutterwave/Stripe write the same row
+    with their own reference once their keys are configured.
+    """
+
+    __tablename__ = "payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    method_id: Mapped[str | None] = mapped_column(
+        ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(16), default="manual", index=True)
+    # Invoice code the user quotes in the MoMo reference field — how an admin
+    # matches a phone notification to an account.
+    invoice_code: Mapped[str] = mapped_column(String(16), default="", index=True)
+    reference: Mapped[str] = mapped_column(String(64), default="", index=True)  # their transaction id
+    payer_name: Mapped[str] = mapped_column(String(120), default="")
+    payer_phone: Mapped[str] = mapped_column(String(40), default="")
+    amount_minor: Mapped[int] = mapped_column(Integer, default=0)   # pesewas — never a float
+    currency: Mapped[str] = mapped_column(String(8), default="GHS")
+    plan: Mapped[str] = mapped_column(String(20), default="pro")    # plan granted on approval
+    months: Mapped[int] = mapped_column(Integer, default=1)
+    offer_id: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(12), default="pending", index=True)
+    note: Mapped[str] = mapped_column(Text, default="")             # user's message to the admin
+    admin_note: Mapped[str] = mapped_column(Text, default="")       # why approved / rejected
+    reviewed_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
