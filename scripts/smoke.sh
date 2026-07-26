@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Mood AI — end-to-end smoke test (pure bash + curl + python3 for JSON parsing)
+# ChatMood — end-to-end smoke test (pure bash + curl + python3 for JSON parsing)
 #
 # Usage:
 #   scripts/smoke.sh                       # against http://localhost:8000
@@ -28,7 +28,7 @@ json_get() { python3 -c 'import json,sys
 try: print(json.load(open(sys.argv[1])).get(sys.argv[2], "") or "")
 except Exception: print("")' "$BODY" "$1"; }
 
-echo "Mood AI smoke test → $BASE"
+echo "ChatMood smoke test → $BASE"
 echo "────────────────────────────────────────────"
 
 # ── 1. liveness ──────────────────────────────────────────────────────────────

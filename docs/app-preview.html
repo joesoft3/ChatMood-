@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Mood AI — Interactive App Preview (offline demo)</title>
+<title>ChatMood — Interactive App Preview (offline demo)</title>
 <style>
   :root { --base:#0b0f14; --panel:#12181f; --line:#1e293b; --accent:#7c9bff; }
   * { margin:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -288,7 +288,7 @@
   function renderSideInner(hostId) {
     const host = $(hostId);
     host.innerHTML =
-      '<div class="brand"><span class="star">✦</span> Mood AI</div>' +
+      '<div class="brand"><span class="star">✦</span> ChatMood</div>' +
       '<button class="newchat">＋ New chat</button>' +
       '<div class="convs">' +
       CONVS.map((c, i) => '<div class="conv' + (i === 0 ? " on" : "") + '">💬 ' + c + "</div>").join("") +
@@ -449,7 +449,7 @@
   const MEMS = [
     ["profile", "Lives in Accra, Ghana"],
     ["preference", "Prefers concise answers with code examples"],
-    ["project", "Building an AI app called Mood AI"],
+    ["project", "Building an AI app called ChatMood"],
   ];
   function renderMems() {
     const list = $("#mem-list");

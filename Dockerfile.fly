@@ -1,4 +1,4 @@
-# Mood AI API — Fly.io image built from the REPO ROOT (fly.toml build context).
+# ChatMood API — Fly.io image built from the REPO ROOT (fly.toml build context).
 # backend/Dockerfile stays intact for docker-compose / CI; this one is identical
 # except COPY paths are prefixed with `backend/` because Fly's build context is
 # the directory containing fly.toml (the repo root), not backend/.

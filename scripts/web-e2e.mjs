@@ -27,8 +27,8 @@ page.on("console", (msg) => {
 });
 
 const checks = [
-  ["/", "Mood AI", "hero copy"],
-  ["/login", "Mood AI", "login shell"],
+  ["/", "ChatMood", "hero copy"],
+  ["/login", "ChatMood", "login shell"],
   ["/terms", "Terms", "terms body"],
   ["/privacy", "Privacy", "privacy body"],
   ["/f/deadbeefdeadbeefdeadbeefdeadbeef", "expired", "graceful share 404 state"],

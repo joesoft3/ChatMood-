@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Mood AI — FIRST Fly.io deploy, guided end-to-end (~5 min).
+# ChatMood — FIRST Fly.io deploy, guided end-to-end (~5 min).
 # Everything is pre-filled EXCEPT the secrets you haven't pasted in chat yet.
 # Run from the repo root:  bash scripts/fly-first-deploy.sh
 #
