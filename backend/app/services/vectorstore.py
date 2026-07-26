@@ -29,7 +29,7 @@ import sqlalchemy as sa
 from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue, PointIdsList
 
 from ..config import settings
-from ..db.session import SessionLocal
+from ..db.session import SessionLocal, engine
 
 log = logging.getLogger(__name__)
 
@@ -125,6 +125,17 @@ class PgVectorStore:
         """
         if self._ensured:
             return
+        # pgvector DDL is Postgres-only. On sqlite (self-hosters, tests, local
+        # dev) the CREATE EXTENSION below cannot ever succeed, so the retry loop
+        # just burned two attempts plus a sleep and logged an alarming
+        # "syntax error near EXTENSION" that looks like a broken deployment
+        # rather than an unconfigured optional feature. Fail fast and say why.
+        if engine.url.get_backend_name() != "postgresql":
+            raise RuntimeError(
+                "pgvector memory needs PostgreSQL; this deployment's DATABASE_URL is "
+                f"{engine.url.get_backend_name()!r}. Point QDRANT_URL at a Qdrant "
+                "instance or move to Postgres to enable long-term memory."
+            )
         async with self._lock:
             if self._ensured:
                 return

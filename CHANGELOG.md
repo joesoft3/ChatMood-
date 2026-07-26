@@ -7,6 +7,40 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🧪 The "sandbox-only" failures were mostly real bugs
+
+The authenticated sweep reported 7 failures; six were initially dismissed as
+environment noise. Re-examined properly, **three were genuine defects** that a
+production Postgres deployment merely papers over.
+
+- **`date_trunc` was registered on one engine, not all of them.** The sqlite
+  compatibility shim bound to `engine.sync_engine` — the module-level engine
+  alone. Every other engine (all 34 test fixtures, any script or self-hoster
+  tool) silently lacked it, so `/admin/overview`, `/admin/users` and
+  `/admin/analytics` raised `no such function: date_trunc` through any of them.
+  Now registered on the `Engine` class so every sqlite connection gets it.
+  (First attempt sniffed the connection's module and **broke the previously
+  working path** — aiosqlite returns an `AsyncAdapt_*` wrapper, not a raw
+  `sqlite3` object. Now duck-types on `create_function`.)
+- **`GET /media/films/resumable` ignored the session it was handed.** It
+  declares `db: AsyncSession = Depends(get_db)` and then called
+  `resumable_orphans()`, which opens its own `SessionLocal()` — bypassing the
+  caller's session, including `get_db` overrides, and querying the globally
+  configured database rather than the one serving the request. The session is
+  now threaded through; background callers keep the old default.
+- **pgvector logged a fake outage.** `_ensure()` ran Postgres-only DDL on
+  sqlite, retried it, and surfaced `syntax error near "EXTENSION"` twice —
+  indistinguishable from a broken deployment, when it is really an
+  unconfigured optional feature. It now fails fast naming the actual cause.
+- **Confirmed genuinely correct:** `/memory` → 503 (verified it returns 200 the
+  moment a store is reachable) and `/readyz` → 503 (that *is* the signal when
+  Redis/Postgres are down).
+- **Tests: +8** (626 total) in `tests/test_sandbox_parity.py`, each
+  mutation-verified by reverting its fix. One pins the engine to sqlite rather
+  than trusting the ambient `DATABASE_URL` — the settings default is Postgres,
+  so a bare `pytest` run skipped the guard entirely and the test passed while
+  proving nothing, a trap caught only by running the full suite.
+
 ### 🎨 Brand Kit app-icon download was a guaranteed 500 — fixed
 
 A full A–Z re-verification (backend compile · 618 tests · web typecheck ·

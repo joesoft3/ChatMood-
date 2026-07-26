@@ -79,9 +79,30 @@ ASGI app. All return 200. Authorization was checked too:
 - unauthenticated → **401** on `/conversations`, `/admin/overview`, `/reels/premium`
 - normal user → **403** on `/admin/overview`
 
-Three endpoints return 503 in the sandbox **by design**, not as faults:
-`/readyz` and `/memory` need Redis/Qdrant, and `/media/films/resumable` uses the
-app's own session factory. All three behave correctly against a real deployment.
+### Round 3 — the "sandbox-only" failures were mostly real
+
+An authenticated sweep (admin + pro, every GET route) reported **7** failures.
+Six were written off as environment noise. Five of those were actually bugs —
+the sandbox was just the only place anything exercised the affected code path.
+
+| Reported as | Verdict | Root cause |
+| --- | --- | --- |
+| `date_trunc` missing on `/admin/overview`, `/admin/users`, `/admin/analytics` | **real** | The sqlite compatibility shim was attached to `engine.sync_engine` — the *module-level* engine only. Every other engine (all 34 test fixtures, any script or tool) silently had no `date_trunc`, so all three admin pages 500'd through one. Now registered on the `Engine` class, so every connection gets it. |
+| `/media/films/resumable` dialling Postgres | **real** | The route declares `db: AsyncSession = Depends(get_db)` and then ignores it, calling `resumable_orphans()` which opens its own `SessionLocal()`. It bypassed the caller's session — including `get_db` overrides — and hit the globally-configured database instead of the one serving the request. The session is now passed through. |
+| `CREATE EXTENSION` syntax error | **real (noise, not an outage)** | `PgVectorStore._ensure()` ran Postgres-only DDL on sqlite, **retried it**, then logged `syntax error near "EXTENSION"` twice. Reads like a broken deployment; is actually an unconfigured optional feature. Now fails fast with a message naming the cause. |
+| `/memory` → 503 | **correct** | Verified: returns 200 the moment a store is reachable. Honest degradation. |
+| `/readyz` → 503 | **correct** | Per-dependency reporting with latency. 503 *is* the signal when Redis/Postgres are down. |
+
+The lesson: "it only fails in the sandbox" is a hypothesis, not a diagnosis. A
+shim scoped to one engine and a route ignoring its injected session are real
+defects that a production Postgres deployment simply papers over — until a
+self-hoster runs sqlite, or a future test reaches for the same route.
+
+**Tests: +8** (`tests/test_sandbox_parity.py`), each mutation-verified by
+reverting its fix. One pins the engine to sqlite explicitly rather than trusting
+the ambient `DATABASE_URL`: the settings default is Postgres, so a bare `pytest`
+run would otherwise skip the guard and prove nothing — a trap this suite fell
+into once already before it was caught.
 
 ## Generated media is now manageable
 
