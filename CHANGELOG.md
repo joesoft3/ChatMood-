@@ -7,6 +7,48 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### ⭐🔴 Creator Pro + Go Live on the Reel
+
+The Reel gets a paywall and real live broadcasting.
+Guide: [docs/REEL-PREMIUM.md](docs/REEL-PREMIUM.md).
+
+- **Creator Pro** — free: watermarked 720p, 60s/60MB clips, basic effects. Pro:
+  watermark-free **1080p**, **3-minute/100MB** uploads, the cinematic
+  **Noir/Dream/Vintage** grades, analytics and Go Live. Posting and duets stay
+  free deliberately — a feed nobody can post to is worth nothing, so the paywall
+  sells polish and reach, not access.
+- **One entitlement source.** Every gate resolves through
+  `reel_premium.entitlements()`, and the UI renders its padlocks from that same
+  payload (`GET /reels/premium`) — a lock can't claim something the server
+  doesn't enforce, and a perk can't silently stop applying. Blocked actions
+  return **402** with actionable copy, never a bare 403. Admins are premium;
+  future tiers are premium by default.
+- **Reels now respect the watermark.** They previously bypassed it entirely — a
+  real revenue gap, since the Reel is the most public surface in the product.
+- **🔴 Go Live.** A broadcast *is* a reel row (`kind="live"`): it floats to the
+  top of the feed while streaming and becomes a replay when ended, so viewers
+  keep the post they were watching. One broadcast at a time, owner-only
+  teardown, and a concurrent-viewer counter that tracks peak and can't go
+  negative.
+- **Security: the stream key never leaves the owner.** It's a *write* credential
+  — anyone holding it could broadcast as that creator — so it's returned exactly
+  once by `/live/start`, and `LiveTarget.as_viewer_dict()` exists so the feed
+  payload physically cannot carry it. A test asserts it never appears in a feed
+  response.
+- **Provider-agnostic, honest about infra.** This repo doesn't host video;
+  `services/live_stream.py` adapts Mux / Cloudflare Stream / LiveKit behind one
+  normalized shape, so swapping is an env change. With no provider configured it
+  **raises rather than inventing a URL** — a Pro creator sees "Go Live isn't
+  switched on yet" (503) instead of a Start button that does nothing.
+  Entitlement and infrastructure are tracked separately for exactly that reason.
+  ⚠️ Managed streaming bills per minute; `LIVE_MAX_MINUTES` caps runaways.
+- Config: `LIVE_PROVIDER`, `MUX_*`, `CLOUDFLARE_STREAM_*`, `LIVEKIT_*`.
+  Migration `0027_reel_live_premium`.
+- **Tests: +34** (604 total, all passing). One existing test correctly caught the
+  upload cap becoming plan-aware and was updated. Both security guards were
+  mutation-tested: leaking the stream key into the feed, and dropping the Go Live
+  paywall, each fail the suite.
+
 ### 💳 Payments — manual mobile money, admin-verified
 
 Revenue can start **today**, with no gateway contract: the admin publishes a MoMo

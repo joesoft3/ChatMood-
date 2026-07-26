@@ -17,17 +17,18 @@ import os
 import re
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...db.models import Film, Reel, ReelLike, ReelSave, User
 from ...db.session import get_db
-from ...services import reel_studio as studio, soundtrack
+from ...services import reel_premium as premium, reel_studio as studio, soundtrack
 from ...services.editor import transcribe_srt
 from ...services.metering import plan_rate_mult, record_usage
 from ..deps import enforce_rate_limit, get_current_user
@@ -112,6 +113,17 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
         "saved": saved,
         "mine": mine,
         "status": r.status,
+        "watermarked": bool(getattr(r, "watermarked", False)),
+        # 🔴 Live broadcast surface. `live_playback_url` is viewer-safe; the
+        # stream KEY is a write credential and is never serialized here.
+        "kind": getattr(r, "kind", "clip") or "clip",
+        "live_state": getattr(r, "live_state", "") or "",
+        "live_playback_url": getattr(r, "live_playback_url", "") or "",
+        "live_viewers": getattr(r, "live_viewers", 0) or 0,
+        "live_peak_viewers": getattr(r, "live_peak_viewers", 0) or 0,
+        "live_started_at": (
+            r.live_started_at.isoformat() if getattr(r, "live_started_at", None) else None
+        ),
         "created_at": r.created_at.isoformat() if r.created_at else None,
     }
 
@@ -184,10 +196,15 @@ async def list_reels(
         else:
             q = q.where(Reel.status == "live")
             count_q = select(func.count(Reel.id)).where(Reel.status == "live")
+        # 🔴 Live broadcasts float to the top of the main feed: a stream is only
+        # watchable WHILE it runs, so burying it under newer clips wastes it.
+        # Ordering (not filtering) keeps pagination stable — a stream that ends
+        # mid-scroll simply falls back into chronological place.
         # `id` breaks ties deterministically: without it, posts sharing a
         # timestamp could shuffle between pages and the reader would skip or
         # re-see one.
-        q = q.order_by(Reel.created_at.desc(), Reel.id.desc())
+        live_first = case((Reel.live_state == "live", 0), else_=1)
+        q = q.order_by(live_first, Reel.created_at.desc(), Reel.id.desc())
 
     rows = (await db.execute(q.offset(offset).limit(FEED_PAGE))).scalars().all()
 
@@ -304,10 +321,18 @@ async def upload_reel(
     raw = await file.read()
     if not raw:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "That file is empty")
-    if len(raw) > REEL_MAX_BYTES:
+    # ⭐ Plan-aware ceiling — Pro posts longer/bigger clips.
+    cap = premium.max_bytes(user)
+    if len(raw) > cap:
+        msg = f"Reels must be ≤ {cap // (1024 * 1024)} MB"
+        if not premium.is_premium(user):
+            msg += f" on the free plan — Pro raises it to {premium.PRO_MAX_MB} MB."
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, msg)
+    # ⭐ Cinematic effects are a Pro perk — 402 tells the client to show the paywall.
+    if not premium.effect_allowed(user, effect):
         raise HTTPException(
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            f"Reels must be ≤ {REEL_MAX_BYTES // (1024 * 1024)} MB",
+            status.HTTP_402_PAYMENT_REQUIRED,
+            premium.upgrade_message(f"The {effect.title()} effect"),
         )
 
     uid = uuid.uuid4().hex
@@ -325,6 +350,14 @@ async def upload_reel(
     if captions:
         captioned = await _apply_captions(path, uid, caption_style)
 
+    # 🏷 Free tier: badge the posted clip. Same fail-open contract as the rest
+    # of the studio pass — a badge failure never costs the creator their upload.
+    stamped = False
+    if premium.entitlements(user)["watermark"]:
+        from ...services.watermark import apply_to_file
+
+        stamped = await apply_to_file(Path(path), video=True)
+
     poster = await _make_poster(path, uid)
 
     row = Reel(
@@ -337,6 +370,7 @@ async def upload_reel(
         poster=poster,
         effect=applied_effect,
         captioned=captioned,
+        watermarked=stamped,
     )
     db.add(row)
     await db.commit()
@@ -988,3 +1022,130 @@ async def serve_reel_file(name: str):
     else:
         media_type = "video/mp4"
     return FileResponse(path, media_type=media_type)
+
+
+# ═══════════════════════════════════════════════════ ⭐ premium · 🔴 Go Live
+
+@router.get("/premium")
+async def reel_premium_status(user: User = Depends(get_current_user)):
+    """Everything the Reel UI needs to draw locks, caps and the paywall.
+
+    The UI renders its padlocks straight from this, so a lock can never claim
+    something the server doesn't actually enforce.
+    """
+    return {
+        **premium.entitlements(user),
+        "live_providers": premium.live_providers(),
+        "upgrade_path": "/upgrade",
+    }
+
+
+@router.post("/live/start", status_code=status.HTTP_201_CREATED)
+async def start_live(
+    caption: str = Form(default="", max_length=CAPTION_MAX),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """🔴 Go Live (Pro) — provision a broadcast and put it at the top of the feed.
+
+    The broadcast IS a reel row (`kind="live"`), so when it ends it becomes a
+    normal replay and viewers keep the post they were watching.
+
+    The ingest URL + stream key are returned ONCE, to the owner only: the key is
+    a write credential, and anyone holding it could broadcast as this creator.
+    """
+    if not premium.is_premium(user):
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED, premium.upgrade_message("Go Live")
+        )
+    await enforce_rate_limit(f"reellive:{user.id}", 4 * plan_rate_mult(user.plan))
+
+    # One broadcast at a time — a second stream would bill twice and split the
+    # audience across two cards in the feed.
+    existing = (
+        await db.execute(
+            select(Reel).where(
+                Reel.user_id == user.id, Reel.kind == "live", Reel.live_state == "live"
+            ).limit(1)
+        )
+    ).scalars().first()
+    if existing:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "You're already live — end that broadcast before starting another.",
+        )
+
+    from ...services.live_stream import LiveNotConfigured, LiveProviderError, create_stream
+
+    try:
+        target = await create_stream(room_hint=f"reel-{user.id[:8]}")
+    except LiveNotConfigured as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(e))
+    except LiveProviderError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
+
+    row = Reel(
+        id=uuid.uuid4().hex,
+        user_id=user.id,
+        author_name=_author_label(user),
+        caption=caption.strip()[:CAPTION_MAX],
+        source="live",
+        kind="live",
+        live_state="live",
+        live_provider=target.provider,
+        live_stream_id=target.stream_id,
+        live_playback_url=target.playback_url,
+        live_started_at=datetime.now(timezone.utc),
+        status="live",
+    )
+    db.add(row)
+    await db.commit()
+    await record_usage(user.id, "reel_live", target.provider)
+    # `as_owner_dict()` carries the stream key — this response, and only this
+    # response, is allowed to include it.
+    return {"reel": _reel_out(row, mine=True), "stream": target.as_owner_dict()}
+
+
+@router.post("/live/{reel_id}/end")
+async def end_live(
+    reel_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """Stop broadcasting. The post stays in the feed as a replay."""
+    row = await db.get(Reel, reel_id)
+    if not row or row.user_id != user.id or row.kind != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Live broadcast not found")
+    if row.live_state != "live":
+        return {"reel": _reel_out(row, mine=True), "already": True}
+
+    from ...services.live_stream import destroy_stream
+
+    await destroy_stream(row.live_provider, row.live_stream_id)
+    row.live_state = "ended"
+    row.live_ended_at = datetime.now(timezone.utc)
+    row.live_viewers = 0  # nobody is watching a finished stream
+    await db.commit()
+    return {"reel": _reel_out(row, mine=True)}
+
+
+@router.post("/live/{reel_id}/heartbeat")
+async def live_heartbeat(
+    reel_id: str,
+    joining: bool = Form(default=True),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Concurrent-viewer ping. Clamped at zero and tracks the peak.
+
+    Deliberately a simple counter rather than presence tracking: an exact
+    concurrent count needs sticky sessions the deployment doesn't have, and a
+    live badge that's off by one is fine — one stuck at -3 is not.
+    """
+    row = await db.get(Reel, reel_id)
+    if not row or row.kind != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Live broadcast not found")
+    if row.live_state != "live":
+        return {"viewers": 0, "live": False}
+    row.live_viewers = max(0, (row.live_viewers or 0) + (1 if joining else -1))
+    row.live_peak_viewers = max(row.live_peak_viewers or 0, row.live_viewers)
+    await db.commit()
+    return {"viewers": row.live_viewers, "peak": row.live_peak_viewers, "live": True}

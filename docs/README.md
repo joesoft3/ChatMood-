@@ -51,6 +51,7 @@ deploy path that matches your host.
 | [BATCH-AND-BEATS.md](BATCH-AND-BEATS.md) | 🔁 Batch Studio + 🎵 Beat-Sync. |
 | [TEAMS-WALKTHROUGH.md](TEAMS-WALKTHROUGH.md) | 👥 Team workspaces walkthrough + test checklist. |
 | [TASKS-PROJECTS-API.md](TASKS-PROJECTS-API.md) | ⏰ Scheduled tasks · 🗂 Projects · 🔑 the OpenAI-compatible developer API. |
+| [REEL-PREMIUM.md](REEL-PREMIUM.md) | ⭐ Creator Pro perks and 🔴 Go Live broadcasting on the Reel. |
 | [PAYMENTS.md](PAYMENTS.md) | 💳 Manual mobile money, admin review, and adding Paystack/Flutterwave later. |
 | [BRAND-ICONS.md](BRAND-ICONS.md) | 🎨 One lockup → every app/PWA/Android icon, with the maskable safe zone. |
 | [WATERMARKING.md](WATERMARKING.md) | 🏷 Free-tier render badging — entitlement rules, where it applies, how to brand it. |

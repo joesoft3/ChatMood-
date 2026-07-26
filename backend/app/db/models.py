@@ -415,6 +415,20 @@ class Reel(Base):
     effect: Mapped[str] = mapped_column(String(16), default="")         # key into reel_studio.EFFECTS
     captioned: Mapped[bool] = mapped_column(Boolean, default=False)     # captions burned in
     status: Mapped[str] = mapped_column(String(12), default="live", index=True)  # live|hidden
+    # 🔴 Go Live (Pro) — a broadcast is a Reel row whose `kind` is "live".
+    # It occupies the feed while streaming, then becomes a normal replay when
+    # the creator ends it, so viewers keep the post they were watching.
+    kind: Mapped[str] = mapped_column(String(10), default="clip", index=True)  # clip | live
+    live_state: Mapped[str] = mapped_column(String(12), default="")   # "" | live | ended
+    live_provider: Mapped[str] = mapped_column(String(16), default="")
+    live_stream_id: Mapped[str] = mapped_column(String(80), default="")
+    live_playback_url: Mapped[str] = mapped_column(String(600), default="")
+    live_viewers: Mapped[int] = mapped_column(Integer, default=0)      # concurrent right now
+    live_peak_viewers: Mapped[int] = mapped_column(Integer, default=0)
+    live_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    live_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 🏷 Free-tier reels carry the badge; Pro posts clean (services/reel_premium).
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     # Denormalized engagement counters — the feed reads them straight off the
     # row instead of running three COUNT(*)s per card. `likes` and `saves` are
     # reconcilable from their join tables; `views`/`shares` are pure tallies.

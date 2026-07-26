@@ -286,6 +286,19 @@ class Settings(BaseSettings):
     WATERMARK_TEXT: str = ""        # blank → "Made with {APP_NAME}"
     WATERMARK_TIMEOUT_S: int = 90   # cap on the stamping encode; on timeout the clean render ships
 
+    # 🔴 Live streaming (Reel → Go Live). This repo does NOT host video infra;
+    # pick a managed provider and set its keys. Blank → Go Live reports itself
+    # unavailable rather than handing creators a dead Start button.
+    LIVE_PROVIDER: str = ""              # mux | cloudflare | livekit
+    LIVE_MAX_MINUTES: int = 120          # auto-end runaway broadcasts (bills by the minute)
+    MUX_TOKEN_ID: str = ""
+    MUX_TOKEN_SECRET: str = ""
+    CLOUDFLARE_STREAM_TOKEN: str = ""
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
+    LIVEKIT_URL: str = ""
+
     # 💳 Payments — manual mobile money now, gateways when their keys land.
     # Manual needs NO keys: admin publishes a MoMo number, the user submits a
     # transaction reference, an admin approves, the plan activates.
