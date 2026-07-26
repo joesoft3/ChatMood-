@@ -150,3 +150,34 @@ def test_blank_source_fails_loudly_instead_of_writing_empty_icons(tmp_path, monk
     monkeypatch.setattr(brand_icons, "REPO", tmp_path)
     with pytest.raises(SystemExit):
         brand_icons.build(src, dry_run=True)
+
+
+# ------------------------------------------------- canvas fill (seam bug)
+
+def test_canvas_fill_matches_the_source_background():
+    """Regression: a near-but-not-identical fill leaves a visible rectangle.
+
+    Caught on the real ChatMood logo — its canvas is #01020D while the brand
+    constant is #0B0F14, so filling with BRAND_BG drew a clearly visible seam
+    around the cropped mark.
+    """
+    img = _lockup(bg=(1, 2, 13, 255))
+    assert brand_icons.canvas_fill(img) == (1, 2, 13, 255)
+
+
+def test_canvas_fill_falls_back_to_brand_bg_when_transparent():
+    img = Image.new("RGBA", (50, 50), (0, 0, 0, 0))
+    assert brand_icons.canvas_fill(img) == brand_icons.BRAND_BG
+
+
+def test_built_icon_has_no_seam_around_the_art(tmp_path, monkeypatch):
+    """The canvas corner and the padding just outside the art must match."""
+    src = tmp_path / "lockup.png"
+    bg = (1, 2, 13, 255)
+    assert bg != brand_icons.BRAND_BG, "fixture must differ from BRAND_BG to detect the seam"
+    _lockup(bg=bg).save(src)
+    monkeypatch.setattr(brand_icons, "REPO", tmp_path)
+    brand_icons.build(src)
+    im = Image.open(tmp_path / "frontend/public/icon.png").convert("RGB")
+    assert im.getpixel((3, 3)) == im.getpixel((256, 8))   # corner vs top padding
+    assert im.getpixel((3, 3)) == bg[:3]                  # and it is the SOURCE bg

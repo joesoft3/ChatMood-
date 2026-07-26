@@ -46,6 +46,20 @@ to a circle. Content is scaled to **78%** of the canvas
 launcher. Aspect ratio is always preserved — a wide mark is letterboxed, never
 squashed.
 
+## Canvas fill
+
+The canvas behind the cropped art is filled with the **source logo's own
+background**, not a hardcoded brand color. A cropped band carries its background
+with it, so a near-but-not-identical fill draws a visible rectangular seam around
+the mark — measured on the real lockup: source `#01020D` vs `BRAND_BG` `#0B0F14`,
+clearly visible on a phone home screen. `BRAND_BG` is only used when the source
+is fully transparent.
+
+## Source of truth
+
+The lockup lives at `store-assets/chatmood-lockup.png`. Re-run the script after
+replacing it to regenerate every icon consistently.
+
 ## Tests
 
 ```bash

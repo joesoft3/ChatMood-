@@ -147,6 +147,19 @@ def wide_canvas(art: Image.Image, w: int, h: int, *, bg, content_ratio: float = 
     return canvas
 
 
+def canvas_fill(img: Image.Image) -> tuple[int, int, int, int]:
+    """Canvas color for the generated icons.
+
+    Uses the SOURCE logo's own background rather than a hardcoded brand color:
+    a cropped band carries its background with it, so filling the canvas with a
+    near-but-not-identical color leaves a visible rectangular seam around the
+    art (measured: source #01020D vs brand #0B0F14 — clearly visible on a phone
+    home screen). Only a fully transparent source falls back to BRAND_BG.
+    """
+    bg = bg_color(img)
+    return BRAND_BG if bg[3] <= 8 else bg
+
+
 def build(source: Path, *, mark_band: int | None = None, dry_run: bool = False) -> dict[str, str]:
     img = Image.open(source).convert("RGBA")
     mask = ink_mask(img)
@@ -165,15 +178,16 @@ def build(source: Path, *, mark_band: int | None = None, dry_run: bool = False) 
     lockup = crop_band(img, mask, (lock_top, lock_bottom))
     full = crop_band(img, mask, (bands[0][0], bands[-1][1]))
 
+    fill = canvas_fill(img)  # match the source bg — a mismatch shows as a seam
     outputs = {
         "frontend/public/icon.png": square_canvas(
-            mark, 512, bg=BRAND_BG, content_ratio=MASKABLE_CONTENT
+            mark, 512, bg=fill, content_ratio=MASKABLE_CONTENT
         ),
         "mobile/assets/icon/app_icon.png": square_canvas(
-            mark, 1024, bg=BRAND_BG, content_ratio=MASKABLE_CONTENT
+            mark, 1024, bg=fill, content_ratio=MASKABLE_CONTENT
         ),
         "frontend/public/logo.png": lockup,
-        "frontend/public/og.png": wide_canvas(full, 1024, 500, bg=BRAND_BG),
+        "frontend/public/og.png": wide_canvas(full, 1024, 500, bg=fill),
     }
 
     report = {
