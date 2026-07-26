@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — Mood AI",
-  description: "The agreement for using Mood AI apps, APIs and arenas.",
+  title: "Terms of Service — ChatMood",
+  description: "The agreement for using ChatMood apps, APIs and arenas.",
   alternates: { canonical: "/terms" },
 };
 
@@ -10,7 +10,7 @@ const SEC = [
   {
     t: "1 · The Service",
     b: [
-      "Mood AI is an AI super-app: streaming chat (including ⚔️ Arena multi-model drafts, blind ballots and an AI judge verdict), 🧠 think mode with visible reasoning traces, live web search, long-term memory and cross-conversation recall, file & vision analysis, voice, image/video generation, plugin actions (Gmail, Calendar, GitHub) always staged for your approval, team workspaces, custom domains, usage metering and owner analytics.",
+      "ChatMood is an AI super-app: streaming chat (including ⚔️ Arena multi-model drafts, blind ballots and an AI judge verdict), 🧠 think mode with visible reasoning traces, live web search, long-term memory and cross-conversation recall, file & vision analysis, voice, image/video generation, plugin actions (Gmail, Calendar, GitHub) always staged for your approval, team workspaces, custom domains, usage metering and owner analytics.",
       "The Service orchestrates third-party AI providers (xAI/Grok, OpenAI, Google Gemini depending on configuration) plus hosting providers (Railway, Netlify). Third-party terms govern those layers.",
     ],
   },
@@ -89,7 +89,7 @@ const SEC = [
   {
     t: "14 · Contact",
     b: [
-      "Joesoft — Mood AI (Accra). Reach us via the owner address shown in-app or the GitHub repo (joesoft3/moodai).",
+      "Joesoft — ChatMood (Accra). Reach us via the owner address shown in-app or the GitHub repo (joesoft3/moodai).",
     ],
   },
 ];
@@ -99,7 +99,7 @@ export default function TermsPage() {
     <main className="min-h-screen bg-base text-gray-200">
       <div className="mx-auto max-w-3xl px-5 py-12">
         <p className="text-2xl font-bold">
-          <span className="text-accent">✦</span> Mood AI
+          <span className="text-accent">✦</span> ChatMood
         </p>
         <h1 className="mt-6 text-3xl font-bold">Terms of Service</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -107,7 +107,7 @@ export default function TermsPage() {
           <a href="/privacy" className="inline-flex min-h-[44px] items-center text-accent underline">Privacy Policy →</a>
         </p>
         <p className="mt-6 text-[15px] leading-relaxed text-gray-300">
-          These Terms are an agreement between you and the operator of Mood AI covering the apps,
+          These Terms are an agreement between you and the operator of ChatMood covering the apps,
           APIs, websites and connected arenas. By creating an account or using the Service you
           accept them.
         </p>

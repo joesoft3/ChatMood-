@@ -17,6 +17,7 @@ def conv_out(c: Conversation) -> dict:
     return {
         "id": c.id,
         "title": c.title,
+        "project_id": c.project_id,
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }

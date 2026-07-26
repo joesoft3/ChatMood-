@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Mood AI",
-  description: "What Mood AI collects, why, and your choices. Short version: your chats belong to you.",
+  title: "Privacy Policy — ChatMood",
+  description: "What ChatMood collects, why, and your choices. Short version: your chats belong to you.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -76,7 +76,7 @@ const SEC = [
   {
     t: "Contact / data controller",
     b: [
-      "Joesoft — Mood AI (Accra, Ghana): the in-app channel or the GitHub repo. On white-label deployments, contact the domain operator first.",
+      "Joesoft — ChatMood (Accra, Ghana): the in-app channel or the GitHub repo. On white-label deployments, contact the domain operator first.",
     ],
   },
 ];
@@ -86,7 +86,7 @@ export default function PrivacyPage() {
     <main className="min-h-screen bg-base text-gray-200">
       <div className="mx-auto max-w-3xl px-5 py-12">
         <p className="text-2xl font-bold">
-          <span className="text-accent">✦</span> Mood AI
+          <span className="text-accent">✦</span> ChatMood
         </p>
         <h1 className="mt-6 text-3xl font-bold">Privacy Policy</h1>
         <p className="mt-1 text-sm text-gray-500">

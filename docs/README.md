@@ -1,4 +1,4 @@
-# 📚 Mood AI documentation index
+# 📚 ChatMood documentation index
 
 Every guide in `docs/`, grouped by what you're trying to do. Start with
 **[ARCHITECTURE.md](ARCHITECTURE.md)** for the technical blueprint, or jump to the
@@ -50,6 +50,12 @@ deploy path that matches your host.
 | [DESIGN-STUDIO.md](DESIGN-STUDIO.md) | 🖨 Flyers, stickers, banners and logos at print resolution. |
 | [BATCH-AND-BEATS.md](BATCH-AND-BEATS.md) | 🔁 Batch Studio + 🎵 Beat-Sync. |
 | [TEAMS-WALKTHROUGH.md](TEAMS-WALKTHROUGH.md) | 👥 Team workspaces walkthrough + test checklist. |
+| [TASKS-PROJECTS-API.md](TASKS-PROJECTS-API.md) | ⏰ Scheduled tasks · 🗂 Projects · 🔑 the OpenAI-compatible developer API. |
+| [QA-AUDIT.md](QA-AUDIT.md) | ✅ A–Z button/route audit, the offline wiring gate, and Play Store readiness. |
+| [REEL-PREMIUM.md](REEL-PREMIUM.md) | ⭐ Creator Pro perks and 🔴 Go Live broadcasting on the Reel. |
+| [PAYMENTS.md](PAYMENTS.md) | 💳 Manual mobile money, admin review, and adding Paystack/Flutterwave later. |
+| [BRAND-ICONS.md](BRAND-ICONS.md) | 🎨 One lockup → every app/PWA/Android icon, with the maskable safe zone. |
+| [WATERMARKING.md](WATERMARKING.md) | 🏷 Free-tier render badging — entitlement rules, where it applies, how to brand it. |
 | [PLUGIN-OAUTH.md](PLUGIN-OAUTH.md) | 🔑 Gmail, Google Calendar and GitHub OAuth for real. |
 | [ADMIN-ANALYTICS.md](ADMIN-ANALYTICS.md) | 📊 Admin analytics & engagement surfaces. |
 

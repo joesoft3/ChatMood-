@@ -7,6 +7,8 @@ import {
   Clapperboard,
   Copy,
   Link2,
+  Lock,
+  Radio,
   Repeat2,
   Sparkles,
   Users,
@@ -26,6 +28,8 @@ import {
   X,
 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import ReelGoLive from "@/components/ReelGoLive";
+import ReelPremium, { type ReelEntitlements } from "@/components/ReelPremium";
 import ReelEditor from "@/components/ReelEditor";
 import { SHARE_TARGETS } from "@/components/SocialIcons";
 import { StudioEmptyState } from "@/components/StudioChrome";
@@ -86,7 +90,7 @@ interface Stats {
   saves: number;
 }
 
-type Tab = "foryou" | "saved" | "mine";
+type Tab = "foryou" | "saved" | "mine" | "pro";
 
 const MAX_MB = 100;
 
@@ -117,8 +121,8 @@ const viewedThisSession = new Set<string>();
 
 const SOURCE_BADGE: Record<Reel["source"], string> = {
   upload: "🎥 Uploaded",
-  film: "🎬 Mood film",
-  chat: "✨ Made in Mood",
+  film: "🎬 ChatMood film",
+  chat: "✨ Made in ChatMood",
   duet: "🎭 Duet",
   repost: "🔁 Repost",
 };
@@ -172,7 +176,7 @@ function ShareSheet({
 }) {
   const [copied, setCopied] = useState(false);
   const link = reel.url;
-  const text = reel.caption ? `${reel.caption} — @${reel.author} on Mood Reel` : `@${reel.author} on Mood Reel`;
+  const text = reel.caption ? `${reel.caption} — @${reel.author} on ChatMood Reel` : `@${reel.author} on ChatMood Reel`;
 
   async function copy() {
     const ok = await copyText(link);
@@ -243,7 +247,7 @@ function ShareSheet({
           <button
             onClick={async () => {
               try {
-                await navigator.share({ title: `@${reel.author} on Mood Reel`, text, url: link });
+                await navigator.share({ title: `@${reel.author} on ChatMood Reel`, text, url: link });
                 onShared("native");
               } catch {
                 /* dismissed — not a share */
@@ -574,6 +578,9 @@ export default function ReelPage() {
   // Creators you follow — a light, local-only preference that powers the
   // TikTok-style follow badge on each reel. Persisted so it survives reloads.
   const [following, setFollowing] = useState<Set<string>>(new Set());
+  // ⭐ Entitlements drive every lock on this screen; 🔴 Go Live is a Pro perk.
+  const [ent, setEnt] = useState<ReelEntitlements | null>(null);
+  const [liveOpen, setLiveOpen] = useState(false);
 
   const flash = useCallback((t: string) => {
     setMsg(t);
@@ -673,6 +680,12 @@ export default function ReelPage() {
   // Effect catalog drives both the chips and the live CSS preview.
   useEffect(() => {
     apiFetch<Catalog>("/reels/effects").then(setCatalog).catch(() => {});
+  }, []);
+
+  // ⭐ Entitlements come from the server so a padlock can never claim
+  // something the backend doesn't actually enforce.
+  useEffect(() => {
+    apiFetch<ReelEntitlements>("/reels/premium").then(setEnt).catch(() => {});
   }, []);
 
   // Films are only fetched once the creator actually opens the Share tab.
@@ -898,12 +911,14 @@ export default function ReelPage() {
     ["foryou", "For you"],
     ["saved", "Saved"],
     ["mine", "My reels"],
+    ["pro", ent?.premium ? "Pro ⭐" : "Pro"],
   ];
 
   const empty = {
-    foryou: ["📺", "The reel is quiet", "Post a clip from your camera roll, or share a film you made in Mood — it lands here for every creator to watch."],
+    foryou: ["📺", "The reel is quiet", "Post a clip from your camera roll, or share a film you made in ChatMood — it lands here for every creator to watch."],
     saved: ["🔖", "Nothing saved yet", "Tap the bookmark on any reel and it'll wait for you here."],
     mine: ["🎬", "You haven't posted yet", "Your posts — live and unposted — collect here with their views, likes, shares and saves."],
+    pro: ["⭐", "Creator Pro", "Unlock watermark-free reels, cinematic effects, HD export and Go Live."],
   }[tab];
 
   return (
@@ -972,7 +987,54 @@ export default function ReelPage() {
         </div>
       )}
 
-      {reels === null ? (
+      {/* 🔴 Go Live launcher — shown on your own tab; locked for free creators. */}
+      {tab === "mine" && ent && (
+        <div className="shrink-0 border-b border-line bg-base px-4 py-2.5">
+          <button
+            onClick={() => (ent.go_live ? setLiveOpen(true) : setTab("pro"))}
+            className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              ent.go_live
+                ? "bg-red-600 text-white hover:brightness-110"
+                : "border border-line bg-panel text-gray-400 hover:border-accent/40"
+            }`}
+          >
+            <Radio size={14} className={ent.go_live ? "animate-pulse" : ""} />
+            {ent.go_live
+              ? "Go Live"
+              : ent.premium
+                ? "Go Live — provider not connected"
+                : "Go Live — Pro feature"}
+            {!ent.premium && <Lock size={12} />}
+          </button>
+        </div>
+      )}
+
+      {liveOpen && ent && (
+        <ReelGoLive
+          configured={ent.live_configured}
+          providerLabel={ent.live_provider}
+          onClose={() => {
+            setLiveOpen(false);
+            load();
+          }}
+          onStarted={() => {
+            setTab("foryou");
+            load();
+          }}
+        />
+      )}
+
+      {tab === "pro" ? (
+        ent === null ? (
+          <div className="grid flex-1 place-items-center">
+            <Loader2 className="animate-spin text-gray-600" />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">
+            <ReelPremium ent={ent} />
+          </div>
+        )
+      ) : reels === null ? (
         <div className="grid flex-1 place-items-center">
           <Loader2 className="animate-spin text-gray-600" />
         </div>

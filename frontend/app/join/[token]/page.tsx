@@ -49,9 +49,9 @@ export default function JoinPage() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm bg-panel border border-line rounded-2xl p-8 space-y-5 text-center">
         <h1 className="text-xl font-bold flex items-center justify-center gap-2">
-          <BrandMark brand={brand} /> {brand?.brand_name ?? "Mood AI"} · Team invite
+          <BrandMark brand={brand} /> {brand?.brand_name ?? "ChatMood"} · Team invite
         </h1>
-        {brand && <p className="text-[10px] text-gray-500 -mt-3">powered by Mood AI</p>}
+        {brand && <p className="text-[10px] text-gray-500 -mt-3">powered by ChatMood</p>}
         {state.phase === "working" && (
           <p className="text-sm text-gray-500 animate-pulse">Redeeming your invite…</p>
         )}

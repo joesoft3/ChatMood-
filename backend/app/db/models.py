@@ -67,6 +67,10 @@ class Conversation(Base):
     workspace_id: Mapped[str | None] = mapped_column(
         ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True
     )  # set → shared with all workspace members
+    project_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )  # 🗂 filed under a Project (instructions + pinned files apply). No FK: projects
+    # is created by a later migration, and a plain column keeps create_all order-free.
     title: Mapped[str] = mapped_column(String(200), default="New chat")
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)  # rolling cross-chat recall summary
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -135,7 +139,7 @@ class UsageEvent(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(24), index=True)  # chat | agent | deepsearch | voice | image
+    kind: Mapped[str] = mapped_column(String(24), index=True)  # chat | agent | deepsearch | voice | image | task | api
     model: Mapped[str | None] = mapped_column(String(80), nullable=True)
     tokens_in: Mapped[int] = mapped_column(Integer, default=0)
     tokens_out: Mapped[int] = mapped_column(Integer, default=0)
@@ -280,6 +284,10 @@ class Film(Base):
     poster: Mapped[str] = mapped_column(String(44), default="")        # <uuid>_p.jpg hero frame
     views: Mapped[int] = mapped_column(Integer, default=0)             # 👁 public share-page opens
     brand_name: Mapped[str] = mapped_column(String(80), default="")    # ⭐ brand woven in (v1.0.0)
+    # 🏷 Entitlement captured at CREATE time and persisted, so a resume after a
+    # restart re-applies the same decision instead of re-deriving it (and a
+    # mid-render upgrade doesn't half-badge a film).
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     fallback_url: Mapped[str] = mapped_column(String(600), default="")
     script: Mapped[str] = mapped_column(Text, default="")
     note: Mapped[str] = mapped_column(Text, default="")
@@ -308,6 +316,9 @@ class Design(Base):
     height: Mapped[int] = mapped_column(Integer, default=0)
     file: Mapped[str] = mapped_column(String(44), default="")       # web tier png
     print_file: Mapped[str] = mapped_column(String(44), default="")  # 300-DPI print png
+    # 🏷 True → the free-tier badge is baked into both tiers (see services/watermark.py).
+    # Recorded so the UI can explain the badge and offer the upgrade.
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -376,7 +387,7 @@ class Reel(Base):
     """📺 Creator Reel — the shared public feed of creator videos.
 
     A post is either an UPLOAD (creator's own clip, stored under `filename`
-    in MEDIA_DIR) or a SHARE of something Mood already generated (a Film or an
+    in MEDIA_DIR) or a SHARE of something ChatMood already generated (a Film or an
     in-chat video), in which case `source_url` points at the existing media and
     no bytes are copied.
 
@@ -404,6 +415,20 @@ class Reel(Base):
     effect: Mapped[str] = mapped_column(String(16), default="")         # key into reel_studio.EFFECTS
     captioned: Mapped[bool] = mapped_column(Boolean, default=False)     # captions burned in
     status: Mapped[str] = mapped_column(String(12), default="live", index=True)  # live|hidden
+    # 🔴 Go Live (Pro) — a broadcast is a Reel row whose `kind` is "live".
+    # It occupies the feed while streaming, then becomes a normal replay when
+    # the creator ends it, so viewers keep the post they were watching.
+    kind: Mapped[str] = mapped_column(String(10), default="clip", index=True)  # clip | live
+    live_state: Mapped[str] = mapped_column(String(12), default="")   # "" | live | ended
+    live_provider: Mapped[str] = mapped_column(String(16), default="")
+    live_stream_id: Mapped[str] = mapped_column(String(80), default="")
+    live_playback_url: Mapped[str] = mapped_column(String(600), default="")
+    live_viewers: Mapped[int] = mapped_column(Integer, default=0)      # concurrent right now
+    live_peak_viewers: Mapped[int] = mapped_column(Integer, default=0)
+    live_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    live_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 🏷 Free-tier reels carry the badge; Pro posts clean (services/reel_premium).
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     # Denormalized engagement counters — the feed reads them straight off the
     # row instead of running three COUNT(*)s per card. `likes` and `saves` are
     # reconcilable from their join tables; `views`/`shares` are pure tallies.
@@ -448,4 +473,197 @@ class ReelSave(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
+    )
+
+
+class Project(Base):
+    """🗂 Project — a durable container for related chats, files and instructions.
+
+    Grok/ChatGPT-style Projects: a persistent workspace with its OWN system
+    instructions and its OWN document set, so every chat inside it starts with
+    the same brief and can retrieve from the same library. Conversations point
+    here via Conversation.project_id (nullable → the chat is loose/unfiled).
+    """
+
+    __tablename__ = "projects"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    workspace_id: Mapped[str | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True
+    )  # set → the whole project is visible to the team
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str] = mapped_column(Text, default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")  # prepended to every chat in the project
+    emoji: Mapped[str] = mapped_column(String(8), default="🗂")
+    accent: Mapped[str | None] = mapped_column(String(9), nullable=True)  # #rrggbb card tint
+    archived: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ProjectFile(Base):
+    """📎 A file pinned to a project (the project's own knowledge base).
+
+    The upload itself stays a normal FileAsset — this is only the membership
+    edge, so the same file can be pinned to several projects and unpinning
+    never destroys the user's upload.
+    """
+
+    __tablename__ = "project_files"
+
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    file_id: Mapped[str] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ScheduledTask(Base):
+    """⏰ Scheduled task — a saved prompt ChatMood runs on a schedule, unattended.
+
+    Grok Tasks parity: "every weekday at 07:00, brief me on AI news". The
+    scheduler (services/scheduler.py) claims due tasks atomically, runs the
+    prompt through the chosen mode (chat / deepsearch / agent), appends the
+    result to a dedicated conversation and pushes a notification.
+
+    Scheduling is intentionally cron-free: kind + hour/minute + weekday mask is
+    enough for the product, trivially explainable in the UI, and computable
+    without a cron parser dependency.
+    """
+
+    __tablename__ = "scheduled_tasks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    conversation_id: Mapped[str | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
+    )  # results are appended here, so a task reads as one growing thread
+    title: Mapped[str] = mapped_column(String(160))
+    prompt: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(16), default="chat")  # chat | deepsearch | agent
+    search: Mapped[bool] = mapped_column(default=True)  # ground the run in live web results
+    schedule_kind: Mapped[str] = mapped_column(String(12), default="daily")  # once | hourly | daily | weekly
+    hour_utc: Mapped[int] = mapped_column(Integer, default=8)     # 0-23, UTC
+    minute_utc: Mapped[int] = mapped_column(Integer, default=0)   # 0-59, UTC
+    weekdays: Mapped[str] = mapped_column(String(20), default="")  # "0,1,2,3,4" (Mon=0); "" = every day
+    enabled: Mapped[bool] = mapped_column(default=True)
+    notify: Mapped[bool] = mapped_column(default=True)  # push when the run finishes
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_status: Mapped[str] = mapped_column(String(16), default="")  # ok | failed | running
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    run_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TaskRun(Base):
+    """📜 One execution of a ScheduledTask — the audit trail behind the Tasks page."""
+
+    __tablename__ = "task_runs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    task_id: Mapped[str] = mapped_column(ForeignKey("scheduled_tasks.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | failed
+    summary: Mapped[str] = mapped_column(Text, default="")  # first ~600 chars of the answer
+    error: Mapped[str] = mapped_column(Text, default="")
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ApiKey(Base):
+    """🔑 Developer API key — programmatic access to the same Grok-class brain.
+
+    Only a SHA-256 hash is stored; the plaintext `mk_live_…` secret is shown
+    once at creation and can never be recovered. `prefix` is the first 11
+    characters, kept in the clear purely so the UI can label rows ("mk_live_a1b…")
+    without weakening the secret.
+    """
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80), default="API key")
+    prefix: Mapped[str] = mapped_column(String(16), index=True)  # display label, e.g. mk_live_a1b
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)  # sha256 hex of the secret
+    scopes: Mapped[str] = mapped_column(String(200), default="chat")  # csv: chat,search,images
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    calls: Mapped[int] = mapped_column(Integer, default=0)
+    revoked: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PaymentMethod(Base):
+    """💳 An admin-published way to pay — a MoMo number, bank account, or cash.
+
+    These are the destinations shown on the upgrade page. They are owned by the
+    platform admin (not by users), and `active` lets a number be retired without
+    deleting it, so historical payments keep pointing at something real.
+    """
+
+    __tablename__ = "payment_methods"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    kind: Mapped[str] = mapped_column(String(12), default="momo")      # momo | bank | cash | other
+    label: Mapped[str] = mapped_column(String(80), default="")          # "MTN MoMo — main"
+    network: Mapped[str] = mapped_column(String(20), default="")        # mtn | vodafone | airteltigo | telecel
+    account_name: Mapped[str] = mapped_column(String(120), default="")  # who the money reaches
+    account_number: Mapped[str] = mapped_column(String(60), default="") # MoMo number / IBAN
+    bank_name: Mapped[str] = mapped_column(String(80), default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")         # free-text steps for the payer
+    currency: Mapped[str] = mapped_column(String(8), default="GHS")
+    active: Mapped[bool] = mapped_column(default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Payment(Base):
+    """🧾 One payment attempt — the audit trail behind every plan change.
+
+    Lifecycle: `pending` (user says they paid) → `approved` (admin verified, plan
+    granted) or `rejected`. A row is never deleted, because "why does this
+    account have Pro?" must stay answerable months later.
+
+    `provider` is `manual` today; Paystack/Flutterwave/Stripe write the same row
+    with their own reference once their keys are configured.
+    """
+
+    __tablename__ = "payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    method_id: Mapped[str | None] = mapped_column(
+        ForeignKey("payment_methods.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(16), default="manual", index=True)
+    # Invoice code the user quotes in the MoMo reference field — how an admin
+    # matches a phone notification to an account.
+    invoice_code: Mapped[str] = mapped_column(String(16), default="", index=True)
+    reference: Mapped[str] = mapped_column(String(64), default="", index=True)  # their transaction id
+    payer_name: Mapped[str] = mapped_column(String(120), default="")
+    payer_phone: Mapped[str] = mapped_column(String(40), default="")
+    amount_minor: Mapped[int] = mapped_column(Integer, default=0)   # pesewas — never a float
+    currency: Mapped[str] = mapped_column(String(8), default="GHS")
+    plan: Mapped[str] = mapped_column(String(20), default="pro")    # plan granted on approval
+    months: Mapped[int] = mapped_column(Integer, default=1)
+    offer_id: Mapped[str] = mapped_column(String(32), default="")
+    status: Mapped[str] = mapped_column(String(12), default="pending", index=True)
+    note: Mapped[str] = mapped_column(Text, default="")             # user's message to the admin
+    admin_note: Mapped[str] = mapped_column(Text, default="")       # why approved / rejected
+    reviewed_by: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
     )

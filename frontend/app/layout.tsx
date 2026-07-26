@@ -5,26 +5,26 @@ import { ConversationsProvider } from "@/lib/conversations";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://moodai-app.vercel.app"),
   title: {
-    default: "Mood AI — chat, arena, deep research & AI films with sound",
-    template: "%s · Mood AI",
+    default: "ChatMood — chat, arena, deep research & AI films with sound",
+    template: "%s · ChatMood",
   },
   description:
     "A Grok-class AI super-app: streaming chat, multi-model ⚔ Arena, deep research with citations, " +
     "and a video studio that directs films with AI voiceovers and cinematic sound.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.png", apple: "/icon.png" },
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Mood AI" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "ChatMood" },
   openGraph: {
-    siteName: "Mood AI",
+    siteName: "ChatMood",
     type: "website",
-    title: "Mood AI — chat, arena, deep research & AI films with sound",
+    title: "ChatMood — chat, arena, deep research & AI films with sound",
     description:
       "Frontier models that debate blind in Arena, research with citations, and direct storyboard films with studio voiceovers — your chats, your terms.",
-    images: [{ url: "/og.png", width: 1024, height: 500, alt: "Mood AI" }],
+    images: [{ url: "/og.png", width: 1024, height: 500, alt: "ChatMood" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Mood AI",
+    title: "ChatMood",
     description: "A Grok-class AI super-app — arena debates, deep research, AI films with sound.",
     images: ["/og.png"],
   },

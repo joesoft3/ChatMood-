@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Mood AI — interactive .env provisioner.
+# ChatMood — interactive .env provisioner.
 #
 # Copies .env.example → .env, generates strong random secrets, and fills in API
 # keys from your environment or interactive prompts. Idempotent: never

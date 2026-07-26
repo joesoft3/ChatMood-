@@ -24,6 +24,25 @@ interface Mem {
   title?: string | null; // set for remembered past conversations
 }
 
+interface ApiKeyRec {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  calls: number;
+  revoked: boolean;
+  last_used_at: string | null;
+  created_at: string | null;
+}
+
+interface ApiKeyList {
+  keys: ApiKeyRec[];
+  limit: number;
+  valid_scopes: string[];
+  base_url: string;
+  rate_per_min: number;
+}
+
 interface Meter {
   used: number;
   limit: number;
@@ -287,6 +306,13 @@ export default function SettingsPage() {
   const [wsMsg, setWsMsg] = useState("");
   // ---- domains
   const [domProviders, setDomProviders] = useState<DomainProviders | null>(null);
+  // 🔑 Developer API keys
+  const [keys, setKeys] = useState<ApiKeyList | null>(null);
+  const [keyName, setKeyName] = useState("");
+  const [keyScopes, setKeyScopes] = useState<string[]>(["chat", "search"]);
+  const [newKey, setNewKey] = useState("");
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyErr, setKeyErr] = useState("");
   const [domains, setDomains] = useState<DomainRec[] | null>(null);
   const [domTab, setDomTab] = useState<"connect" | "buy">("connect");
   const [domMsg, setDomMsg] = useState("");
@@ -333,9 +359,41 @@ export default function SettingsPage() {
   const [wsInvites, setWsInvites] = useState<InviteRec[] | null>(null);
   const [wsEmails, setWsEmails] = useState("");
 
+  async function createApiKey() {
+    setKeyBusy(true);
+    setKeyErr("");
+    setNewKey("");
+    try {
+      const r = await apiFetch<ApiKeyRec & { key: string }>("/keys", {
+        method: "POST",
+        body: JSON.stringify({ name: keyName.trim() || "API key", scopes: keyScopes }),
+      });
+      setNewKey(r.key); // shown once — the server only kept a hash
+      setKeyName("");
+      setKeys(await apiFetch<ApiKeyList>("/keys"));
+    } catch (e: any) {
+      setKeyErr(e.message ?? "Couldn't create the key");
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function revokeApiKey(id: string) {
+    if (!window.confirm("Revoke this key? Any integration using it stops working immediately.")) return;
+    setKeyBusy(true);
+    try {
+      await apiFetch(`/keys/${id}`, { method: "DELETE" });
+      setKeys(await apiFetch<ApiKeyList>("/keys"));
+    } catch (e: any) {
+      setKeyErr(e.message);
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
   const refreshDashboard = useCallback(async (options?: { silent?: boolean; hydrateInstructions?: boolean }) => {
     if (!options?.silent) setRefreshing(true);
-    const [meRes, billingRes, usageRes, pluginsRes, workspacesRes, domainsRes, providersRes] = await Promise.allSettled([
+    const [meRes, billingRes, usageRes, pluginsRes, workspacesRes, domainsRes, providersRes, keysRes] = await Promise.allSettled([
       apiFetch<Me>("/auth/me"),
       apiFetch<any>("/billing/status"),
       apiFetch<UsageSummary>("/usage/summary"),
@@ -343,6 +401,7 @@ export default function SettingsPage() {
       apiFetch<{ workspaces: Workspace[] }>("/workspaces"),
       apiFetch<{ domains: DomainRec[] }>("/domains"),
       apiFetch<DomainProviders>("/domains/providers"),
+      apiFetch<ApiKeyList>("/keys"),
     ]);
 
     if (meRes.status === "fulfilled") {
@@ -360,6 +419,10 @@ export default function SettingsPage() {
     if (domainsRes.status === "fulfilled") setDomains(domainsRes.value.domains);
     else setDomains(null);
     if (providersRes.status === "fulfilled") setDomProviders(providersRes.value);
+    // The public API can be switched off server-side (503) — that isn't an error,
+    // it just means the card stays hidden.
+    if (keysRes.status === "fulfilled") setKeys(keysRes.value);
+    else setKeys(null);
 
     setLastSyncAt(Date.now());
     setRefreshing(false);
@@ -368,7 +431,7 @@ export default function SettingsPage() {
   useEffect(() => {
     // OAuth callback lands here as /settings?plugin=connected|error (no Suspense needed)
     const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("plugin") : null;
-    if (q === "connected") setPluginMsg("✅ App connected — Mood can now act on it in chat (🧩 toggle).");
+    if (q === "connected") setPluginMsg("✅ App connected — ChatMood can now act on it in chat (🧩 toggle).");
     if (q === "error") setPluginMsg("⚠️ Connection failed — please try again.");
     if (q) window.history.replaceState({}, "", window.location.pathname);
 
@@ -794,7 +857,7 @@ export default function SettingsPage() {
   }
 
   async function disconnectPlugin(provider: string) {
-    if (!confirm("Disconnect this app? Mood will lose access immediately.")) return;
+    if (!confirm("Disconnect this app? ChatMood will lose access immediately.")) return;
     setPlugins((p) => (p ? p.map((x) => (x.provider === provider ? { ...x, connected: false, account: null } : x)) : p));
     await apiFetch(`/plugins/${provider}`, { method: "DELETE" }).catch(loadPlugins);
   }
@@ -816,7 +879,7 @@ export default function SettingsPage() {
   }
 
   async function clearAll() {
-    if (!confirm("Delete ALL of Mood’s memories about you?")) return;
+    if (!confirm("Delete ALL of ChatMood’s memories about you?")) return;
     await apiFetch("/memory", { method: "DELETE" }).catch(() => {});
     loadMemories();
   }
@@ -824,10 +887,12 @@ export default function SettingsPage() {
   async function upgrade() {
     setBillingMsg("");
     try {
+      // Stripe first when it's configured; otherwise fall through to the
+      // mobile-money flow rather than dead-ending on a 503.
       const r = await apiFetch<{ checkout_url: string }>("/billing/checkout", { method: "POST" });
       window.location.href = r.checkout_url;
-    } catch (e: any) {
-      setBillingMsg(e.message ?? "Billing unavailable");
+    } catch {
+      router.push("/upgrade");
     }
   }
 
@@ -951,7 +1016,7 @@ export default function SettingsPage() {
             {me ? (
               <div className="space-y-4 text-sm">
                 <div className="space-y-1">
-                  <p className="text-gray-200 font-medium">{me.display_name || "Mood user"}</p>
+                  <p className="text-gray-200 font-medium">{me.display_name || "ChatMood user"}</p>
                   <p className="text-gray-500 break-all">{me.email}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1049,6 +1114,8 @@ export default function SettingsPage() {
               <li>🔢 5M tokens/mo · 🔭 200 deep searches/day · 🎬 60 videos/day</li>
               <li>📎 50 MB uploads (vs 25) · 🧠 365-day memory (vs 30)</li>
               <li>⏫ 4× rate-limit throughput</li>
+              <li>🏷 <span className="text-gray-200">Watermark-free exports</span> — free renders carry a small ChatMood badge</li>
+              <li>📱 Pay with <span className="text-gray-200">MTN MoMo, Telecel or Vodafone Cash</span></li>
             </ul>
             <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
               Upgrade instantly to unlock higher daily quotas, faster throughput and premium creation workflows.
@@ -1114,7 +1181,7 @@ export default function SettingsPage() {
           {/* Plugins */}
           <Card icon={<Puzzle size={16} />} title="Connected apps">
             <p className="text-xs text-gray-500">
-              Let Mood read &amp; act in your apps. In chat, turn on the 🧩 toggle and ask —
+              Let ChatMood read &amp; act in your apps. In chat, turn on the 🧩 toggle and ask —
               e.g. <i>“Check my unread emails”</i> or <i>“Create a GitHub issue for the login bug.”</i>
             </p>
             <div className="flex flex-wrap gap-2">
@@ -1329,7 +1396,7 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <Card icon={<Globe size={16} />} title="Custom domains">
               <p className="text-xs text-gray-500">
-                Run Mood on your own domain for your business (white-label), or buy a new domain in real time —
+                Run ChatMood on your own domain for your business (white-label), or buy a new domain in real time —
                 availability, pricing, secure checkout and auto-connection included.
                 {domProviders?.registrar_env === "ote" && domProviders.registrar && (
                   <span className="text-yellow-500/90"> Registrar is in SANDBOX mode (no real registration/charge).</span>
@@ -1870,7 +1937,7 @@ export default function SettingsPage() {
           <div className="md:col-span-2">
             <Card icon={<SlidersHorizontal size={16} />} title="Custom instructions">
               <p className="text-xs text-gray-500">
-                Tell Mood how to behave in <b>every</b> conversation — tone, format, language, expertise level
+                Tell ChatMood how to behave in <b>every</b> conversation — tone, format, language, expertise level
                 (e.g. “Answer like a senior engineer; keep answers concise; always show code in Python”).
               </p>
               <textarea
@@ -1878,7 +1945,7 @@ export default function SettingsPage() {
                 onChange={(e) => setInstructions(e.target.value)}
                 rows={4}
                 maxLength={2000}
-                placeholder="How should Mood respond to you?"
+                placeholder="How should ChatMood respond to you?"
                 className="w-full rounded-xl bg-base border border-line px-4 py-3 text-sm outline-none focus:border-accent/60 placeholder-gray-600 resize-y"
               />
               <div className="flex items-center gap-3">
@@ -1894,15 +1961,135 @@ export default function SettingsPage() {
             </Card>
           </div>
 
+          {/* 🔑 Developer API keys */}
+          {keys && (
+            <div className="md:col-span-2">
+              <Card
+                icon={<KeyRound size={16} />}
+                title="🔑 Developer API — build on ChatMood"
+                action={
+                  <span className="text-[10px] text-gray-500">
+                    {keys.keys.filter((k) => !k.revoked).length}/{keys.limit} active
+                  </span>
+                }
+              >
+                <p className="text-xs text-gray-400">
+                  Call the same brain from your own code. The API is{" "}
+                  <strong className="text-gray-200">OpenAI-compatible</strong>, so any existing SDK works by
+                  changing two strings — no new client library.
+                </p>
+
+                <pre className="overflow-x-auto rounded-xl border border-line bg-base p-3 text-[11px] leading-relaxed text-gray-400">
+{`from openai import OpenAI
+
+client = OpenAI(
+    base_url="${keys.base_url}",
+    api_key="mk_live_…",          # the key you create below
+)
+
+client.chat.completions.create(
+    model="mood-flagship",
+    messages=[{"role": "user", "content": "Hello"}],
+)`}
+                </pre>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    value={keyName}
+                    onChange={(e) => setKeyName(e.target.value)}
+                    placeholder="Key name — e.g. production backend"
+                    maxLength={80}
+                    className="min-w-[200px] flex-1 rounded-xl border border-line bg-base px-3 py-2 text-sm text-gray-100 outline-none focus:border-accent/50"
+                  />
+                  {keys.valid_scopes.map((sc) => (
+                    <label key={sc} className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={keyScopes.includes(sc)}
+                        onChange={(e) =>
+                          setKeyScopes((prev) =>
+                            e.target.checked ? [...prev, sc] : prev.filter((x) => x !== sc),
+                          )
+                        }
+                      />
+                      {sc}
+                    </label>
+                  ))}
+                  <button
+                    onClick={createApiKey}
+                    disabled={keyBusy}
+                    className="rounded-xl border border-accent/30 bg-accent/15 px-4 py-2 text-xs text-accent transition hover:bg-accent/25 disabled:opacity-50"
+                  >
+                    Create key
+                  </button>
+                </div>
+
+                {keyErr && <StudioNotice tone="warn">{keyErr}</StudioNotice>}
+
+                {newKey && (
+                  <div className="space-y-2 rounded-xl border border-green-400/30 bg-green-400/10 p-3">
+                    <p className="text-xs text-green-300">
+                      ✅ Key created. <strong>Copy it now</strong> — only a hash was stored, so this is the
+                      one and only time it can be shown.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-base px-2.5 py-2 text-[11px] text-gray-200">
+                        {newKey}
+                      </code>
+                      <CopyBtn text={newKey} />
+                    </div>
+                  </div>
+                )}
+
+                {keys.keys.length === 0 ? (
+                  <p className="text-xs text-gray-600">No API keys yet.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {keys.keys.map((k) => (
+                      <div
+                        key={k.id}
+                        className={`flex flex-wrap items-center gap-2 rounded-xl border border-line bg-base px-3 py-2 text-xs ${
+                          k.revoked ? "opacity-50" : ""
+                        }`}
+                      >
+                        <span className="font-medium text-gray-200">{k.name}</span>
+                        <code className="text-[11px] text-gray-500">{k.prefix}…</code>
+                        <span className="text-[10px] text-gray-600">{k.scopes.join(" · ") || "no scopes"}</span>
+                        <span className="text-[10px] text-gray-600">{k.calls} calls</span>
+                        {k.revoked ? (
+                          <span className="text-[10px] text-red-400">revoked</span>
+                        ) : (
+                          <button
+                            onClick={() => revokeApiKey(k.id)}
+                            disabled={keyBusy}
+                            className="ml-auto rounded-lg border border-line px-2 py-1 text-[10px] text-gray-500 transition hover:border-red-400/40 hover:text-red-300"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-[10px] text-gray-600">
+                  Endpoints: <code>/chat/completions</code> (streaming supported) · <code>/search</code> ·{" "}
+                  <code>/images</code> · <code>/models</code> · <code>/usage</code>. Calls count against your
+                  plan and appear in the usage dashboard above. Limit {keys.rate_per_min} req/min per key.
+                </p>
+              </Card>
+            </div>
+          )}
+
           {/* Memory */}
           <div className="md:col-span-2">
             <Card
               icon={<Brain size={16} />}
-              title={`What Mood remembers ${mems ? `(${mems.length})` : ""}`}
+              title={`What ChatMood remembers ${mems ? `(${mems.length})` : ""}`}
             >
               <p className="text-xs text-gray-500">
-                Mood remembers durable facts about you and what your past conversations were about — that&apos;s how
-                it picks up where you left off in new chats. Delete anything you don&apos;t want Mood to know.
+                ChatMood remembers durable facts about you and what your past conversations were about — that&apos;s how
+                it picks up where you left off in new chats. Delete anything you don&apos;t want ChatMood to know.
               </p>
               <div className="flex gap-2">
                 <button
@@ -1968,7 +2155,7 @@ export default function SettingsPage() {
             <Card icon={<Trash2 size={16} className="text-red-400" />} title="Danger zone">
               <div className="space-y-3">
                 <p className="text-xs text-gray-400">
-                  Permanently delete your Mood AI account — chats, uploads, designs, films, edits, orders, memory,
+                  Permanently delete your ChatMood account — chats, uploads, designs, films, edits, orders, memory,
                   plugin tokens, and teams you own. <span className="font-semibold text-red-300">This is instant and cannot be undone.</span>{" "}
                   Details at <a href="/account-deletion" className="inline-block py-1 text-accent underline underline-offset-2">/account-deletion</a>.
                 </p>

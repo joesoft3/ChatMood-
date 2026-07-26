@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Mood AI — LIVE smoke: exercises the REAL paid paths against a deployed stack
+# ChatMood — LIVE smoke: exercises the REAL paid paths against a deployed stack
 # (staging or production): gated register → login → chat stream → 🧠 think mode →
 # ⚔️ Arena stream (drafts + ballots + verdict) → arena quota gate → usage meters.
 #
@@ -41,7 +41,7 @@ except Exception: print("")' "$BODY" "$1"; }
 
 sse_has() { grep -q "^data:.*\"type\": *\"$1\"" "$2" 2>/dev/null || grep -q "\"type\": \"$1\"" "$2" 2>/dev/null; }
 
-echo "Mood AI LIVE smoke → $BASE"
+echo "ChatMood LIVE smoke → $BASE"
 echo "account: $EMAIL"
 echo "────────────────────────────────────────────"
 
@@ -177,7 +177,7 @@ if [ -n "${WEB_URL:-}" ]; then
   wcode=$(curl -sL -o "$BODY" -w '%{http_code}' --max-time 15 "$WEB/")
   if [ "$wcode" = "200" ]; then
     if grep -qi "Mood" "$BODY"; then
-      pass "Web app serves $WEB (200, Mood AI markup present)"
+      pass "Web app serves $WEB (200, ChatMood markup present)"
     else
       pass "Web app serves $WEB (200)"
     fi

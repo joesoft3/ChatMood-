@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Mood AI — Netlify deployment (frontend only; the FastAPI backend runs
+# ChatMood — Netlify deployment (frontend only; the FastAPI backend runs
 # separately anywhere Docker runs — see docs/DEPLOY-WALKTHROUGH.md).
 #
 # Connect the repo in Netlify and it picks these settings up automatically,

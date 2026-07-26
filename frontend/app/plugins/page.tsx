@@ -98,7 +98,7 @@ export default function PluginsPage() {
     void load();
     // OAuth round trips land back here with ?plugin=connected|error
     const qp = new URLSearchParams(window.location.search).get("plugin");
-    if (qp === "connected") setMsg("✅ Connected — turn on 🧩 in chat to let Mood use it.");
+    if (qp === "connected") setMsg("✅ Connected — turn on 🧩 in chat to let ChatMood use it.");
     if (qp === "error") setMsg("⚠️ Connection failed — please try again.");
   }, [load]);
 
@@ -129,7 +129,7 @@ export default function PluginsPage() {
   }
 
   async function disconnect(p: PluginStatus) {
-    if (!window.confirm(`Disconnect ${p.name}? Mood will lose access until you reconnect.`)) return;
+    if (!window.confirm(`Disconnect ${p.name}? ChatMood will lose access until you reconnect.`)) return;
     setMsg("");
     setBusy(p.provider);
     try {
@@ -176,7 +176,7 @@ export default function PluginsPage() {
           <StudioHero
             icon={<Puzzle size={20} />}
             title="Plugin Store"
-            subtitle="Connect your accounts so Mood can read on demand and always ask before writing. Turn on 🧩 in chat to use them."
+            subtitle="Connect your accounts so ChatMood can read on demand and always ask before writing. Turn on 🧩 in chat to use them."
             actions={
               <>
                 <StudioActionButton onClick={() => void load()} tone="accent">

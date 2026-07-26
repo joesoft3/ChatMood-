@@ -1,8 +1,8 @@
-# Mood AI — Privacy Policy
+# ChatMood — Privacy Policy
 
 **Effective date:** 18 July 2026 · **Last updated:** 18 July 2026
 
-This policy explains what Mood AI (“we”) collects, why, and your choices. Short version:
+This policy explains what ChatMood (“we”) collects, why, and your choices. Short version:
 **your chats belong to you, plugins always ask before acting, you can delete everything — instantly via Settings → Danger zone or the app drawer; full scope documented at `/account-deletion`**
 
 ## 1. What we collect
@@ -81,7 +81,7 @@ Material changes announced in-app/email; history lives next to this doc in the r
 
 ## 12. Contact / data controller
 
-**Joesoft — Mood AI** (Accra, Ghana) · privacy questions via the in-app feedback channel or the
+**Joesoft — ChatMood** (Accra, Ghana) · privacy questions via the in-app feedback channel or the
 GitHub repo. White-label deployments: contact the domain operator first.
 
 ---

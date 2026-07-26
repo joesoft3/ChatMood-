@@ -610,6 +610,7 @@ async def generate_design(
     transparent: bool = False,
     enhance: bool = True,
     brand: dict[str, Any] | None = None,
+    watermark: bool = False,
 ) -> dict[str, Any]:
     """Full pipeline → {file, print_file, width, height, prompt} (paths relative to MEDIA_DIR)."""
     if kind not in KIND_PRESETS:
@@ -660,6 +661,17 @@ async def generate_design(
         note = "ffmpeg unavailable — delivered unnormalized base render."
     raw_path.unlink(missing_ok=True)
 
+    # 🏷 Free tier gets the badge baked into BOTH tiers. Stamping here — rather
+    # than at download — means every downstream path (export presets, direct
+    # download, print pack, share link) inherits it automatically, and there is
+    # no cached-artifact entitlement to invalidate later.
+    stamped = False
+    if watermark:
+        from .watermark import apply_to_file
+
+        stamped = await apply_to_file(web_path, video=False, width=kp.web_w)
+        stamped = await apply_to_file(print_path, video=False, width=kp.print_w) or stamped
+
     return {
         "id": uid,
         "file": web_path.name,
@@ -676,6 +688,7 @@ async def generate_design(
         "note": note,
         "native": bool(kw),
         "branded": branded,
+        "watermarked": stamped,
     }
 
 

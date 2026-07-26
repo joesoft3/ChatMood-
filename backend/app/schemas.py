@@ -47,6 +47,7 @@ class RenameRequest(BaseModel):
 class ChatRequest(BaseModel):
     conversation_id: str | None = None
     workspace_id: str | None = None  # create/share this conversation in a team workspace
+    project_id: str | None = None    # 🗂 file this chat under a Project (brief + pinned docs apply)
     message: str = ""
     files: list[str] = []
     search: bool = False
@@ -145,7 +146,7 @@ class AdminFlagUpdate(BaseModel):
 
 
 class AdminPushTest(BaseModel):
-    title: str = Field(default="🔔 Mood AI push test", max_length=80)
+    title: str = Field(default="🔔 ChatMood push test", max_length=80)
     body: str = Field(default="If you can read this, push is wired end-to-end. 🎉", max_length=240)
 
 

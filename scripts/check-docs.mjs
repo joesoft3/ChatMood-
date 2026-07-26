@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────────────
-// Mood AI — documentation housekeeping gate.
+// ChatMood — documentation housekeeping gate.
 //
 // Fast, dependency-free, offline. Run from anywhere:  node scripts/check-docs.mjs
 //

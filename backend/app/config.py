@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         return v
 
     # Core
-    APP_NAME: str = "Mood AI"
+    APP_NAME: str = "ChatMood"
     DEBUG: bool = False
     DATABASE_URL: str = "postgresql+asyncpg://mood:mood@localhost:5432/mood"
     REDIS_URL: str = "redis://localhost:6379/0"
@@ -237,7 +237,7 @@ class Settings(BaseSettings):
     NOTIFY_COOLDOWN_SECONDS: int = 300  # per user+kind, process-local
 
     # Video generation — comma-chain of providers, first that succeeds wins:
-    #   "reel"        = zero-key Mood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
+    #   "reel"        = zero-key ChatMood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
     #   "pollinations"= gen.pollinations.ai video models (needs POLLINATIONS_API_KEY)
     #   "xai"         = Grok video when credits exist
     # Default ships "reel" so chat video works TODAY with no keys; "xai,reel" once funded.
@@ -247,7 +247,7 @@ class Settings(BaseSettings):
     POLLINATIONS_VIDEO_URL: str = "https://gen.pollinations.ai/video"
     POLLINATIONS_VIDEO_MODEL: str = "wan-fast"
     VIDEO_MAX_WAIT_SECONDS: int = 240
-    # 🎬 Mood Reel composer (ffmpeg present in both deploy images — verified)
+    # 🎬 ChatMood Reel composer (ffmpeg present in both deploy images — verified)
     REEL_ENABLED: bool = True
     REEL_MAX_SCENES: int = 5
     # 🎞️ v1.9.8 richer reels: LLM storyboard (free Groq brain, fail-open to
@@ -260,7 +260,7 @@ class Settings(BaseSettings):
     TTS_TIMEOUT_S: int = 45
 
     # 🎨🎬 In-chat creation (v1.9.7): type "create an image of…" / "make a video of…"
-    # in any chat and Mood generates inline. Zero-cost heuristic router (no LLM spent).
+    # in any chat and ChatMood generates inline. Zero-cost heuristic router (no LLM spent).
     CHAT_MEDIA: bool = True
     CHAT_IMAGE_RATE_PER_MIN: int = 8
     CHAT_VIDEO_RATE_PER_MIN: int = 2
@@ -279,6 +279,60 @@ class Settings(BaseSettings):
     SANDBOX_ENABLED: bool = True    # NOT a hardened security boundary — see services/sandbox.py
     SANDBOX_TIMEOUT: int = 8        # seconds
     SANDBOX_MAX_OUTPUT: int = 6000  # chars captured from stdout/stderr each
+
+    # 🏷 Output watermarking — free tier is badged; paid plans and admins are not.
+    # The entitlement rule lives in services/watermark.should_watermark().
+    WATERMARK_ENABLED: bool = True
+    WATERMARK_TEXT: str = ""        # blank → "Made with {APP_NAME}"
+    WATERMARK_TIMEOUT_S: int = 90   # cap on the stamping encode; on timeout the clean render ships
+
+    # 🔴 Live streaming (Reel → Go Live). This repo does NOT host video infra;
+    # pick a managed provider and set its keys. Blank → Go Live reports itself
+    # unavailable rather than handing creators a dead Start button.
+    LIVE_PROVIDER: str = ""              # mux | cloudflare | livekit
+    LIVE_MAX_MINUTES: int = 120          # auto-end runaway broadcasts (bills by the minute)
+    MUX_TOKEN_ID: str = ""
+    MUX_TOKEN_SECRET: str = ""
+    CLOUDFLARE_STREAM_TOKEN: str = ""
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+    LIVEKIT_API_KEY: str = ""
+    LIVEKIT_API_SECRET: str = ""
+    LIVEKIT_URL: str = ""
+
+    # 💳 Payments — manual mobile money now, gateways when their keys land.
+    # Manual needs NO keys: admin publishes a MoMo number, the user submits a
+    # transaction reference, an admin approves, the plan activates.
+    CURRENCY: str = "GHS"
+    PRO_PRICE_MONTHLY_MINOR: int = 15_000   # 150.00 GHS in pesewas (integer minor units)
+    PRO_YEAR_MONTHS: int = 10               # yearly = 10× monthly → 2 months free
+    MANUAL_PAYMENTS_ENABLED: bool = True
+    PAYMENT_EXPIRY_SWEEP_HOURS: float = 6.0  # how often lapsed manual plans are downgraded
+    # Gateways — leave blank until you have the keys; the UI shows them as
+    # "coming soon" rather than pretending the option doesn't exist.
+    PAYSTACK_SECRET_KEY: str = ""
+    PAYSTACK_PUBLIC_KEY: str = ""
+    FLUTTERWAVE_SECRET_KEY: str = ""
+    FLUTTERWAVE_PUBLIC_KEY: str = ""
+
+    # 🗂 Projects — durable chat/file containers with standing instructions
+    PROJECTS_ENABLED: bool = True
+    PROJECT_MAX_FILES: int = 40        # pinned documents per project
+    PROJECT_MAX_PER_USER: int = 100
+
+    # ⏰ Scheduled tasks — saved prompts ChatMood runs unattended
+    TASKS_ENABLED: bool = True
+    SCHEDULER_ENABLED: bool = True     # false on extra replicas if you ever want a single runner
+    SCHEDULER_TICK_S: float = 60.0     # how often the loop looks for due tasks
+    SCHEDULER_BATCH: int = 10          # max tasks claimed per tick
+    SCHEDULER_RUN_TIMEOUT_S: int = 300  # hard cap on one unattended run
+    TASK_MAX_PER_USER_FREE: int = 3
+    TASK_MAX_PER_USER_PRO: int = 30
+    TASK_RUNS_KEEP: int = 50           # audit rows retained per task
+
+    # 🔑 Developer API — programmatic access with `mk_live_…` keys
+    PUBLIC_API_ENABLED: bool = True
+    API_KEY_MAX_PER_USER: int = 10
+    API_KEY_RATE_PER_MIN: int = 60     # per-key request budget (plan multiplier applies)
 
     # Limits
     CHAT_RATE_LIMIT_PER_MIN: int = 30

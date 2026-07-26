@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
 import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Pencil, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice } from "@/components/StudioChrome";
@@ -11,6 +12,8 @@ interface ImgItem {
   id: string;
   url: string;
   prompt: string;
+  /** FileAsset id — enables the stable download route and delete. */
+  file_id?: string;
   pending?: boolean;
   meta?: {
     duration?: number;
@@ -278,51 +281,6 @@ export default function ImagesPage() {
     }
   }
 
-  /** Download through the authenticated API when possible; fall back to the source URL.
-   * This also makes provider-hosted assets save with a useful filename. */
-  async function downloadMedia(item: ImgItem, kind: "image" | "video") {
-    try {
-      const response = await fetch(item.url, { headers: token.get() ? { Authorization: `Bearer ${token.get()}` } : undefined });
-      if (!response.ok) throw new Error("Download unavailable");
-      const blob = await response.blob();
-      const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : kind === "video" ? "mp4" : "jpg";
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `mood-ai-${kind}-${item.id}.${extension}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-    } catch {
-      // Some third-party providers don't permit CORS reads. Their native URL can still be saved by the browser.
-      const link = document.createElement("a");
-      link.href = item.url;
-      link.target = "_blank";
-      link.rel = "noreferrer";
-      link.download = "";
-      link.click();
-    }
-  }
-
-  function deleteImage(item: ImgItem) {
-    if (!window.confirm("Remove this image from your gallery? This cannot delete the provider's original file.")) return;
-    const next = items.filter((i) => i.id !== item.id);
-    persist(next);
-    if (zoom?.id === item.id) setZoom(null);
-  }
-
-  function deleteVideo(item: ImgItem) {
-    if (!window.confirm("Remove this video from your gallery? This cannot delete the provider's original file.")) return;
-    persistVideos(videos.filter((v) => v.id !== item.id));
-  }
-
-  function remixImage(item: ImgItem) {
-    setMode("image");
-    setPrompt(`${item.prompt}. Edit this image: `);
-    setInfo("✏️ Describe the change, then generate a new image. Your original stays in the gallery.");
-    document.getElementById("main-generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   async function editVideo(item: ImgItem) {
     setError("");
     try {
@@ -347,12 +305,16 @@ export default function ImagesPage() {
     const tmpId = "pending-" + Date.now();
     setItems((it) => [{ id: tmpId, url: "", prompt: p, pending: true }, ...it]);
     try {
-      const res = await apiFetch<{ url: string }>("/chat/image", {
+      const res = await apiFetch<{ url: string; file_id?: string }>("/chat/image", {
         method: "POST",
         body: JSON.stringify({ prompt: p }),
       });
       setItems((it) => {
-        const next = it.map((i) => (i.id === tmpId ? { id: tmpId.replace("pending", "img"), url: res.url, prompt: p } : i));
+        const next = it.map((i) =>
+          i.id === tmpId
+            ? { id: tmpId.replace("pending", "img"), url: res.url, prompt: p, file_id: res.file_id }
+            : i,
+        );
         persist(next);
         return next;
       });
@@ -360,6 +322,54 @@ export default function ImagesPage() {
       setItems((it) => it.filter((i) => i.id !== tmpId));
       setError(e.message ?? "Generation failed");
     }
+  }
+
+  /** ⬇ Save a generation. Uses the stable /files route when the item was
+   *  archived — the visible URL is a presigned link that eventually expires. */
+  async function saveImage(img: ImgItem) {
+    const name = mediaFilename(img.prompt, "image");
+    if (img.file_id) await downloadFile(img.file_id, name);
+    else await downloadUrl(img.url, name);
+  }
+
+  async function saveVideo(v: ImgItem) {
+    const name = mediaFilename(v.prompt, "video");
+    if (v.file_id) await downloadFile(v.file_id, name);
+    else await downloadUrl(v.url, name);
+  }
+
+  /** ✨ Remix — seed the prompt box with this generation's prompt to iterate on. */
+  function remixImage(img: ImgItem) {
+    setPrompt(img.prompt);
+    document.getElementById("main-generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setInfo("✨ Prompt loaded — tweak it and generate a new version.");
+  }
+
+  /** 🗑 Remove from the gallery, and from the server library when archived. */
+  async function removeImage(img: ImgItem) {
+    if (!window.confirm("Delete this image?")) return;
+    if (img.file_id) {
+      // Best-effort: a stale/missing asset shouldn't block clearing the tile.
+      await apiFetch(`/files/${img.file_id}`, { method: "DELETE" }).catch(() => {});
+    }
+    setItems((it) => {
+      const next = it.filter((i) => i.id !== img.id);
+      persist(next);
+      return next;
+    });
+    setZoom((z) => (z && z.id === img.id ? null : z));
+  }
+
+  async function removeVideo(v: ImgItem) {
+    if (!window.confirm("Delete this video?")) return;
+    if (v.file_id) {
+      await apiFetch(`/files/${v.file_id}`, { method: "DELETE" }).catch(() => {});
+    }
+    setVideos((it) => {
+      const next = it.filter((i) => i.id !== v.id);
+      persistVideos(next);
+      return next;
+    });
   }
 
   function finishTile(tmpId: string, p: string, meta: ImgItem["meta"], url: string, note?: string | null) {
@@ -986,9 +996,30 @@ export default function ImagesPage() {
                         <div className="flex items-start gap-2">
                           <p className="flex-1 text-[11px] text-gray-400 line-clamp-2">{v.prompt}</p>
                           <div className="flex shrink-0 gap-1">
-                            <button onClick={() => void downloadMedia(v, "video")} title="Download video" aria-label="Download video" className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"><Download size={14} /></button>
-                            <button onClick={() => void editVideo(v)} title="Edit video" aria-label="Edit video" className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"><Pencil size={14} /></button>
-                            <button onClick={() => deleteVideo(v)} title="Delete video" aria-label="Delete video" className="rounded-md p-1.5 text-gray-400 hover:bg-red-500/15 hover:text-red-400 transition"><Trash2 size={14} /></button>
+                            <button
+                              onClick={() => saveVideo(v)}
+                              title="Download"
+                              aria-label="Download video"
+                              className="rounded-lg border border-line p-1.5 text-gray-400 transition hover:text-white"
+                            >
+                              <Download size={12} />
+                            </button>
+                            <button
+                              onClick={() => void editVideo(v)}
+                              title="Edit video"
+                              aria-label="Edit video"
+                              className="rounded-lg border border-line p-1.5 text-gray-400 transition hover:text-white"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              onClick={() => removeVideo(v)}
+                              title="Delete"
+                              aria-label="Delete video"
+                              className="rounded-lg border border-line p-1.5 text-gray-500 transition hover:border-red-400/40 hover:text-red-400"
+                            >
+                              <Trash2 size={12} />
+                            </button>
                           </div>
                         </div>
                         {v.meta && (
@@ -1046,22 +1077,51 @@ export default function ImagesPage() {
                     <Loader2 size={22} className="animate-spin text-accent" />
                   </div>
                 ) : (
-                  <button
+                  // A div, not a button: the hover actions below are buttons,
+                  // and nesting interactive elements is invalid HTML (it also
+                  // breaks keyboard focus order and screen readers).
+                  <div
                     key={img.id}
-                    onClick={() => setZoom(img)}
                     className="group relative aspect-square rounded-xl overflow-hidden border border-line bg-panel"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
+                    <button
+                      onClick={() => setZoom(img)}
+                      title="View full size"
+                      className="block h-full w-full"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    </button>
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
                       {img.prompt}
                     </span>
-                    <span className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
-                      <span role="button" tabIndex={0} onClick={() => void downloadMedia(img, "image")} onKeyDown={(e) => { if (e.key === "Enter") void downloadMedia(img, "image"); }} title="Download image" aria-label="Download image" className="rounded-md bg-black/65 p-1.5 text-white hover:bg-black/90"><Download size={14} /></span>
-                      <span role="button" tabIndex={0} onClick={() => remixImage(img)} onKeyDown={(e) => { if (e.key === "Enter") remixImage(img); }} title="Edit / remix image" aria-label="Edit / remix image" className="rounded-md bg-black/65 p-1.5 text-white hover:bg-black/90"><Pencil size={14} /></span>
-                      <span role="button" tabIndex={0} onClick={() => deleteImage(img)} onKeyDown={(e) => { if (e.key === "Enter") deleteImage(img); }} title="Delete image" aria-label="Delete image" className="rounded-md bg-black/65 p-1.5 text-red-300 hover:bg-red-950"><Trash2 size={14} /></span>
-                    </span>
-                  </button>
+                    <div className="absolute right-1.5 top-1.5 flex gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
+                      <button
+                        onClick={() => saveImage(img)}
+                        title="Download"
+                        aria-label="Download image"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-white"
+                      >
+                        <Download size={12} />
+                      </button>
+                      <button
+                        onClick={() => remixImage(img)}
+                        title="Edit / remix"
+                        aria-label="Edit / remix image"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-accent"
+                      >
+                        <Wand2 size={12} />
+                      </button>
+                      <button
+                        onClick={() => removeImage(img)}
+                        title="Delete"
+                        aria-label="Delete image"
+                        className="rounded-lg bg-black/70 p-1.5 text-gray-200 backdrop-blur hover:text-red-400"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
                 )
               )}
             </div>
@@ -1084,13 +1144,22 @@ export default function ImagesPage() {
             <img src={zoom.url} alt={zoom.prompt} className="w-full max-h-[75vh] object-contain rounded-xl" />
             <div className="flex items-center gap-3">
               <p className="flex-1 text-xs text-gray-400 line-clamp-2">{zoom.prompt}</p>
-              <button onClick={() => void downloadMedia(zoom, "image")} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
+              <button
+                onClick={() => saveImage(zoom)}
+                className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition"
+              >
                 <Download size={13} /> Download
               </button>
-              <button onClick={() => remixImage(zoom)} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
+              <button
+                onClick={() => remixImage(zoom)}
+                className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition"
+              >
                 <Pencil size={13} /> Edit
               </button>
-              <button onClick={() => deleteImage(zoom)} className="flex items-center gap-1.5 text-xs rounded-lg bg-red-500/10 text-red-300 hover:bg-red-500/20 px-3 py-2 transition">
+              <button
+                onClick={() => removeImage(zoom)}
+                className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 px-3 py-2 transition hover:bg-red-400/20 hover:text-red-300"
+              >
                 <Trash2 size={13} /> Delete
               </button>
               <button onClick={() => setZoom(null)} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">

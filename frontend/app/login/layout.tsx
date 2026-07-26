@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in or create your Mood AI account.",
+  description: "Sign in or create your ChatMood account.",
   robots: { index: false, follow: false },
 };
 

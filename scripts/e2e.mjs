@@ -1,5 +1,5 @@
 /**
- * Mood AI — weekly live E2E (Playwright + native fetch).
+ * ChatMood — weekly live E2E (Playwright + native fetch).
  *
  *   WEB_URL  — e.g. https://mood-ai.netlify.app
  *   API_URL  — https://<railway>.up.railway.app  (root OR full .../api/v1 — both accepted)
@@ -130,7 +130,7 @@ try {
   await page.goto(WEB_URL, { waitUntil: "networkidle", timeout: 45000 });
   (await page.title()) ? ok(`home rendered: "${await page.title()}"`) : hard("home title empty");
   const bodyText = await page.textContent("body");
-  bodyText?.includes("Mood AI") ? ok("hero copy present") : hard("home missing brand copy");
+  bodyText?.includes("ChatMood") ? ok("hero copy present") : hard("home missing brand copy");
   for (const legal of ["terms", "privacy"]) {
     const res = await get(`${WEB_URL}/${legal}`);
     res.status === 200 ? ok(`/${legal} 200`) : hard(`/${legal} → ${res.status}`);
