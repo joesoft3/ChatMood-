@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Brain, Check, Clapperboard, Copy, Download, RotateCcw, Search, Sparkles, Square, Swords, Volume2 } from "lucide-react";
+import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
+import { Brain, Check, Clapperboard, Copy, Download, RotateCcw, Search, Sparkles, Square, Swords, Trash2, Volume2, Wand2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import ArenaPanel from "./ArenaPanel";
 import ThinkingPanel from "./ThinkingPanel";
@@ -63,6 +64,9 @@ export interface ChatMedia {
   url?: string;
   prompt?: string;
   stored?: string;
+  /** FileAsset id — present once the generation is archived. Enables the
+   *  stable download route plus edit/delete; absent for provider hotlinks. */
+  file_id?: string;
   pending?: boolean;
   stage?: string;
   done?: number;
@@ -86,7 +90,15 @@ export interface ChatMsg {
 
 const AGENT_ICON: Record<string, string> = { researcher: "🔍", coder: "⌨️", writer: "✍️", critic: "🧐" };
 
-function MediaBlock({ m }: { m: ChatMedia }) {
+function MediaBlock({
+  m,
+  onEdit,
+  onDelete,
+}: {
+  m: ChatMedia;
+  onEdit?: (m: ChatMedia) => void;
+  onDelete?: (m: ChatMedia) => void;
+}) {
   const label =
     m.kind === "image"
       ? "Generating your image…"
@@ -127,16 +139,41 @@ function MediaBlock({ m }: { m: ChatMedia }) {
           {m.kind === "image" ? "🎨" : "🎬"} {m.prompt}
         </span>
         {m.stored === "r2" && <span className="shrink-0" title="Saved to your library">☁️</span>}
-        <a
-          href={m.url}
-          target="_blank"
-          rel="noreferrer"
-          download
+
+        {/* Download — via the STABLE /files/{id} route when the generation was
+            archived. The visible URL is a presigned link that expires, so
+            linking to it directly would rot after IMAGE_PERSIST_TTL_S. */}
+        <button
+          onClick={async () => {
+            const name = mediaFilename(m.prompt, m.kind);
+            if (m.file_id) await downloadFile(m.file_id, name);
+            else if (m.url) await downloadUrl(m.url, name);
+          }}
           title="Download"
-          className="shrink-0 text-gray-500 hover:text-white transition"
+          className="shrink-0 text-gray-500 transition hover:text-white"
         >
           <Download size={13} />
-        </a>
+        </button>
+
+        {onEdit && (
+          <button
+            onClick={() => onEdit(m)}
+            title={m.kind === "image" ? "Edit this image" : "Edit this video"}
+            className="shrink-0 text-gray-500 transition hover:text-accent"
+          >
+            <Wand2 size={13} />
+          </button>
+        )}
+
+        {m.file_id && onDelete && (
+          <button
+            onClick={() => onDelete(m)}
+            title="Delete from your library"
+            className="shrink-0 text-gray-500 transition hover:text-red-400"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -164,7 +201,7 @@ function ToolPills({ tools }: { tools: { name: string; ok: boolean }[] }) {
 function PendingAssistantState({ msg }: { msg: ChatMsg }) {
   let icon = <Brain size={14} className="text-accent" />;
   let title = "Thinking through the answer…";
-  let detail = "Mood is working on your response.";
+  let detail = "ChatMood is working on your response.";
   let activity = ["understanding", "reasoning", "drafting"];
 
   const pendingMedia = msg.media?.find((m) => m.pending);
@@ -305,11 +342,17 @@ export default function MessageBubble({
   msg,
   onRegenerate,
   onRematch,
+  onEditMedia,
+  onDeleteMedia,
   isStreaming = false,
 }: {
   msg: ChatMsg;
   onRegenerate?: () => void;
   onRematch?: () => void;
+  /** 🎨 Remix a generation — prefills the composer with an edit instruction. */
+  onEditMedia?: (m: ChatMedia) => void;
+  /** 🗑 Remove a generation from the user's library. */
+  onDeleteMedia?: (m: ChatMedia) => void;
   isStreaming?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
@@ -374,7 +417,7 @@ export default function MessageBubble({
           ? (msg.media?.[0]?.kind === "image" ? "Image studio" : "Video studio")
           : isStreaming
             ? "Working"
-            : "Mood";
+            : "ChatMood";
   const assistantIcon = msg.research
     ? <Search size={13} />
     : msg.arena && !msg.arena.winner
@@ -395,7 +438,7 @@ export default function MessageBubble({
           <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
             {assistantIcon}
           </span>
-          <span className="font-medium text-gray-300">Mood</span>
+          <span className="font-medium text-gray-300">ChatMood</span>
           <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
           {isStreaming && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent/80" />}
         </div>
@@ -408,7 +451,7 @@ export default function MessageBubble({
           {msg.media && msg.media.length > 0 && (
             <div className="space-y-3">
               {msg.media.map((m, i) => (
-                <MediaBlock key={i} m={m} />
+                <MediaBlock key={i} m={m} onEdit={onEditMedia} onDelete={onDeleteMedia} />
               ))}
             </div>
           )}

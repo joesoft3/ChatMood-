@@ -24,7 +24,7 @@ def resolve(host: str) -> tuple[bool, str]:
 
 
 def fetch(url: str) -> tuple[bool, str]:
-    req = urllib.request.Request(url, headers={"User-Agent": "MoodAI-Domain-Check/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "ChatMood-Domain-Check/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=15, context=ssl.create_default_context()) as r:
             body = r.read(160).decode("utf-8", "ignore").replace("\n", " ")

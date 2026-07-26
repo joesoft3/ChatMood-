@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 🔌 Supabase setup — pushes Mood AI's full schema (16 migrations) into your
+# 🔌 Supabase setup — pushes ChatMood's full schema (16 migrations) into your
 # Supabase Postgres and verifies it. Run locally or in Railway's one-off shell.
 #
 # Usage:

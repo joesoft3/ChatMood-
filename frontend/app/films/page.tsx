@@ -26,6 +26,7 @@ interface Film {
   views?: number;
   script: string | null;
   note: string | null;
+  watermarked?: boolean;
   scenes: { shot: string; narration: string; voice?: string }[];
   created_at: string | null;
 }

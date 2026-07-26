@@ -1,4 +1,4 @@
-# Mood AI API — Fly.io deployment (Docker).
+# ChatMood API — Fly.io deployment (Docker).
 # Pair with any hosted Postgres (docs/DATABASE-OPTIONS.md) + R2 for durable files.
 app = "moodai-api"
 primary_region = "jnb"          # Johannesburg — closest to 🇬🇭 Accra

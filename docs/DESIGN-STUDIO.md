@@ -97,7 +97,7 @@ renderer run — the design lands in your Studio gallery with a how-to card.
 ## 🎞 Branded films (v1.0.0)
 Storyboard films accept `use_brand: true`: identity colors/style are woven into
 scene planning and your logo is stamped onto the hero-frame poster; the public
-share card says "by *Your Brand* · Directed with Mood AI".
+share card says "by *Your Brand* · Directed with ChatMood".
 
 ## 🛍 Client mode (v1.1.0)
 `POST /media/design-orders` → magic link `/order/{token}`. Clients pick

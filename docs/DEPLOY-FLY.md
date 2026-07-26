@@ -1,4 +1,4 @@
-# 🪰 Deploy the Mood AI backend on Fly.io
+# 🪰 Deploy the ChatMood backend on Fly.io
 
 > ### 🚦 LIVE STATUS (2026-07-21) — **RUNNING IN PRODUCTION** ✅
 > | Piece | State (all agent-verified live) |

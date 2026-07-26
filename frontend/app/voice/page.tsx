@@ -15,7 +15,7 @@ type ConnState = "connecting" | "live" | "offline";
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "Tap the orb to talk",
   listening: "Listening… tap to send",
-  thinking: "Mood is thinking…",
+  thinking: "ChatMood is thinking…",
   speaking: "Speaking… tap to interrupt",
 };
 

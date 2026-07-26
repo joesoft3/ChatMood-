@@ -1,4 +1,4 @@
-# Mood AI — Flutter mobile client
+# ChatMood — Flutter mobile client
 
 Native Android/iOS client for the Mood API (`backend/`, `/api/v1`): email login,
 conversation drawer, **streaming** chat with live-search toggle and markdown rendering,

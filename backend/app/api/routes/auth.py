@@ -153,7 +153,7 @@ async def delete_me(
                             "Password didn't match — account NOT deleted")
     summary = await account_svc.delete_user_data(db, user)
     return {"deleted": True, "summary": summary,
-            "message": "Your Mood AI account and all associated data were permanently deleted."}
+            "message": "Your ChatMood account and all associated data were permanently deleted."}
 
 
 @router.patch("/preferences")

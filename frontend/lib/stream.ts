@@ -6,6 +6,7 @@ import { API, token } from "./api";
 export interface ChatPayload {
   conversation_id: string | null;
   workspace_id?: string | null;
+  project_id?: string | null;  // 🗂 file this chat under a Project (brief + pinned docs apply)
   message: string;
   files: string[];
   search: boolean;
@@ -113,7 +114,7 @@ async function* streamSSE(
     });
   } catch (e) {
     if (e instanceof TypeError) {
-      throw new Error("Can't reach the Mood AI server — it may be starting up or your connection dropped. Try again in a few seconds.");
+      throw new Error("Can't reach the ChatMood server — it may be starting up or your connection dropped. Try again in a few seconds.");
     }
     throw e;
   }

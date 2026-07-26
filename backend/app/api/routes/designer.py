@@ -46,6 +46,7 @@ def _row(d: Design) -> dict:
         "dpi": kp.print_dpi if kp else 300,
         "exports": dzn.exports_for_kind(d.kind),
         "note": d.note or None,
+        "watermarked": bool(getattr(d, "watermarked", False)),
         "created_at": d.created_at.isoformat() if d.created_at else None,
     }
 
@@ -152,6 +153,11 @@ async def create_design(
                 "logo_file": logo_file,
             }
 
+    # 🏷 Free tier is badged; paid plans and admins render clean.
+    from ...services.watermark import should_watermark
+
+    stamp = should_watermark(user)
+
     try:
         out = await dzn.generate_design(
             req.idea.strip(),
@@ -161,6 +167,7 @@ async def create_design(
             transparent=req.transparent,
             enhance=req.enhance,
             brand=brand,
+            watermark=stamp,
         )
     except dzn.DesignError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e))
@@ -181,6 +188,7 @@ async def create_design(
         height=out["height"],
         file=out["file"],
         print_file=out["print_file"],
+        watermarked=bool(out.get("watermarked")),
         note=out["note"] or "",
     )
     db.add(d)

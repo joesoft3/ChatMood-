@@ -139,13 +139,13 @@ async def email_invites(
         f"\nNote: only accounts on @{gates[0].domain} email addresses can accept this invite."
         if gates else ""
     )
-    subject = f"👥 {user.display_name or user.email} invited you to {ws.name} on Mood AI"
+    subject = f"👥 {user.display_name or user.email} invited you to {ws.name} on ChatMood"
     body = (
-        f"Hi,\n\nYou've been invited to join the “{ws.name}” team workspace on Mood AI — "
+        f"Hi,\n\nYou've been invited to join the “{ws.name}” team workspace on ChatMood — "
         f"shared conversations, files and agents with your team.\n\n"
         f"Join here (link expires {inv_exp.date().isoformat() if inv_exp else 'soon'}): {link}\n"
         f"{gate_line}\n\n"
-        f"— Sent via Mood AI"
+        f"— Sent via ChatMood"
     )
     sent, failed = 0, []
     for e in dict.fromkeys(x.lower() for x in req.emails):  # dedupe, keep order
@@ -278,7 +278,7 @@ async def add_member(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners can add members")
     target = await db.scalar(select(User).where(User.email == req.email.lower()))
     if not target:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "No Mood account with that email — ask them to sign up first")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No ChatMood account with that email — ask them to sign up first")
     if await membership_of(db, wid, target.id):
         return {"added": True, "already_member": True}
     db.add(WorkspaceMember(workspace_id=wid, user_id=target.id, role=req.role))

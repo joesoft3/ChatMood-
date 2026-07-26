@@ -129,7 +129,7 @@ class _DesignScreenState extends State<DesignScreen> {
       final path = await _saveTemp(bytes, 'mood-${d['kind']}-${id.substring(0, 8)}-$tier.png');
       await Share.shareXFiles(
         [XFile(path, mimeType: 'image/png')],
-        text: 'Made with Mood AI Design Studio 🎨',
+        text: 'Made with ChatMood Design Studio 🎨',
       );
     } catch (e) {
       _flash('$e');

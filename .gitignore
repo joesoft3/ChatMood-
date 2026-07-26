@@ -27,3 +27,6 @@ tsconfig.tsbuildinfo
 mobile/.dart_tool/
 mobile/build/
 .secrets/
+
+# generated route table for the wiring gate
+.routes.json

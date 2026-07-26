@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AudioLines, Brush, Clapperboard, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
+import { AlarmClock, AudioLines, Brush, Clapperboard, FolderKanban, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
 import ErrorBoundary from "./ErrorBoundary";
@@ -26,6 +26,8 @@ const NAV = [
   { href: "/reel", label: "Reel", icon: Tv },
   { href: "/films", label: "Films", icon: Clapperboard },
   { href: "/design", label: "Design", icon: Brush },
+  { href: "/tasks", label: "Tasks", icon: AlarmClock },
+  { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/deepsearch", label: "Research", icon: Telescope },
@@ -178,9 +180,9 @@ export default function AppShell({
           <BrandMark brand={brand} />
         </div>
         <div className="min-w-0">
-          <span className="font-semibold tracking-tight block truncate text-gray-100">{brand?.brand_name ?? "Mood AI"}</span>
+          <span className="font-semibold tracking-tight block truncate text-gray-100">{brand?.brand_name ?? "ChatMood"}</span>
           <span className="text-[10px] text-gray-600 block mt-0.5">AI workspace</span>
-          {brand && <span className="text-[10px] text-gray-500 block -mt-0.5">powered by Mood AI</span>}
+          {brand && <span className="text-[10px] text-gray-500 block -mt-0.5">powered by ChatMood</span>}
         </div>
       </div>
       <ConversationList onNavigate={() => setDrawerOpen(false)} />
@@ -285,7 +287,7 @@ export default function AppShell({
             ) : (
               <div className="min-w-0 flex-1">
                 <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
-                <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "Mood AI"} workspace</p>
+                <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "ChatMood"} workspace</p>
               </div>
             )}
             <ThemeToggle compact />

@@ -1,4 +1,4 @@
-# Mood AI API — Railway service config.
+# ChatMood API — Railway service config.
 # When you add the service on Railway: Settings → set "Root Directory" to /backend
 # (or let Railway pick this file up automatically for monorepo layouts).
 [build]

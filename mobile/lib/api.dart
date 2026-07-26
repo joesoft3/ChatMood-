@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Thin client for the Mood AI API (FastAPI, /api/v1).
+/// Thin client for the ChatMood API (FastAPI, /api/v1).
 /// Pass the API root at build/run time:
 ///   flutter run --dart-define=API_URL=http://192.168.1.10:8000/api/v1
 /// Default targets the Android emulator's host loopback.
@@ -54,6 +54,18 @@ class Api {
         .timeout(timeout);
     if (res.statusCode >= 400) throw Exception(_error(res));
     return jsonDecode(res.body) as Map<String, dynamic>;
+  }
+
+  /// PATCH with a JSON body (⏰ task pause/resume/edit).
+  static Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body,
+      {Duration timeout = const Duration(seconds: 30)}) async {
+    final token = await getToken();
+    final res = await _client
+        .patch(Uri.parse('$baseUrl$path'), headers: _headers(token), body: jsonEncode(body))
+        .timeout(timeout);
+    if (res.statusCode >= 400) throw Exception(_error(res));
+    final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
+    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
   }
 
   /// Binary download with auth header (Design Studio PNG tiers, etc.).

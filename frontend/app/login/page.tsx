@@ -75,7 +75,7 @@ export default function LoginPage() {
         <section className="hidden lg:flex flex-col gap-6 pr-6">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-500">
-              <BrandMark brand={brand} /> {brand?.brand_name ?? "Mood AI"}
+              <BrandMark brand={brand} /> {brand?.brand_name ?? "ChatMood"}
             </div>
             <h1 className="text-4xl xl:text-5xl font-semibold tracking-tight text-white leading-[1.05]">
               A focused AI workspace for chat, research, images and video.
@@ -104,8 +104,8 @@ export default function LoginPage() {
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/8">
               <BrandMark brand={brand} />
             </div>
-            <h1 className="text-2xl font-semibold text-white">{brand?.brand_name ?? "Mood AI"}</h1>
-            {brand && <p className="text-[10px] text-gray-500">powered by Mood AI</p>}
+            <h1 className="text-2xl font-semibold text-white">{brand?.brand_name ?? "ChatMood"}</h1>
+            {brand && <p className="text-[10px] text-gray-500">powered by ChatMood</p>}
             <p className="text-sm text-gray-500">
               {mode === "login" ? "Welcome back" : "Create your account"}
             </p>

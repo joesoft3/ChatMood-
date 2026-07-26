@@ -1,6 +1,6 @@
 # 👥 Teams & Workspaces — walkthrough + test checklist
 
-Teams in Mood AI = **workspaces**: shared space with members, a per-team conversation list,
+Teams in ChatMood = **workspaces**: shared space with members, a per-team conversation list,
 invite links (optional email-gated), and per-workspace usage metering. No extra auth —
 your normal account can belong to many workspaces.
 

@@ -362,7 +362,7 @@ async def admin_push_test(req: AdminPushTest, admin: User = Depends(require_admi
             "Push not configured — set FCM_PROJECT_ID + FCM_SERVICE_ACCOUNT_JSON on the backend.",
         )
     sent = await notify.notify_user(
-        admin.id, "admin_test", req.title.strip() or "🔔 Mood AI push test", req.body.strip(), {"kind": "admin_test"}
+        admin.id, "admin_test", req.title.strip() or "🔔 ChatMood push test", req.body.strip(), {"kind": "admin_test"}
     )
     if sent == 0:
         raise HTTPException(

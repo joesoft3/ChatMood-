@@ -15,8 +15,8 @@ log = logging.getLogger(__name__)
 
 # Plan tiers (per-calendar-month unless the key says _day). 0 = unlimited.
 PLAN_LIMITS: dict[str, dict[str, int]] = {
-    "free": {"tokens_month": 200_000, "images_month": 20, "deepsearch_day": 10, "agent_day": 15, "video_day": 3, "design_day": 5, "edit_day": 3, "arena_day": 3, "upload_mb": 25, "mem_days": 30},
-    "pro": {"tokens_month": 5_000_000, "images_month": 500, "deepsearch_day": 200, "agent_day": 300, "video_day": 60, "design_day": 60, "edit_day": 30, "arena_day": 100, "upload_mb": 50, "mem_days": 365},
+    "free": {"tokens_month": 200_000, "images_month": 20, "deepsearch_day": 10, "agent_day": 15, "video_day": 3, "design_day": 5, "edit_day": 3, "arena_day": 3, "task_day": 10, "api_day": 200, "upload_mb": 25, "mem_days": 30},
+    "pro": {"tokens_month": 5_000_000, "images_month": 500, "deepsearch_day": 200, "agent_day": 300, "video_day": 60, "design_day": 60, "edit_day": 30, "arena_day": 100, "task_day": 300, "api_day": 20_000, "upload_mb": 50, "mem_days": 365},
 }
 
 
@@ -153,6 +153,9 @@ async def usage_summary(db, user_id: str, plan: str) -> dict:
         "agent_day": meter(today_by_kind.get("agent", 0), limits["agent_day"]),
         "video_day": meter(today_by_kind.get("video", 0), limits.get("video_day", 0)),
         "arena_day": meter(today_by_kind.get("arena", 0), limits.get("arena_day", 0)),
+        # ⏰ unattended task runs and 🔑 developer-API calls meter like any other action
+        "task_day": meter(today_by_kind.get("task", 0), limits.get("task_day", 0)),
+        "api_day": meter(today_by_kind.get("api", 0), limits.get("api_day", 0)),
         "by_kind_month": by_kind,
         "today_by_kind": today_by_kind,
         "daily_tokens": series,

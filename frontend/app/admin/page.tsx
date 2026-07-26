@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Activity, BarChart3, Bell, KeyRound, Puzzle, RefreshCw, Search, Send, ShieldCheck, Smartphone, Trash2, UserCog, Users } from "lucide-react";
+import AdminPayments from "@/components/AdminPayments";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
@@ -179,7 +180,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [devices, setDevices] = useState<DevicesInfo | null>(null);
   const [engagement, setEngagement] = useState<Engagement | null>(null);
-  const [pushTitle, setPushTitle] = useState("🔔 Mood AI push test");
+  const [pushTitle, setPushTitle] = useState("🔔 ChatMood push test");
   const [pushBody, setPushBody] = useState("If you can read this, push is wired end-to-end. 🎉");
   const [pushMsg, setPushMsg] = useState("");
   const [pushBusy, setPushBusy] = useState(false);
@@ -874,6 +875,11 @@ export default function AdminPage() {
               here re-checks admin rights — this page is only a view.
             </p>
           </Card>
+
+          {/* 💳 Payments — manual mobile money review */}
+          <div className="md:col-span-2">
+            <AdminPayments />
+          </div>
 
           {/* Users */}
           <div className="md:col-span-2">

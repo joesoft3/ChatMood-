@@ -30,7 +30,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Structured log — visible in browser DevTools and any log aggregator.
-    console.error("[Mood AI] ErrorBoundary caught:", error, info.componentStack);
+    console.error("[ChatMood] ErrorBoundary caught:", error, info.componentStack);
   }
 
   private handleReset = () => {

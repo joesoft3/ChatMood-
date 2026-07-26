@@ -14,6 +14,7 @@ import 'design_screen.dart';
 import 'edit_screen.dart';
 import 'orders_screen.dart';
 import 'films_screen.dart';
+import 'tasks_screen.dart';
 
 import 'api.dart';
 import 'arena_view.dart';
@@ -508,13 +509,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _arenaMode = wasArena;
   }
 
-  // display-name rule (web parity): users see S1 Mood-4 / S1 Mood-4-Fast labels,
+  // display-name rule (web parity): users see S1 ChatMood-4 / S1 ChatMood-4-Fast labels,
   // never raw vendor ids (ids themselves stay = server routes on them)
   static const _pickerModels = [
     ['auto', '🚀', 'Auto · best pick per message'],
     ['grok-3-mini', '💸', 'Mini · cheapest, quick answers'],
-    ['grok-4-fast', '⚡', 'S1 Mood-4-Fast · newest gen, 2M ctx'],
-    ['grok-4', '👑', 'S1 Mood-4 · flagship (🧠 reasoning)'],
+    ['grok-4-fast', '⚡', 'S1 ChatMood-4-Fast · newest gen, 2M ctx'],
+    ['grok-4', '👑', 'S1 ChatMood-4 · flagship (🧠 reasoning)'],
     ['grok-code-fast-1', '💻', 'Code · deep reasoning for code'],
   ];
 
@@ -551,7 +552,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   contentPadding: EdgeInsets.zero,
                   activeColor: MoodColors.accent,
                   title: Text('🧠 Extended reasoning', style: TextStyle(color: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1') ? Colors.white70 : Colors.white24, fontSize: 13)),
-                  subtitle: const Text('S1 Mood-4 (or code models) only', style: TextStyle(color: Colors.white24, fontSize: 11)),
+                  subtitle: const Text('S1 ChatMood-4 (or code models) only', style: TextStyle(color: Colors.white24, fontSize: 11)),
                   value: _thinkOn && (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1'),
                   onChanged: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1')
                       ? (v) {
@@ -796,13 +797,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       case 'grok-3-mini':
         return 'Mini';
       case 'grok-4-fast':
-        return 'S1 Mood-4-Fast';
+        return 'S1 ChatMood-4-Fast';
       case 'grok-4':
-        return 'S1 Mood-4';
+        return 'S1 ChatMood-4';
       case 'grok-code-fast-1':
         return 'Code';
       default:
-        return 'S1 Mood-4 · auto';
+        return 'S1 ChatMood-4 · auto';
     }
   }
 
@@ -840,7 +841,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
         ),
         const SizedBox(height: 14),
-        const Text('Mood AI', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: .2)),
+        const Text('ChatMood', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: .2)),
         const SizedBox(height: 5),
         Text('UNDERSTAND · ADAPT · ELEVATE',
             style: TextStyle(fontSize: 11, letterSpacing: 2.4, color: Colors.grey.shade500)),
@@ -940,7 +941,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             textInputAction: TextInputAction.send,
             onSubmitted: (_) => _send(),
             decoration: InputDecoration(
-              hintText: _agentMode ? 'Give the agent team a goal…' : 'Ask Mood anything…',
+              hintText: _agentMode ? 'Give the agent team a goal…' : 'Ask ChatMood anything…',
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
@@ -987,7 +988,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         title: _modeTabs(),
         actions: [
           IconButton(
-            tooltip: '⚔️ Arena — models debate, S1 Mood-4 judges',
+            tooltip: '⚔️ Arena — models debate, S1 ChatMood-4 judges',
             icon: Icon(_arenaMode ? Icons.shield : Icons.shield_outlined,
                 color: _arenaMode ? MoodColors.accent : Colors.grey[700]),
             onPressed: () => setState(() {
@@ -1117,6 +1118,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
               ),
               const Divider(height: 1, color: MoodColors.line),
+              ListTile(
+                leading: const Icon(Icons.alarm, size: 18),
+                title: const Text('⏰ Tasks', style: TextStyle(fontSize: 14)),
+                subtitle: const Text('Prompts ChatMood runs on a schedule',
+                    style: TextStyle(fontSize: 10, color: Colors.grey)),
+                onTap: () {
+                  Navigator.of(context).maybePop();
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TasksScreen()));
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.movie_creation_outlined, size: 18),
                 title: const Text('🎞 Films'),

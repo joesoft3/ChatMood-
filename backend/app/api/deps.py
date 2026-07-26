@@ -1,12 +1,15 @@
+from datetime import datetime, timezone
+
 import redis.asyncio as redis
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..core.security import decode_token
-from ..db.models import User
+from ..db.models import ApiKey, User
 from ..db.session import get_db
 
 bearer = HTTPBearer()
@@ -25,6 +28,70 @@ async def get_current_user(
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
     return user
+
+
+async def resolve_api_key(db: AsyncSession, secret: str) -> tuple[User, ApiKey] | None:
+    """Authenticate an `mk_live_…` secret → (user, key), or None if it isn't valid.
+
+    Lookup is a single indexed hit on the stored SHA-256 (see services/apikeys.py
+    for why a fast hash is the right call for high-entropy keys). Usage counters
+    are bumped in a separate UPDATE that deliberately does NOT block the request:
+    a stats write failing must never cost a caller their API call.
+    """
+    from ..services.apikeys import hash_key, looks_like_key
+
+    if not looks_like_key(secret):
+        return None
+    row = await db.scalar(
+        select(ApiKey).where(ApiKey.key_hash == hash_key(secret), ApiKey.revoked.is_(False))
+    )
+    if not row:
+        return None
+    user = await db.get(User, row.user_id)
+    if not user:
+        return None
+    try:
+        await db.execute(
+            update(ApiKey)
+            .where(ApiKey.id == row.id)
+            .values(calls=ApiKey.calls + 1, last_used_at=datetime.now(timezone.utc))
+        )
+        await db.commit()
+    except Exception:
+        await db.rollback()  # stats are best-effort; the call itself still stands
+    return user, row
+
+
+async def get_api_caller(
+    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[User, ApiKey]:
+    """Auth for the public developer API (/api/v1/public/*) — API keys ONLY.
+
+    Session JWTs are rejected here on purpose: browser tokens live in
+    localStorage and are handed to far more code than a deliberately-minted,
+    revocable, scoped key. Keeping the surfaces separate means revoking a key
+    actually revokes that integration's access.
+    """
+    if not settings.PUBLIC_API_ENABLED:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Public API is disabled on this deployment")
+    resolved = await resolve_api_key(db, creds.credentials)
+    if not resolved:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Invalid or revoked API key — create one in Settings → API keys.",
+        )
+    return resolved
+
+
+def require_scope(key: ApiKey, scope: str) -> None:
+    from ..services.apikeys import has_scope
+
+    if not has_scope(key.scopes, scope):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            f"This API key lacks the '{scope}' scope (it has: {key.scopes or 'none'}).",
+        )
 
 
 def is_effective_admin(user: User) -> bool:

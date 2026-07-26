@@ -65,7 +65,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       final path = '${res['path']}';
       final link = _linkText(path);
       await Clipboard.setData(ClipboardData(text: link));
-      await Share.share('🛍 Order your design — tap my Mood AI order link:\n$link',
+      await Share.share('🛍 Order your design — tap my ChatMood order link:\n$link',
           subject: 'Design order link');
       _refresh(quiet: true);
     } catch (e) {

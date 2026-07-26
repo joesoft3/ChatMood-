@@ -1,4 +1,4 @@
-# Mood AI — Render blueprint (docs/BACKEND-HOSTING.md · Path B).
+# ChatMood — Render blueprint (docs/BACKEND-HOSTING.md · Path B).
 # Render → New → Blueprint → paste the repo URL. Secrets (sync: false) are
 # prompted once in the dashboard; everything else is automatic.
 

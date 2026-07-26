@@ -17,14 +17,14 @@ One Google OAuth client serves both providers. Scopes the app requests:
 - `gmail.readonly`, `gmail.send` (+ Calendar: `calendar.readonly`, `calendar.events`)
 
 **G1.** 🖱 [console.cloud.google.com](https://console.cloud.google.com) → top bar →
-**New Project** → name `Mood AI` → **Create**.
+**New Project** → name `ChatMood` → **Create**.
 
 **G2.** 🖱 **APIs & Services → Enabled APIs & services → + ENABLE APIS AND SERVICES**:
 search and enable **Gmail API**, then again for **Google Calendar API**.
 
 **G3.** 🖱 **APIs & Services → OAuth consent screen → Get started**:
 
-- App name **Mood AI**, user support email = yours
+- App name **ChatMood**, user support email = yours
 - Audience: **External** → Contact: your email
 - Finish. It starts in **Testing** mode — fine: add yourself as a
   **Test user** (Audience → Test users → + Add users). Up to 100 test users
@@ -36,7 +36,7 @@ search and enable **Gmail API**, then again for **Google Calendar API**.
 
 **G5.** 🖱 **Credentials → + Create Credentials → OAuth client ID**:
 
-- Application type: **Web application** · Name: `Mood AI backend`
+- Application type: **Web application** · Name: `ChatMood backend`
 - **Authorized redirect URIs** — add BOTH:
   - `https://YOUR-API/api/v1/plugins/gmail/callback`
   - `https://YOUR-API/api/v1/plugins/google_calendar/callback`
@@ -59,7 +59,7 @@ search and enable **Gmail API**, then again for **Google Calendar API**.
 
 | Field | Value |
 |---|---|
-| Application name | `Mood AI` |
+| Application name | `ChatMood` |
 | Homepage URL | your Netlify web URL |
 | Authorization callback URL | `https://YOUR-API/api/v1/plugins/github/callback` |
 

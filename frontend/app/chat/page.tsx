@@ -8,7 +8,7 @@ import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
 import { OPEN_CONV_KEY, useConversations } from "@/lib/conversations";
 import AppShell from "@/components/AppShell";
-import MessageBubble, { ChatMsg } from "@/components/MessageBubble";
+import MessageBubble, { ChatMedia, ChatMsg } from "@/components/MessageBubble";
 import Composer, { FileChip } from "@/components/Composer";
 import ArenaPanel, { ArenaEvt } from "@/components/ArenaPanel";
 import ThinkingPanel, { ThinkEvt } from "@/components/ThinkingPanel";
@@ -36,6 +36,9 @@ export default function ChatPage() {
   const [shareMsg, setShareMsg] = useState("");
   const [wsId, setWsId] = useState<string | null>(null);
   const [wsName, setWsName] = useState("");
+  // 🗂 Project mode via /chat?project=<id> — the chat inherits the project brief
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("");
   const [billingNote, setBillingNote] = useState("");
   const [billingCta, setBillingCta] = useState<"" | "upgrade">("");
   const [teamConvs, setTeamConvs] = useState<{ id: string; title: string; author: string }[] | null>(null);
@@ -99,7 +102,25 @@ export default function ChatPage() {
           setBillingCta("");
         }, 9000);
       }
-      window.history.replaceState({}, "", window.location.pathname + (id ? `?ws=${id}` : ""));
+      // Preserve every other param when scrubbing ?billing — dropping them here
+      // was silently discarding ?project= / ?c= deep links.
+      q.delete("billing");
+      const rest = q.toString();
+      window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
+    }
+    // 🗂 /chat?project=<id> — file this conversation under a project
+    const proj = q.get("project");
+    if (proj) {
+      setProjectId(proj);
+      apiFetch<{ name: string; emoji: string }>(`/projects/${proj}`)
+        .then((p) => setProjectName(`${p.emoji ?? "🗂"} ${p.name}`))
+        .catch(() => setProjectId(null));
+    }
+    // 🔗 /chat?c=<id> — deep link straight to a conversation (task threads, project lists)
+    const openConv = q.get("c");
+    if (openConv) {
+      pendingOpenRef.current = true;
+      setActiveId(openConv);
     }
     if (!id) return;
     setWsId(id);
@@ -276,6 +297,7 @@ export default function ChatPage() {
         {
           conversation_id: activeId,
           workspace_id: wsId,
+          project_id: projectId,
           message: text,
           files: fileIds,
           search,
@@ -423,6 +445,33 @@ export default function ChatPage() {
     }
   }
 
+  /** 🎨 Edit a generation — prefill the composer with a remix instruction.
+   *  The chat media router already treats "change the sky to sunset" as a
+   *  refine of the previous generation, so this just seeds the phrasing. */
+  function editMedia(m: ChatMedia) {
+    const verb = m.kind === "image" ? "Edit this image" : "Edit this video";
+    setDraft({ text: `${verb}: `, nonce: Date.now() });
+  }
+
+  /** 🗑 Delete a generation from the library, and drop its card from the thread. */
+  async function deleteMedia(m: ChatMedia) {
+    if (!m.file_id) return;
+    if (!window.confirm("Delete this generation from your library? This can't be undone.")) return;
+    try {
+      await apiFetch(`/files/${m.file_id}`, { method: "DELETE" });
+      // Remove the card locally so the thread matches reality without a reload.
+      setMsgs((prev) =>
+        prev.map((msg) =>
+          msg.media?.some((x) => x.file_id === m.file_id)
+            ? { ...msg, media: msg.media.filter((x) => x.file_id !== m.file_id) }
+            : msg,
+        ),
+      );
+    } catch (e: any) {
+      setTransportError(e?.message ?? "Couldn't delete that file");
+    }
+  }
+
   /** ⚔️ Rematch: rerun the arena — drafters are shown this winner and asked to beat it. */
   async function rematch() {
     if (busy) return;
@@ -483,9 +532,9 @@ export default function ChatPage() {
 
   function exportChat() {
     const title = convs.find((c) => c.id === activeId)?.title || "mood-conversation";
-    const md: string[] = [`# ${title}`, "", `_Exported from Mood AI · ${new Date().toLocaleString()}_`, ""];
+    const md: string[] = [`# ${title}`, "", `_Exported from ChatMood · ${new Date().toLocaleString()}_`, ""];
     for (const m of msgs) {
-      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ Mood", "", m.content, "");
+      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ ChatMood", "", m.content, "");
     }
     const blob = new Blob([md.join("\n")], { type: "text/markdown" });
     const a = document.createElement("a");
@@ -603,7 +652,7 @@ export default function ChatPage() {
   );
 
   return (
-    <AppShell title={activeTitle || "Mood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
+    <AppShell title={activeTitle || "ChatMood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
       {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
       {!emptyHome && (
         <>
@@ -661,6 +710,21 @@ export default function ChatPage() {
         </div>
       </div>
         </>
+      )}
+      {/* 🗂 Project mode — the standing brief is applied server-side; say so plainly
+          so the user knows why answers differ from a loose chat. */}
+      {projectId && (
+        <div className="shrink-0 border-b border-line bg-accent/5 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-[11px]">
+          <span className="truncate text-gray-300">
+            {projectName || "🗂 Project"} — this chat follows the project brief &amp; pinned files
+          </span>
+          <button
+            onClick={() => router.push(`/projects`)}
+            className="ml-auto shrink-0 text-accent hover:underline"
+          >
+            manage
+          </button>
+        </div>
       )}
       {showTeam && wsId && (
         <div className="border-b border-line bg-panel px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">
@@ -724,10 +788,10 @@ export default function ChatPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/icon.png"
-                  alt="Mood AI"
+                  alt="ChatMood"
                   className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
                 />
-                <p className="text-base font-semibold tracking-tight text-gray-200">Mood AI</p>
+                <p className="text-base font-semibold tracking-tight text-gray-200">ChatMood</p>
               </div>
               <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
               <div className="w-full max-w-xl">{composerEl(true)}</div>
@@ -761,6 +825,8 @@ export default function ChatPage() {
                 onRematch={
                   !busy && i === msgs.length - 1 && m.role === "assistant" && m.arena ? rematch : undefined
                 }
+                onEditMedia={editMedia}
+                onDeleteMedia={deleteMedia}
               />
             </div>
           ))}

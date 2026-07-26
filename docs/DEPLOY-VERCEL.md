@@ -1,4 +1,4 @@
-# ▲ Deploy the Mood AI backend on Vercel
+# ▲ Deploy the ChatMood backend on Vercel
 
 The FastAPI backend runs on Vercel as a **Python serverless function**
 (no Docker, no server to babysit). One function serves the whole API —

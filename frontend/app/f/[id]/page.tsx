@@ -34,13 +34,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const film = await loadFilm(id);
   if (!film) {
-    return { title: "Film not found · Mood AI", robots: { index: false } };
+    return { title: "Film not found · ChatMood", robots: { index: false } };
   }
-  const description = `${film.scenes}-scene AI film directed with Mood AI — ${
+  const description = `${film.scenes}-scene AI film directed with ChatMood — ${
     film.audio === "voice+ambience" ? "AI voiceover + cinematic ambience" : film.audio === "voice" ? "AI voiceover" : "direction"
   }.`;
   return {
-    title: `${film.title} — a Mood AI film`,
+    title: `${film.title} — a ChatMood film`,
     description,
     openGraph: {
       type: "video.other",
@@ -62,7 +62,7 @@ export default async function FilmSharePage({ params }: { params: Promise<{ id: 
       <div className="w-full max-w-3xl space-y-6">
         <div className="text-center space-y-1">
           <Link href="/" className="text-xs uppercase tracking-[0.3em] text-accent hover:brightness-125 transition">
-            Mood AI · Films
+            ChatMood · Films
           </Link>
         </div>
 
@@ -108,7 +108,7 @@ export default async function FilmSharePage({ params }: { params: Promise<{ id: 
                 {film.brand_name ? (
                   <span className="text-amber-300 font-semibold">by {film.brand_name} · </span>
                 ) : null}
-                <span className="text-gray-200 font-semibold">Directed with Mood AI</span> — one prompt, four model
+                <span className="text-gray-200 font-semibold">Directed with ChatMood</span> — one prompt, four model
                 brains, a film with studio voice and sound. Make yours free in 30 seconds.
               </p>
               <Link
@@ -124,7 +124,7 @@ export default async function FilmSharePage({ params }: { params: Promise<{ id: 
         <footer className="flex justify-center gap-5 text-[11px] text-gray-600 pt-2">
           <Link href="/terms" className="hover:text-gray-400 transition">Terms</Link>
           <Link href="/privacy" className="hover:text-gray-400 transition">Privacy</Link>
-          <span>© 2026 Mood AI · Accra</span>
+          <span>© 2026 ChatMood · Accra</span>
         </footer>
       </div>
     </main>

@@ -126,7 +126,11 @@ def test_upload_rejects_wrong_mime_and_oversize(env, monkeypatch):
                              files={"file": ("x.txt", b"hello", "text/plain")})
             assert r.status_code == 415
 
-            monkeypatch.setattr(reelmod, "REEL_MAX_BYTES", 100)
+            # The upload cap is now plan-aware (services/reel_premium), so the
+            # free-tier ceiling is what this exercises.
+            from app.services import reel_premium as premium
+
+            monkeypatch.setattr(premium, "FREE_MAX_MB", 0.0001)  # ~100 bytes
             r2 = await c.post("/reels/upload", headers=_h(tk),
                               files={"file": ("big.mp4", b"x" * 500, "video/mp4")})
             assert r2.status_code == 413
