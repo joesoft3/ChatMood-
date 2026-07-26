@@ -284,6 +284,10 @@ class Film(Base):
     poster: Mapped[str] = mapped_column(String(44), default="")        # <uuid>_p.jpg hero frame
     views: Mapped[int] = mapped_column(Integer, default=0)             # 👁 public share-page opens
     brand_name: Mapped[str] = mapped_column(String(80), default="")    # ⭐ brand woven in (v1.0.0)
+    # 🏷 Entitlement captured at CREATE time and persisted, so a resume after a
+    # restart re-applies the same decision instead of re-deriving it (and a
+    # mid-render upgrade doesn't half-badge a film).
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     fallback_url: Mapped[str] = mapped_column(String(600), default="")
     script: Mapped[str] = mapped_column(Text, default="")
     note: Mapped[str] = mapped_column(Text, default="")
@@ -312,6 +316,9 @@ class Design(Base):
     height: Mapped[int] = mapped_column(Integer, default=0)
     file: Mapped[str] = mapped_column(String(44), default="")       # web tier png
     print_file: Mapped[str] = mapped_column(String(44), default="")  # 300-DPI print png
+    # 🏷 True → the free-tier badge is baked into both tiers (see services/watermark.py).
+    # Recorded so the UI can explain the badge and offer the upgrade.
+    watermarked: Mapped[bool] = mapped_column(Boolean, default=False)
     note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

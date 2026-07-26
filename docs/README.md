@@ -51,6 +51,7 @@ deploy path that matches your host.
 | [BATCH-AND-BEATS.md](BATCH-AND-BEATS.md) | 🔁 Batch Studio + 🎵 Beat-Sync. |
 | [TEAMS-WALKTHROUGH.md](TEAMS-WALKTHROUGH.md) | 👥 Team workspaces walkthrough + test checklist. |
 | [TASKS-PROJECTS-API.md](TASKS-PROJECTS-API.md) | ⏰ Scheduled tasks · 🗂 Projects · 🔑 the OpenAI-compatible developer API. |
+| [WATERMARKING.md](WATERMARKING.md) | 🏷 Free-tier render badging — entitlement rules, where it applies, how to brand it. |
 | [PLUGIN-OAUTH.md](PLUGIN-OAUTH.md) | 🔑 Gmail, Google Calendar and GitHub OAuth for real. |
 | [ADMIN-ANALYTICS.md](ADMIN-ANALYTICS.md) | 📊 Admin analytics & engagement surfaces. |
 

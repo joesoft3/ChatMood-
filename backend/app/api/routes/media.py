@@ -21,6 +21,7 @@ from ...services import editor_jobs, film_jobs, soundtrack, storyboard
 from ...services.llm import friendly_ai_error, llm
 from ...services.media import STYLE_PRESETS, VideoGenerationError, VideoNotConfigured, VideoOptions, video
 from ...services.metering import PLAN_LIMITS, count_today, record_usage
+from ...services.watermark import should_watermark
 from ...services.voice import VoiceNotConfigured
 from ..deps import enforce_rate_limit, get_current_user
 
@@ -95,7 +96,8 @@ async def create_edit(
     db.add(row)
     await db.commit()
     editor_jobs.launch(row.id, {"user_id": user.id, "instruction": row.instruction,
-                                "src_name": src_name, "brand_logo_file": brand_logo_file})
+                                "src_name": src_name, "brand_logo_file": brand_logo_file,
+                                "watermark": should_watermark(user)})
     return {"edit": _edit_out(row)}
 
 
@@ -395,6 +397,7 @@ def _film_out(f: Film) -> dict:
         "script": f.script or None,
         "note": f.note or None,
         "scenes": scenes,
+        "watermarked": bool(getattr(f, "watermarked", False)),
         "created_at": f.created_at.isoformat() if f.created_at else None,
     }
 
@@ -428,6 +431,7 @@ def _film_kwargs(f: Film) -> dict:
         "subtitles": bool(f.subtitles),
         "music": f.music,
         "tempo": f.tempo,
+        "watermark": bool(getattr(f, "watermarked", False)),
     }
 
 
@@ -539,6 +543,7 @@ async def _launch_storyboard(req: StoryboardRequest, db: AsyncSession, user: Use
         music=req.music,
         tempo=req.tempo,
         subtitles=req.subtitles,
+        watermarked=should_watermark(user),  # 🏷 decided once, honored on resume too
         note=note or "",
     )
     db.add(film)
@@ -548,6 +553,7 @@ async def _launch_storyboard(req: StoryboardRequest, db: AsyncSession, user: Use
         film.id,
         {
             "user_id": user.id,
+            "watermark": bool(film.watermarked),
             "prompt": film.prompt,
             "scene_count": scene_count,
             "scene_seconds": req.scene_seconds,

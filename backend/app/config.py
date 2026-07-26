@@ -280,6 +280,12 @@ class Settings(BaseSettings):
     SANDBOX_TIMEOUT: int = 8        # seconds
     SANDBOX_MAX_OUTPUT: int = 6000  # chars captured from stdout/stderr each
 
+    # 🏷 Output watermarking — free tier is badged; paid plans and admins are not.
+    # The entitlement rule lives in services/watermark.should_watermark().
+    WATERMARK_ENABLED: bool = True
+    WATERMARK_TEXT: str = ""        # blank → "Made with {APP_NAME}"
+    WATERMARK_TIMEOUT_S: int = 90   # cap on the stamping encode; on timeout the clean render ships
+
     # 🗂 Projects — durable chat/file containers with standing instructions
     PROJECTS_ENABLED: bool = True
     PROJECT_MAX_FILES: int = 40        # pinned documents per project

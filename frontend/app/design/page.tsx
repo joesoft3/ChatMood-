@@ -41,6 +41,7 @@ interface Design {
   dpi: number;
   exports: string[];
   note: string | null;
+  watermarked?: boolean;
   created_at: string | null;
 }
 interface Presets {
@@ -662,6 +663,16 @@ export default function DesignPage() {
                     <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] capitalize text-gray-200 backdrop-blur">{d.kind}</span>
                     {brand.logo_design_id === d.id && (
                       <span className="absolute right-2 top-2 rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[9px] font-bold text-black">BRAND LOGO</span>
+                    )}
+                    {/* 🏷 Free-tier badge — say so plainly and point at the fix,
+                        rather than letting the user wonder what the mark is. */}
+                    {d.watermarked && (
+                      <span
+                        title="Free plan renders carry a small Mood AI badge. Upgrade to Pro for clean exports."
+                        className="absolute bottom-2 right-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-gray-200 backdrop-blur"
+                      >
+                        🏷 badged
+                      </span>
                     )}
                   </div>
                   <div className="p-2.5 space-y-2">

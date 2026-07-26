@@ -41,6 +41,15 @@ async def _run(edit_id: str, kw: dict) -> None:
         name, notes = await editor.run_edit(
             Path(settings.MEDIA_DIR) / kw["src_name"], plan, brand_logo_file=kw.get("brand_logo_file", "")
         )
+        # 🏷 Free tier: badge the finished edit before it is marked done, so a
+        # poller can never grab the clean file in the gap.
+        if kw.get("watermark") and name:
+            try:
+                from .watermark import apply_to_file
+
+                await apply_to_file(Path(settings.MEDIA_DIR) / name, video=True)
+            except Exception as e:  # a finished edit always ships
+                log.info("edit watermark skipped: %s", e)
         await _set(edit_id, status="done", out_name=name, note=" · ".join(notes))
         await record_usage(kw["user_id"], "edit", "ffmpeg+llm")
     except Exception as e:

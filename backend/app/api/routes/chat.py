@@ -9,6 +9,7 @@ import re
 import time
 import uuid
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -559,6 +560,18 @@ async def _persist_generated_media(db: AsyncSession, user: User, url: str, expec
         if not data or not mime.startswith(f"{expect}/") or len(data) > max_mb * 1024 * 1024:
             return url, "hotlink"
         ext = exts.get(mime, "jpg" if expect == "image" else "mp4")
+
+        # 🏷 Free tier: bake the badge into the ARCHIVED bytes, so the durable
+        # copy the user downloads/shares carries it. Images are stamped in
+        # memory (Pillow); video is stamped via a temp file (ffmpeg overlay).
+        # Both are fail-open — an un-badged render always beats a lost one.
+        from ...services.watermark import apply_to_bytes, should_watermark
+
+        if should_watermark(user):
+            if expect == "image":
+                data = apply_to_bytes(data, suffix=f".{ext}")
+            else:
+                data = await _watermark_video_bytes(data, ext)
         fname = f"mood-gen-{uuid.uuid4().hex[:12]}.{ext}"
         marker = await storage.put_upload(user.id, fname, data)
         db.add(FileAsset(user_id=user.id, filename=fname, mime=mime, path=marker, size_bytes=len(data)))
@@ -568,6 +581,39 @@ async def _persist_generated_media(db: AsyncSession, user: User, url: str, expec
     except Exception as e:
         log.warning("%s persistence skipped (serving provider link): %s", expect, e)
         return url, "hotlink"
+
+
+async def _watermark_video_bytes(data: bytes, ext: str) -> bytes:
+    """Stamp generated video bytes via a scratch file (ffmpeg needs real paths).
+
+    Returns the ORIGINAL bytes if anything goes wrong — the badge is never worth
+    failing a render the user already spent quota on.
+    """
+    import os
+    import tempfile
+
+    tmp_path = None
+    try:
+        from ...services.watermark import apply_to_file
+
+        os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            suffix=f".{ext}", dir=settings.MEDIA_DIR, delete=False
+        ) as fh:
+            fh.write(data)
+            tmp_path = fh.name
+        if await apply_to_file(Path(tmp_path), video=True):
+            return Path(tmp_path).read_bytes()
+        return data
+    except Exception as e:
+        log.warning("video watermark skipped: %s", e)
+        return data
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
 
 
 async def _persist_generated_image(db: AsyncSession, user: User, url: str) -> tuple[str, str]:

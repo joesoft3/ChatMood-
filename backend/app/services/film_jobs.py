@@ -97,6 +97,21 @@ async def _run(film_id: str, kw: dict) -> None:
                         log.info("film %s poster branded with kit logo", film_id[:8])
                 except Exception as e:  # never fail a finished film over branding
                     log.info("poster brand stamp skipped: %s", e)
+            # 🏷 Free tier: badge the finished film + its poster. Same fail-open
+            # contract as branding — a finished render always ships.
+            if kw.get("watermark"):
+                try:
+                    from pathlib import Path as _P
+
+                    from ..config import settings as _cfg
+                    from .watermark import apply_to_file
+
+                    if result.filename:
+                        await apply_to_file(_P(_cfg.MEDIA_DIR) / result.filename, video=True)
+                    if result.poster:
+                        await apply_to_file(_P(_cfg.MEDIA_DIR) / result.poster, video=False)
+                except Exception as e:
+                    log.info("film watermark skipped: %s", e)
             await _set(
                 film_id,
                 {

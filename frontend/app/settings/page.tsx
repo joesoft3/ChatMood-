@@ -1112,6 +1112,7 @@ export default function SettingsPage() {
               <li>🔢 5M tokens/mo · 🔭 200 deep searches/day · 🎬 60 videos/day</li>
               <li>📎 50 MB uploads (vs 25) · 🧠 365-day memory (vs 30)</li>
               <li>⏫ 4× rate-limit throughput</li>
+              <li>🏷 <span className="text-gray-200">Watermark-free exports</span> — free renders carry a small Mood AI badge</li>
             </ul>
             <div className="rounded-xl border border-line bg-base/70 p-3 text-xs text-gray-400">
               Upgrade instantly to unlock higher daily quotas, faster throughput and premium creation workflows.

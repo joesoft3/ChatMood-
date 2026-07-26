@@ -7,6 +7,48 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🏷 Free-tier watermarking (Pro & admins render clean)
+
+Generated output on the free plan now carries a subtle "Made with Mood AI" badge.
+Paid plans and admins are unaffected. Guide: [docs/WATERMARKING.md](docs/WATERMARKING.md).
+
+- **One entitlement rule, one place** (`services/watermark.should_watermark()`), because
+  the two failure modes cost real money in opposite directions: a badge on a paying
+  customer's export is a refund request, and a missing badge on free output is lost
+  conversion. Paid detection is a **denylist of one** (`plan != "free"`) so any future
+  tier is exempt by default — the safe direction to be wrong in. Admins
+  (`is_admin` **or** an `ADMIN_EMAILS` entry) render clean even on the free plan, so
+  owner demos and store screenshots need no plan juggling.
+- **Applied across every creation surface** — 🎨 Design Studio (web *and* print tiers),
+  🎬 storyboard films (film + poster), ✂️ Auto-Edit clips, and 💬 in-chat image/video,
+  which is stamped at the single `_persist_generated_media()` chokepoint.
+- **Stamped at render time, not download.** Design exports are cached by filename with
+  no entitlement in the key, so badging at delivery would mean re-deriving entitlement
+  on four separate download paths *or* serving a stale artifact after an upgrade. Baking
+  it into the source render means every downstream path inherits it and there is no
+  cache to invalidate. Films additionally **persist** the decision, so a render resumed
+  after a restart re-applies the original one instead of half-badging a film whose owner
+  upgraded mid-render.
+- **Pillow draws the badge, ffmpeg composites it.** Not `drawtext` — this codebase
+  already documents that the shipped ffmpeg build lacks it and serverless images ship no
+  fonts. Rasterizing once to a transparent PNG means the same asset overlays onto both
+  stills and video via a filter every build supports. The badge scales with output width
+  (so it neither dominates a reel nor vanishes on a 4000px print export) and is cached
+  per width bucket.
+- **Fail-open by construction.** Missing ffmpeg, missing font, failed encode, timeout or
+  corrupt bytes all return the original file/bytes untouched; the swap is atomic and
+  scratch files are cleaned up. Losing a badge is acceptable; losing a paid-for render
+  is not.
+- Config: `WATERMARK_ENABLED` · `WATERMARK_TEXT` (white-label) · `WATERMARK_TIMEOUT_S`.
+  Migration `0025_watermark_flags` adds `designs.watermarked` / `films.watermarked`
+  (guarded, re-runnable, verified up→down→up).
+- **Tests: +29** (512 total, all passing) covering entitlement in both directions,
+  future-tier safety, env-listed owners, fail-safe behavior when the admin lookup throws,
+  badge rendering/scaling, the argv builders (video re-encodes but copies audio), the
+  bytes path incl. JPEG targets, fail-open paths, and wiring through the design, film and
+  in-chat routes. Both regression directions were confirmed by mutation testing —
+  breaking the paid exemption fails 6 tests; disabling free-tier badging fails 6.
+
 ### ⏰🗂🔑 Scheduled tasks · Projects · OpenAI-compatible developer API
 
 Three Grok-parity surfaces that turn Mood from *something you ask* into *something
