@@ -5,6 +5,33 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ---
 
+## 2026-07-26
+
+### 📚 Docs index + automated housekeeping gate (PR #21)
+
+- **`docs/README.md` — a real documentation index.** All 33 guides in `docs/` are now
+  listed in one place, grouped by task (start here · hosting & infra · domains &
+  white-label · product surfaces · mobile & store release · auth/policy/compliance ·
+  testing & ops), each with a one-line description of what it actually covers. Previously
+  the only way to find a guide was to `ls docs/` and guess from the filename.
+- **`scripts/check-docs.mjs` — offline, dependency-free docs gate.** Verifies that (1)
+  every relative markdown link resolves to a file that exists, (2) every `#anchor`
+  exists as a heading in its target document, (3) no guide in `docs/` is orphaned from
+  the index, and (4) every guide opens with a level-1 `# Title`. Fenced and inline code
+  are stripped first, so illustrative snippets like `[n](url)` in ARCHITECTURE.md don't
+  trip it. Failures are grouped per file with an actionable message.
+- **Ready to wire into CI as a third `test.yml` job** alongside `backend-unit` and
+  `web-typecheck` — the copy-paste job block lives in [docs/README.md](docs/README.md#wiring-the-gate-into-ci).
+  (Not applied in this PR: the automation that opened it cannot write to
+  `.github/workflows/`.) The check never fetches external URLs, so it cannot flake
+  on a third-party outage.
+- **README:** links the new index from the intro and the repo map, and adds a
+  **"Checks to run before opening a PR"** table mapping each CI job to its local
+  command (`pytest backend/tests -q`, `npm run typecheck`, `node scripts/check-docs.mjs`).
+- Docs/CI only — no application, API or schema changes.
+
+---
+
 ## 2026-07-25
 
 ### 🎵 TikTok-style Reel polish (PR #20)
