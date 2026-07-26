@@ -172,9 +172,9 @@ export default function AppShell({
   }
 
   const sideNav = (
-    <div className="flex flex-col h-full bg-[#0b0b0c]">
-      <div className="px-4 py-4 flex items-center gap-3 border-b border-white/5 shrink-0">
-        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/5 border border-white/5 shrink-0">
+    <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgb(var(--mood-accent)_/_0.10),transparent_18rem),rgb(var(--mood-base)_/_0.94)]">
+      <div className="shrink-0 border-b border-white/8 px-4 py-4 flex items-center gap-3">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] shadow-[0_0_38px_-18px_rgb(var(--mood-accent))]">
           <BrandMark brand={brand} />
         </div>
         <div className="min-w-0">
@@ -190,7 +190,7 @@ export default function AppShell({
           overflowed their box and were painted UNDER this block — visible but
           impossible to click. Both regions may now shrink and scroll, and the
           history keeps a floor tall enough for its header. */}
-      <div className="border-t border-white/5 p-2.5 space-y-1.5 shrink min-h-0 overflow-y-auto scrollbar-thin">
+      <div className="border-t border-white/8 p-2.5 space-y-1.5 shrink min-h-0 overflow-y-auto scrollbar-thin">
         <div className="px-2 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-600">Workspace</div>
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
@@ -199,8 +199,8 @@ export default function AppShell({
             onClick={() => navigateTo(href)}
             className={`touch-manipulation flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border transition ${
               pathname === href
-                ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
-                : "border-transparent text-gray-400 hover:bg-white/5 hover:border-white/5"
+                ? "bg-accent/12 border-accent/35 text-white shadow-[0_10px_30px_rgb(var(--mood-accent)/0.12)]"
+                : "border-transparent text-gray-400 hover:bg-white/[0.06] hover:border-white/10 hover:text-gray-200"
             }`}
           >
             <Icon size={16} /> {label}
@@ -212,8 +212,8 @@ export default function AppShell({
             onClick={() => setDrawerOpen(false)}
             className={`touch-manipulation flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm border transition ${
               pathname === "/admin"
-                ? "bg-white/10 border-white/10 text-white shadow-[0_8px_24px_rgb(0_0_0/0.18)]"
-                : "border-transparent text-gray-400 hover:bg-white/5 hover:border-white/5"
+                ? "bg-accent/12 border-accent/35 text-white shadow-[0_10px_30px_rgb(var(--mood-accent)/0.12)]"
+                : "border-transparent text-gray-400 hover:bg-white/[0.06] hover:border-white/10 hover:text-gray-200"
             }`}
           >
             <ShieldCheck size={16} /> Owner
@@ -231,9 +231,10 @@ export default function AppShell({
   );
 
   return (
-    <div ref={rootRef} className="app-height flex overflow-hidden">
+    <div ref={rootRef} className="app-height relative flex overflow-hidden bg-base">
+      <div aria-hidden className="mood-aurora pointer-events-none absolute inset-0 opacity-70" />
       {/* Desktop / landscape-tablet sidebar — cleaner, ChatGPT-like left rail */}
-      <aside className="hidden lg:flex w-[280px] xl:w-[300px] 2xl:w-[320px] flex-col border-r border-white/5 bg-[#0b0b0c] shrink-0">
+      <aside className="relative z-10 hidden w-[280px] shrink-0 flex-col border-r border-white/8 bg-[#0b0b0c]/95 shadow-[18px_0_70px_rgb(0_0_0/0.22)] lg:flex xl:w-[300px] 2xl:w-[320px]">
         {sideNav}
       </aside>
 
@@ -251,7 +252,7 @@ export default function AppShell({
           }`}
         />
         <div
-          className={`absolute inset-y-0 left-0 w-72 md:w-80 bg-panel border-r border-line transform transition-transform duration-200 pb-[env(safe-area-inset-bottom)] ${
+          className={`absolute inset-y-0 left-0 w-72 md:w-80 mood-glass border-r border-line transform transition-transform duration-200 pb-[env(safe-area-inset-bottom)] ${
             drawerOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -260,19 +261,19 @@ export default function AppShell({
       </div>
 
       {/* Main column: header → scrollable content → in-flow bottom tab bar */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-0 relative z-0">
+      <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Header (phone + tablet). Focused surfaces can keep only the menu
             button, fixed at this same safe-area position without the bar. */}
         {mobileMenuOnly ? (
           <button
             onClick={() => setDrawerOpen((v) => !v)}
-            className="lg:hidden fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 touch-manipulation rounded-xl border border-line bg-panel/90 p-2 text-gray-300 shadow-[0_8px_22px_rgb(0_0_0/0.22)] backdrop-blur hover:bg-white/10 hover:text-white transition"
+            className="lg:hidden fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 touch-manipulation rounded-2xl border border-white/10 bg-panel/85 p-2 text-gray-300 shadow-[0_12px_34px_rgb(0_0_0/0.28)] backdrop-blur-xl hover:bg-white/10 hover:text-white transition"
             aria-label={drawerOpen ? "Close menu" : "Open menu"}
           >
             <Menu size={20} />
           </button>
         ) : (
-          <header className="lg:hidden flex items-center gap-2 border-b border-white/5 px-3 py-3 bg-panel/85 backdrop-blur shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <header className="lg:hidden flex items-center gap-2 border-b border-white/8 px-3 py-3 bg-panel/82 backdrop-blur-xl shadow-[0_12px_34px_rgb(0_0_0/0.12)] shrink-0 compact-v pt-[max(0.75rem,env(safe-area-inset-top))]">
             <button
               onClick={() => setDrawerOpen(true)}
               className="touch-manipulation p-2 rounded-xl text-gray-300 hover:bg-white/5 hover:text-white transition"
@@ -317,8 +318,8 @@ export default function AppShell({
 
         {/* Bottom tab bar (phones only) — in flow, raised above content, always tappable.
             Grok-clean: first 5 destinations only; the full list lives in the ☰ drawer. */}
-        <nav className="md:hidden shrink-0 relative z-10 border-t border-white/5 bg-[#0f0f10]/95 backdrop-blur pb-[env(safe-area-inset-bottom)] px-2 pt-2">
-          <div className="grid grid-cols-5 gap-1 rounded-2xl border border-white/6 bg-[#141415] p-1 shadow-[0_12px_28px_rgb(0_0_0/0.18)]">
+        <nav className="md:hidden relative z-10 shrink-0 border-t border-white/8 bg-[#0f0f10]/90 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl">
+          <div className="grid grid-cols-5 gap-1 rounded-2xl border border-white/8 bg-white/[0.05] p-1 shadow-[0_14px_34px_rgb(0_0_0/0.2)]">
             {NAV.slice(0, 5).map(({ href, label, icon: Icon }) => {
               const active = pathname === href;
               return (
@@ -327,7 +328,7 @@ export default function AppShell({
                   href={href}
                   onClick={() => navigateTo(href)}
                   className={`touch-manipulation select-none flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 text-[10px] transition ${
-                    active ? "bg-white text-black" : "text-gray-500 active:text-gray-300"
+                    active ? "bg-accent text-black shadow-[0_8px_24px_rgb(var(--mood-accent)/0.22)]" : "text-gray-500 active:text-gray-300"
                   }`}
                 >
                   <Icon size={19} />

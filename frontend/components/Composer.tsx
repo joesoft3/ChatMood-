@@ -254,9 +254,9 @@ export default function Composer({
         <div
           className={`${
             bare
-              ? "min-h-[4rem] rounded-[1.35rem] border border-white/10 bg-[#171718] px-2 py-1.5 shadow-[0_14px_32px_rgb(0_0_0/0.28)]"
-              : "min-h-[4.6rem] rounded-[1.8rem] border border-white/10 bg-[#171718] px-2.5 py-2.5 shadow-[0_18px_40px_rgb(0_0_0/0.38)] sm:px-3"
-          } flex items-center gap-1 focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition`}
+              ? "min-h-[4rem] rounded-[1.55rem] border border-white/10 bg-white/[0.075] px-2 py-1.5 shadow-[0_18px_48px_rgb(0_0_0/0.28)] backdrop-blur-xl"
+              : "min-h-[4.6rem] rounded-[1.9rem] border border-white/10 bg-white/[0.07] px-2.5 py-2.5 shadow-[0_20px_54px_rgb(0_0_0/0.34)] backdrop-blur-xl sm:px-3"
+          } flex items-center gap-1 focus-within:border-accent/55 focus-within:shadow-[0_22px_60px_-12px_rgb(var(--mood-accent)/0.32)] transition`}
         >
           <input
             ref={fileRef}

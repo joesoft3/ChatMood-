@@ -353,7 +353,7 @@ export default function MessageBubble({
       <div className="flex justify-end mood-fade-up">
         <div className="flex max-w-[min(88%,42rem)] flex-col items-end gap-1">
           {msg.author && <span className="text-[10px] text-gray-500 pr-1">🧑 {msg.author}</span>}
-          <div className="rounded-[1.55rem] border border-accent/20 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_12px_28px_rgb(0_0_0/0.14)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+          <div className="rounded-[1.55rem] border border-accent/25 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_14px_34px_rgb(var(--mood-accent)/0.10)] backdrop-blur whitespace-pre-wrap [overflow-wrap:anywhere]">
             {msg.content}
           </div>
         </div>
@@ -387,19 +387,19 @@ export default function MessageBubble({
 
   return (
     <div className="group flex items-start gap-3 sm:gap-4 mood-fade-up">
-      <div className="hidden sm:inline-flex mt-1 h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_8px_20px_rgb(0_0_0/0.16)]">
+      <div className="hidden sm:inline-flex mt-1 h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.065] text-accent shadow-[0_10px_28px_rgb(0_0_0/0.18)]">
         {assistantIcon}
       </div>
       <div className="min-w-0 flex-1 max-w-full">
         <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-          <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
+          <span className="inline-flex sm:hidden h-8 w-8 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.065] text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
             {assistantIcon}
           </span>
           <span className="font-medium text-gray-300">Mood</span>
-          <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
+          <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
           {isStreaming && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent/80" />}
         </div>
-        <div className="msg rounded-[1.55rem] sm:rounded-[1.8rem] border border-white/6 bg-[#141415]/96 px-4 sm:px-5 py-3.5 sm:py-4 text-gray-200 leading-relaxed text-[15px] shadow-[0_12px_28px_rgb(0_0_0/0.16)]">
+        <div className="msg rounded-[1.65rem] sm:rounded-[1.95rem] border border-white/8 bg-white/[0.06] px-4 sm:px-5 py-3.5 sm:py-4 text-gray-200 leading-relaxed text-[15px] shadow-[0_16px_44px_rgb(0_0_0/0.18)] backdrop-blur-xl">
           {msg.research && <ResearchPanel r={msg.research} />}
           {msg.steps && msg.steps.length > 0 && <AgentSteps steps={msg.steps} />}
           {msg.think && <ThinkingPanel state={msg.think} replayEvents={msg.think.events} />}

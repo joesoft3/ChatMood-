@@ -2,30 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------------------------------------------------------- Arena palette
-   Arena's current identity uses warm paper/sand lights and worn leather
-   darks. Keep the palette in RGB tokens so every Tailwind surface, border,
-   input and text color can follow the same theme without hidden black boxes.
-   Palette reference: white #fff, gray-01 #f5f1ec, gray-02 #ebe7e2,
-   gray-03 #c7c2bc, gray-04 #8b887e, gray-05 #66615a, gray-06 #403c38,
-   gray-07 #2b2b29, black #1c1c1a, teal #31b8b5. */
+/* ---------------------------------------------------------- Mood 2026 palette
+   The refresh moves Mood from a flat leather surface to a deeper, cinematic
+   workspace: ink base, violet/teal aurora accents, and higher contrast glass.
+   RGB tokens keep Tailwind utilities, white-label accents and light mode in
+   sync across landing, auth and the app shell. */
 :root {
-  --mood-base: 28 28 26;       /* Arena black */
-  --mood-panel: 43 43 41;      /* Arena gray-07 */
-  --mood-line: 64 60 56;       /* Arena gray-06 */
-  --mood-accent: 49 184 181;   /* Arena teal */
-  --mood-text: 245 241 236;    /* Arena gray-01 */
-  --mood-muted: 199 194 188;   /* Arena gray-03 */
+  --mood-base: 8 10 16;         /* midnight ink */
+  --mood-panel: 17 19 28;       /* elevated obsidian */
+  --mood-panel-2: 24 27 39;
+  --mood-line: 78 88 118;
+  --mood-accent: 64 229 215;    /* electric mint */
+  --mood-accent-2: 145 118 255; /* soft violet */
+  --mood-text: 246 248 255;
+  --mood-muted: 160 169 192;
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --mood-base: 245 241 236;    /* Arena gray-01 — weathered notebook page */
-  --mood-panel: 255 255 255;   /* Arena white */
-  --mood-line: 199 194 188;    /* Arena gray-03 */
-  --mood-accent: 49 184 181;   /* Arena teal */
-  --mood-text: 28 28 26;       /* Arena black */
-  --mood-muted: 102 97 90;     /* Arena gray-05 */
+  --mood-base: 247 249 253;
+  --mood-panel: 255 255 255;
+  --mood-panel-2: 239 244 250;
+  --mood-line: 196 207 224;
+  --mood-accent: 31 174 166;
+  --mood-accent-2: 104 91 224;
+  --mood-text: 16 23 42;
+  --mood-muted: 83 96 121;
   color-scheme: light;
 }
 
@@ -41,10 +43,55 @@ body {
 }
 
 body {
-  background: rgb(var(--mood-base));
+  background:
+    radial-gradient(circle at 12% -10%, rgb(var(--mood-accent-2) / 0.22), transparent 30rem),
+    radial-gradient(circle at 88% 0%, rgb(var(--mood-accent) / 0.18), transparent 28rem),
+    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)));
   color: rgb(var(--mood-text));
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.mood-aurora {
+  background:
+    radial-gradient(circle at 16% 18%, rgb(var(--mood-accent-2) / 0.34), transparent 26rem),
+    radial-gradient(circle at 78% 8%, rgb(var(--mood-accent) / 0.25), transparent 28rem),
+    radial-gradient(circle at 70% 78%, rgb(34 197 94 / 0.08), transparent 30rem),
+    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)));
+}
+.mood-aurora::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.24;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--mood-text) / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--mood-text) / 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at top, black, transparent 70%);
+}
+.mood-glass {
+  border: 1px solid rgb(var(--mood-text) / 0.10);
+  background:
+    linear-gradient(135deg, rgb(var(--mood-text) / 0.10), rgb(var(--mood-text) / 0.045)),
+    rgb(var(--mood-panel) / 0.72);
+  box-shadow: inset 0 1px 0 rgb(var(--mood-text) / 0.08);
+  backdrop-filter: blur(24px);
+}
+.mood-card {
+  border: 1px solid rgb(var(--mood-text) / 0.09);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at top left, rgb(var(--mood-accent) / 0.10), transparent 16rem),
+    linear-gradient(180deg, rgb(var(--mood-text) / 0.07), rgb(var(--mood-text) / 0.035));
+  box-shadow: 0 18px 56px rgb(0 0 0 / 0.20), inset 0 1px 0 rgb(var(--mood-text) / 0.06);
+}
+.mood-gradient-text {
+  background: linear-gradient(90deg, rgb(var(--mood-text)), rgb(var(--mood-accent)), rgb(var(--mood-accent-2)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Explicit input color fixes the invisible-typed-text bug on mobile browsers. */
@@ -96,10 +143,11 @@ input::placeholder {
 
 /* Dark-first components also contain literal Tailwind hex surfaces. Re-map
    those exact tokens so light mode never produces a dark composer/sidebar,
-   and dark mode stays on Arena's leather/paper palette too. */
+   and dark mode stays on the refreshed Mood glass palette too. */
 [class~="bg-[#0b0b0c]"] { background-color: rgb(var(--mood-base)) !important; }
 [class~="bg-[#0f0f10]"],
 [class~="bg-[#0f1011]"],
+[class~="bg-[#101114]"],
 [class~="bg-[#111214]"],
 [class~="bg-[#121213]"] { background-color: rgb(var(--mood-panel)) !important; }
 [class~="bg-[#141415]"],

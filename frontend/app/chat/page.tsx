@@ -604,14 +604,14 @@ export default function ChatPage() {
 
   return (
     <AppShell title={activeTitle || "Mood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
-      {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
+      {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-panel/80 px-6 backdrop-blur-xl">{chatTabs}</div>}
       {!emptyHome && (
         <>
       {/* conversation toolbar — cleaner and closer to ChatGPT, with live workspace status */}
-      <div className="border-b border-white/5 px-3 sm:px-4 py-3 shrink-0 compact-v bg-[#0f1011]/88 backdrop-blur space-y-2.5">
+      <div className="border-b border-white/8 px-3 sm:px-4 py-3 shrink-0 compact-v bg-panel/80 backdrop-blur-xl space-y-2.5 shadow-[0_12px_34px_rgb(0_0_0/0.12)]">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] p-1 shrink-0 shadow-[0_10px_24px_rgb(0_0_0/0.18)]">
-            <span className="rounded-full bg-white text-black px-3 py-1.5 text-xs font-semibold">Ask</span>
+          <div className="flex items-center gap-1 shrink-0 rounded-full border border-white/10 bg-white/[0.055] p-1 shadow-[0_10px_28px_rgb(0_0_0/0.18)]">
+            <span className="rounded-full bg-accent text-black px-3 py-1.5 text-xs font-semibold shadow-[0_8px_22px_rgb(var(--mood-accent)/0.18)]">Ask</span>
             <button onClick={() => router.push("/images")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
               Imagine
             </button>
@@ -626,15 +626,15 @@ export default function ChatPage() {
           </div>
           {msgs.length > 0 && (
             <div className="ml-auto flex items-center gap-1.5 shrink-0">
-              <button onClick={shareChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition" title="Create a public read-only link">
+              <button onClick={shareChat} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.055] px-3 py-1.5 hover:text-gray-300 transition" title="Create a public read-only link">
                 <Share2 size={13} /> <span className="hidden sm:inline">Share</span>
               </button>
               {shared && (
-                <button onClick={revokeShare} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-red-400 transition" title="Revoke the public link">
+                <button onClick={revokeShare} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.055] px-3 py-1.5 hover:text-red-400 transition" title="Revoke the public link">
                   <Link2Off size={13} /> <span className="hidden sm:inline">Revoke</span>
                 </button>
               )}
-              <button onClick={exportChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition">
+              <button onClick={exportChat} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.055] px-3 py-1.5 hover:text-gray-300 transition">
                 <Download size={13} /> <span className="hidden sm:inline">Export</span>
               </button>
             </div>
@@ -663,7 +663,7 @@ export default function ChatPage() {
         </>
       )}
       {showTeam && wsId && (
-        <div className="border-b border-line bg-panel px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">
+        <div className="border-b border-white/8 bg-panel/80 backdrop-blur-xl px-3 sm:px-4 py-2 shrink-0 max-h-48 overflow-y-auto scrollbar-thin">
           <p className="text-[11px] text-gray-500 mb-1.5">Shared with the team — anyone in this workspace can read &amp; continue these</p>
           {!teamConvs || teamConvs.length === 0 ? (
             <p className="text-xs text-gray-600 py-1">No team conversations yet — send a message to start one.</p>
@@ -716,7 +716,7 @@ export default function ChatPage() {
           </button>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgb(var(--mood-accent-2)_/_0.10),transparent_38%)]">
         <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
             <div className="flex min-h-[calc(100dvh-10rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
@@ -725,18 +725,18 @@ export default function ChatPage() {
                 <img
                   src="/icon.png"
                   alt="Mood AI"
-                  className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
+                  className="h-16 w-16 rounded-3xl ring-1 ring-white/10 shadow-[0_0_70px_-18px_rgb(var(--mood-accent))] sm:h-20 sm:w-20"
                 />
                 <p className="text-base font-semibold tracking-tight text-gray-200">Mood AI</p>
               </div>
-              <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
+              <h2 className="text-center text-[clamp(2.3rem,5vw,3.6rem)] font-semibold tracking-[-0.055em] text-white">What are we making today?</h2>
               <div className="w-full max-w-xl">{composerEl(true)}</div>
               <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Start with an action">
                 {homeActions.map(({ icon: Icon, label, onClick }) => (
                   <button
                     key={label}
                     onClick={onClick}
-                    className="touch-manipulation flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-[#141415] px-3 py-3 text-xs text-gray-400 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
+                    className="touch-manipulation flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-3 text-xs text-gray-400 shadow-[0_10px_28px_rgb(0_0_0/0.12)] transition hover:-translate-y-0.5 hover:border-accent/35 hover:bg-white/[0.08] hover:text-white"
                   >
                     <Icon size={14} className="text-accent" />
                     {label}
