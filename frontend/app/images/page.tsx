@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Sparkles, Wand2, X } from "lucide-react";
+import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Pencil, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice } from "@/components/StudioChrome";
 import { API, apiFetch, token } from "@/lib/api";
@@ -275,6 +275,67 @@ export default function ImagesPage() {
       localStorage.setItem(VIDEO_STORE_KEY, JSON.stringify(next.slice(0, 12)));
     } catch {
       /* quota — non-fatal */
+    }
+  }
+
+  /** Download through the authenticated API when possible; fall back to the source URL.
+   * This also makes provider-hosted assets save with a useful filename. */
+  async function downloadMedia(item: ImgItem, kind: "image" | "video") {
+    try {
+      const response = await fetch(item.url, { headers: token.get() ? { Authorization: `Bearer ${token.get()}` } : undefined });
+      if (!response.ok) throw new Error("Download unavailable");
+      const blob = await response.blob();
+      const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : kind === "video" ? "mp4" : "jpg";
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `mood-ai-${kind}-${item.id}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch {
+      // Some third-party providers don't permit CORS reads. Their native URL can still be saved by the browser.
+      const link = document.createElement("a");
+      link.href = item.url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.download = "";
+      link.click();
+    }
+  }
+
+  function deleteImage(item: ImgItem) {
+    if (!window.confirm("Remove this image from your gallery? This cannot delete the provider's original file.")) return;
+    const next = items.filter((i) => i.id !== item.id);
+    persist(next);
+    if (zoom?.id === item.id) setZoom(null);
+  }
+
+  function deleteVideo(item: ImgItem) {
+    if (!window.confirm("Remove this video from your gallery? This cannot delete the provider's original file.")) return;
+    persistVideos(videos.filter((v) => v.id !== item.id));
+  }
+
+  function remixImage(item: ImgItem) {
+    setMode("image");
+    setPrompt(`${item.prompt}. Edit this image: `);
+    setInfo("✏️ Describe the change, then generate a new image. Your original stays in the gallery.");
+    document.getElementById("main-generator")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function editVideo(item: ImgItem) {
+    setError("");
+    try {
+      const response = await fetch(item.url, { headers: token.get() ? { Authorization: `Bearer ${token.get()}` } : undefined });
+      if (!response.ok) throw new Error("Could not load video");
+      const blob = await response.blob();
+      setEditFile(new File([blob], `mood-ai-video-${item.id}.mp4`, { type: blob.type || "video/mp4" }));
+      setEditOpen(true);
+      setPrompt("");
+      setInfo("✂️ Video loaded into the editor. Describe the changes in the prompt box, then choose Edit my video.");
+      document.getElementById("clip-editor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } catch (e: any) {
+      setError(e.message ?? "Could not load this video for editing. Download it and upload it to the clip editor instead.");
     }
   }
 
@@ -641,7 +702,7 @@ export default function ImagesPage() {
             )}
           </section>
           {/* ✂️ Auto-Edit */}
-          <section className="rounded-xl border border-line bg-white/5 overflow-hidden">
+          <section id="clip-editor" className="rounded-xl border border-line bg-white/5 overflow-hidden">
             <button onClick={() => setEditOpen((o) => !o)} className="touch-manipulation w-full flex items-center gap-2 px-4 py-3 text-left">
               <span className="text-base">✂️</span>
               <span className="text-sm font-semibold text-gray-100">Auto-Edit Video</span>
@@ -922,7 +983,14 @@ export default function ImagesPage() {
                         className={`w-full bg-black ${v.meta?.aspect_ratio === "9:16" ? "aspect-[9/16] max-h-[480px] mx-auto" : v.meta?.aspect_ratio === "1:1" ? "aspect-square" : "aspect-video"}`}
                       />
                       <div className="p-2 space-y-1.5">
-                        <p className="text-[11px] text-gray-400 line-clamp-2">{v.prompt}</p>
+                        <div className="flex items-start gap-2">
+                          <p className="flex-1 text-[11px] text-gray-400 line-clamp-2">{v.prompt}</p>
+                          <div className="flex shrink-0 gap-1">
+                            <button onClick={() => void downloadMedia(v, "video")} title="Download video" aria-label="Download video" className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"><Download size={14} /></button>
+                            <button onClick={() => void editVideo(v)} title="Edit video" aria-label="Edit video" className="rounded-md p-1.5 text-gray-400 hover:bg-white/10 hover:text-white transition"><Pencil size={14} /></button>
+                            <button onClick={() => deleteVideo(v)} title="Delete video" aria-label="Delete video" className="rounded-md p-1.5 text-gray-400 hover:bg-red-500/15 hover:text-red-400 transition"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
                         {v.meta && (
                           <div className="flex gap-1.5 flex-wrap">
                             {[v.meta.aspect_ratio, v.meta.duration ? `${v.meta.duration}s` : "", v.meta.quality, v.meta.style?.replace("_", " ")]
@@ -988,6 +1056,11 @@ export default function ImagesPage() {
                     <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
                       {img.prompt}
                     </span>
+                    <span className="absolute right-2 top-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+                      <span role="button" tabIndex={0} onClick={() => void downloadMedia(img, "image")} onKeyDown={(e) => { if (e.key === "Enter") void downloadMedia(img, "image"); }} title="Download image" aria-label="Download image" className="rounded-md bg-black/65 p-1.5 text-white hover:bg-black/90"><Download size={14} /></span>
+                      <span role="button" tabIndex={0} onClick={() => remixImage(img)} onKeyDown={(e) => { if (e.key === "Enter") remixImage(img); }} title="Edit / remix image" aria-label="Edit / remix image" className="rounded-md bg-black/65 p-1.5 text-white hover:bg-black/90"><Pencil size={14} /></span>
+                      <span role="button" tabIndex={0} onClick={() => deleteImage(img)} onKeyDown={(e) => { if (e.key === "Enter") deleteImage(img); }} title="Delete image" aria-label="Delete image" className="rounded-md bg-black/65 p-1.5 text-red-300 hover:bg-red-950"><Trash2 size={14} /></span>
+                    </span>
                   </button>
                 )
               )}
@@ -1011,14 +1084,15 @@ export default function ImagesPage() {
             <img src={zoom.url} alt={zoom.prompt} className="w-full max-h-[75vh] object-contain rounded-xl" />
             <div className="flex items-center gap-3">
               <p className="flex-1 text-xs text-gray-400 line-clamp-2">{zoom.prompt}</p>
-              <a
-                href={zoom.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition"
-              >
-                <Download size={13} /> Original
-              </a>
+              <button onClick={() => void downloadMedia(zoom, "image")} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
+                <Download size={13} /> Download
+              </button>
+              <button onClick={() => remixImage(zoom)} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
+                <Pencil size={13} /> Edit
+              </button>
+              <button onClick={() => deleteImage(zoom)} className="flex items-center gap-1.5 text-xs rounded-lg bg-red-500/10 text-red-300 hover:bg-red-500/20 px-3 py-2 transition">
+                <Trash2 size={13} /> Delete
+              </button>
               <button onClick={() => setZoom(null)} className="flex items-center gap-1.5 text-xs rounded-lg bg-white/10 hover:bg-white/20 px-3 py-2 transition">
                 <X size={13} /> Close
               </button>
