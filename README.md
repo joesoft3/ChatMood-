@@ -36,6 +36,10 @@ Mood AI is a full-stack AI super-app scaffold that delivers Grok-style capabilit
 - 🪰 **Fly.io deploy target** (`fly.toml` + auto-deploy workflow) alongside Vercel/Railway/Render/VPS — long renders & voice WebSocket friendly ([docs/DEPLOY-FLY.md](docs/DEPLOY-FLY.md))
 - 🐳 One-command Docker setup; Kubernetes-ready architecture
 
+> 📚 **[docs/README.md](docs/README.md)** is the documentation index — every guide in one
+> place, grouped by task (start here · hosting · domains · product surfaces · mobile &
+> store · policy · ops).
+>
 > See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for the full technical blueprint,
 > model routing strategy, multi-agent design, plugin framework, and scaling roadmap.
 > Ready to ship? **[docs/DEPLOY-WALKTHROUGH.md](docs/DEPLOY-WALKTHROUGH.md)** — zero to live,
@@ -100,6 +104,7 @@ npm run verify                              # typecheck + production build
 mood-ai/
 ├── docker-compose.yml        # full stack: app + postgres + redis + qdrant
 ├── .env.example              # every configurable knob, documented
+├── docs/README.md            # documentation index — every guide, grouped by task
 ├── docs/ARCHITECTURE.md      # the blueprint (read this)
 ├── backend/                  # FastAPI service
 │   └── app/
@@ -263,3 +268,23 @@ Preview the tiers without running anything: open `docs/ui-design-preview.html`
    ```
 3. Open `http://192.168.1.50:3000` on the phone, register/login, then the bottom tabs work.
 4. If taps feel "dead": hard-refresh first (old cached JS) — the shell pins the tab bar in normal flow above the visible viewport, so it is always on-screen and tappable.
+
+---
+
+## ✅ Checks to run before opening a PR
+
+| Check | Locally | What it guards |
+|---|---|---|
+| `backend-unit` (CI) | `pytest backend/tests -q` | Backend unit tests, plus a `py_compile` sweep of every module in `backend/app`. |
+| `web-typecheck` (CI) | `cd frontend && npm run typecheck` | `tsc --noEmit` over the Next.js app (`npm run verify` also does a production build). |
+| docs gate | `node scripts/check-docs.mjs` | Relative markdown links resolve, `#anchors` exist in their target, every `docs/*.md` is listed in [docs/README.md](docs/README.md) and opens with an `# H1`. |
+
+The first two run in `.github/workflows/test.yml`. The docs gate runs locally today —
+[the copy-paste CI job](docs/README.md#wiring-the-gate-into-ci) is ready to append when
+you want it enforced on every PR.
+
+The docs gate is offline and dependency-free — it never fetches external URLs, so it
+can't flake on someone else's outage. Adding a guide? Drop it in `docs/`, give it a
+`# Title` first line, and add a row to the [documentation index](docs/README.md).
+
+Shipping to `main`? Add a [CHANGELOG.md](CHANGELOG.md) entry with the PR number.
