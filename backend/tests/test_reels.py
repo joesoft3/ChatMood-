@@ -230,14 +230,19 @@ def test_feed_is_shared_across_creators_newest_first(env):
             assert feed["total"] == 2
             captions = [r["caption"] for r in feed["reels"]]
             assert set(captions) == {"first", "second"}
-            # newest first — timestamps carry sub-second precision so two posts
-            # made in the same second still order correctly (regression guard:
-            # SQLite CURRENT_TIMESTAMP alone is 1-second resolution)
-            stamps = [r["created_at"] for r in feed["reels"]]
-            assert stamps == sorted(stamps, reverse=True)
-            assert captions == ["second", "first"]
             mine = {r["caption"]: r["mine"] for r in feed["reels"]}
             assert mine == {"second": True, "first": False}  # ownership is per-viewer
+
+            # `sort=new` is the chronological view (the default is now the
+            # ranked For You feed, see test_reel_ranking.py).
+            # Newest first — timestamps carry sub-second precision so two posts
+            # made in the same second still order correctly (regression guard:
+            # SQLite CURRENT_TIMESTAMP alone is 1-second resolution)
+            chrono = (await c.get("/reels?sort=new", headers=_h(b))).json()
+            captions = [r["caption"] for r in chrono["reels"]]
+            stamps = [r["created_at"] for r in chrono["reels"]]
+            assert stamps == sorted(stamps, reverse=True)
+            assert captions == ["second", "first"]
 
             # ?mine=true narrows to your own posts
             just_ama = (await c.get("/reels?mine=true", headers=_h(a))).json()

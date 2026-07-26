@@ -15,6 +15,7 @@ import {
   EyeOff,
   Heart,
   Loader2,
+  MessageCircle,
   Music2,
   Play,
   Plus,
@@ -36,6 +37,7 @@ import { copyText } from "@/lib/clipboard";
 interface Reel {
   id: string;
   author: string;
+  author_id: string;
   caption: string;
   source: "upload" | "film" | "chat" | "duet" | "repost";
   url: string;
@@ -45,6 +47,7 @@ interface Reel {
   shares: number;
   saves: number;
   reposts: number;
+  comments: number;
   parent_id: string;
   parent_author: string;
   effect: string;
@@ -52,7 +55,21 @@ interface Reel {
   liked: boolean;
   saved: boolean;
   mine: boolean;
+  following: boolean;
+  duration_s: number;
+  completion: number;
+  score: number | null;
   status: "live" | "hidden";
+  created_at: string | null;
+}
+
+interface Comment {
+  id: string;
+  author: string;
+  author_id: string;
+  body: string;
+  likes: number;
+  mine: boolean;
   created_at: string | null;
 }
 
@@ -84,9 +101,13 @@ interface Stats {
   likes: number;
   shares: number;
   saves: number;
+  comments: number;
+  followers: number;
+  following: number;
+  completion: number;
 }
 
-type Tab = "foryou" | "saved" | "mine";
+type Tab = "foryou" | "following" | "saved" | "mine";
 
 const MAX_MB = 100;
 
@@ -157,6 +178,151 @@ function RailButton({
         <span className="text-[11px] font-semibold text-white drop-shadow">{compact(count)}</span>
       )}
     </button>
+  );
+}
+
+/* ------------------------------------------------------- comments sheet */
+function CommentSheet({
+  reel,
+  onClose,
+  onCount,
+  flash,
+}: {
+  reel: Reel;
+  onClose: () => void;
+  onCount: (id: string, n: number) => void;
+  flash: (t: string) => void;
+}) {
+  const [items, setItems] = useState<Comment[] | null>(null);
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    apiFetch<{ comments: Comment[] }>(`/reels/${reel.id}/comments`)
+      .then((j) => alive && setItems(j.comments))
+      .catch(() => {
+        if (alive) {
+          setItems([]);
+          setError("Couldn't load comments");
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [reel.id]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const text = body.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    try {
+      const j = await apiFetch<{ comment: Comment; comments: number }>(
+        `/reels/${reel.id}/comments`,
+        { method: "POST", body: JSON.stringify({ body: text }) },
+      );
+      setItems((xs) => [j.comment, ...(xs ?? [])]);
+      onCount(reel.id, j.comments);
+      setBody("");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Couldn't post that comment");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    const before = items ?? [];
+    setItems(before.filter((c) => c.id !== id));
+    try {
+      await apiFetch(`/reels/${reel.id}/comments/${id}`, { method: "DELETE" });
+      onCount(reel.id, Math.max(0, reel.comments - 1));
+    } catch {
+      setItems(before); // roll back
+      flash("Couldn't delete that comment");
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-end bg-black/70 backdrop-blur-sm sm:place-items-center"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-[72vh] w-full max-w-full flex-col overflow-hidden rounded-t-2xl border border-line bg-panel sm:h-[70vh] sm:max-w-md sm:rounded-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-line p-4">
+          <h2 className="text-sm font-semibold text-gray-100">
+            {reel.comments > 0 ? `${compact(reel.comments)} comments` : "Comments"}
+          </h2>
+          <button onClick={onClose} aria-label="Close comments" className="text-gray-500 hover:text-gray-200">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
+          {items === null ? (
+            <div className="grid h-full place-items-center">
+              <Loader2 className="animate-spin text-gray-600" />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="mt-8 text-center text-sm text-gray-500">
+              {error || "No comments yet — say the first thing."}
+            </p>
+          ) : (
+            <ul className="space-y-4">
+              {items.map((c) => (
+                <li key={c.id} className="flex gap-2.5">
+                  <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/85 text-[11px] font-bold uppercase text-black">
+                    {c.author.slice(0, 1)}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 text-[12px] font-semibold text-gray-300">
+                      @{c.author}
+                      <span className="font-normal text-gray-500">{ago(c.created_at)}</span>
+                    </p>
+                    <p className="whitespace-pre-wrap break-words text-[13px] leading-snug text-gray-100">
+                      {c.body}
+                    </p>
+                  </div>
+                  {(c.mine || reel.mine) && (
+                    <button
+                      onClick={() => remove(c.id)}
+                      aria-label="Delete comment"
+                      title={c.mine ? "Delete your comment" : "Remove from your reel"}
+                      className="shrink-0 text-gray-600 hover:text-red-400"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <form onSubmit={submit} className="flex items-center gap-2 border-t border-line p-3">
+          <input
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={500}
+            placeholder="Add a comment…"
+            className="min-w-0 flex-1 rounded-full border border-line bg-black/40 px-4 py-2 text-sm text-gray-100 outline-none placeholder:text-gray-600 focus:border-accent"
+          />
+          <button
+            type="submit"
+            disabled={!body.trim() || busy}
+            aria-label="Post comment"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent text-black transition disabled:opacity-40"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -273,8 +439,11 @@ function ReelCard({
   onDelete,
   onVisibility,
   onView,
-  isFollowing,
+  onWatch,
+  onComment,
   onFollow,
+  eager,
+  onActive,
 }: {
   reel: Reel;
   muted: boolean;
@@ -287,14 +456,30 @@ function ReelCard({
   onDelete: (id: string) => void;
   onVisibility: (r: Reel) => void;
   onView: (id: string) => void;
-  isFollowing: boolean;
+  onWatch: (id: string, m: { watched_ms: number; duration_s: number; replays: number }) => void;
+  onComment: (r: Reel) => void;
   onFollow: () => void;
+  /** Preload aggressively: this card is the active one or an immediate neighbour. */
+  eager: boolean;
+  onActive: () => void;
 }) {
   const vidRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
   const counted = useRef(false);
+
+  // ⏱ Watch telemetry. Accumulated locally and flushed once on swipe-away —
+  // reporting every tick would be a request per second per viewer. This is the
+  // signal the For You ranker leans on, so it has to be accurate rather than
+  // cheap: `watched` sums real playing time (not wall-clock, which would count
+  // a paused reel sitting on screen).
+  const watched = useRef(0);
+  const replays = useRef(0);
+  const lastTick = useRef(0);
+  const reported = useRef(false);
 
   // TikTok-style double-tap-to-like: a single tap toggles play/pause, a quick
   // second tap inside the window likes the reel and pops a heart where you tapped.
@@ -325,6 +510,19 @@ function ReelCard({
     }, 240);
   }
 
+  /** Flush accumulated watch time. Idempotent per swipe-away. */
+  const flushWatch = useCallback(() => {
+    const el = vidRef.current;
+    const ms = Math.round(watched.current);
+    if (reported.current || ms < 250) return; // ignore accidental flicks
+    reported.current = true;
+    onWatch(reel.id, {
+      watched_ms: ms,
+      duration_s: el?.duration && Number.isFinite(el.duration) ? el.duration : reel.duration_s || 0,
+      replays: replays.current,
+    });
+  }, [reel.id, reel.duration_s, onWatch]);
+
   // Autoplay only while the card actually fills the screen — an off-screen
   // <video> that keeps decoding is the fastest way to melt a phone battery.
   useEffect(() => {
@@ -334,6 +532,9 @@ function ReelCard({
       ([entry]) => {
         const visible = entry.intersectionRatio > 0.6;
         if (visible) {
+          reported.current = false;
+          lastTick.current = el.currentTime;
+          onActive();
           el.play().catch(() => {});
           if (!counted.current && !viewedThisSession.has(reel.id)) {
             counted.current = true;
@@ -341,15 +542,36 @@ function ReelCard({
             onView(reel.id);
           }
         } else {
+          // Report BEFORE resetting, or the completion ratio is always 0.
+          flushWatch();
           el.pause();
           el.currentTime = 0;
+          watched.current = 0;
+          replays.current = 0;
         }
       },
       { threshold: [0, 0.6, 1] },
     );
     io.observe(el);
-    return () => io.disconnect();
-  }, [reel.id, onView]);
+    return () => {
+      io.disconnect();
+      flushWatch(); // unmount (tab switch, feed reload) still counts
+    };
+  }, [reel.id, onView, flushWatch, onActive]);
+
+  // A swipe-away is often a page teardown; `visibilitychange` + the pagehide
+  // path are the only chances we get to report before the tab is frozen.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushWatch();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flushWatch);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flushWatch);
+    };
+  }, [flushWatch]);
 
   return (
     <section className="relative mx-auto h-full w-full max-w-[calc(100vh*9/16)] snap-start snap-always overflow-hidden bg-black">
@@ -361,13 +583,33 @@ function ReelCard({
           loop
           muted={muted}
           playsInline
-          preload="metadata"
-          onPlay={() => setPlaying(true)}
+          // The neighbours of the visible card fetch their whole first chunk so
+          // a swipe starts on an already-buffered frame — this is most of what
+          // makes a feed feel "instant" rather than "loading". Distant cards
+          // stay on `metadata` so we never pull the entire feed over mobile data.
+          preload={eager ? "auto" : "metadata"}
+          onPlay={() => {
+            setPlaying(true);
+            lastTick.current = vidRef.current?.currentTime ?? 0;
+          }}
           onPause={() => setPlaying(false)}
           onError={() => setFailed(true)}
+          onWaiting={() => setBuffering(true)}
+          onPlaying={() => setBuffering(false)}
+          onCanPlay={() => setBuffering(false)}
+          onEnded={() => {
+            replays.current += 1;
+          }}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             if (v.duration) setProgress((v.currentTime / v.duration) * 100);
+            // Accumulate only forward, real playback time. Using the delta
+            // between ticks (rather than wall-clock) means a paused or
+            // buffering reel doesn't inflate the completion signal, and a
+            // loop-around subtracting time is ignored.
+            const d = v.currentTime - lastTick.current;
+            if (d > 0 && d < 1.5) watched.current += d * 1000;
+            lastTick.current = v.currentTime;
           }}
           onClick={handleTap}
           className="h-full w-full object-contain"
@@ -378,12 +620,20 @@ function ReelCard({
         </div>
       )}
 
-      {/* tap-to-play affordance */}
-      {!playing && reel.url && !failed && (
+      {/* tap-to-play affordance (hidden while buffering — a play icon over a
+          stalled video reads as "broken", a spinner reads as "loading") */}
+      {!playing && !buffering && reel.url && !failed && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <span className="grid h-16 w-16 place-items-center rounded-full bg-black/45 backdrop-blur">
             <Play size={30} className="ml-1 text-white/90" />
           </span>
+        </div>
+      )}
+
+      {/* buffering spinner — without it a slow network looks like a dead app */}
+      {buffering && !failed && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+          <Loader2 size={38} className="animate-spin text-white/85 drop-shadow" />
         </div>
       )}
 
@@ -405,9 +655,66 @@ function ReelCard({
         </div>
       )}
 
-      {/* scrub progress */}
-      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/15">
-        <div className="h-full bg-white/85 transition-[width] duration-150" style={{ width: `${progress}%` }} />
+      {/* 📊 Creator analytics — your own reels only. Completion rate is the
+          number that actually drives ranking, so showing it (instead of just
+          views) tells a creator *why* a reel is or isn't travelling. */}
+      {reel.mine && reel.status === "live" && reel.completion > 0 && (
+        <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+          <span className={reel.completion >= 0.6 ? "text-emerald-400" : "text-amber-400"}>
+            {Math.round(reel.completion * 100)}% watched
+          </span>
+          <span className="text-white/40">·</span>
+          <span className="text-white/80">{compact(reel.views)} views</span>
+        </div>
+      )}
+
+      {/* Scrubbable progress bar. The old one was a 2px read-only sliver; being
+          able to drag back to the bit you liked is a baseline expectation, and
+          the generous invisible hit area is what makes it usable with a thumb. */}
+      <div
+        role="slider"
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress)}
+        tabIndex={0}
+        onKeyDown={(e) => {
+          const v = vidRef.current;
+          if (!v || !v.duration) return;
+          if (e.key === "ArrowRight") v.currentTime = Math.min(v.duration, v.currentTime + 5);
+          if (e.key === "ArrowLeft") v.currentTime = Math.max(0, v.currentTime - 5);
+        }}
+        onPointerDown={(e) => {
+          const v = vidRef.current;
+          if (!v || !v.duration) return;
+          setScrubbing(true);
+          e.currentTarget.setPointerCapture(e.pointerId);
+          const rect = e.currentTarget.getBoundingClientRect();
+          v.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * v.duration;
+        }}
+        onPointerMove={(e) => {
+          if (!scrubbing) return;
+          const v = vidRef.current;
+          if (!v || !v.duration) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          v.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * v.duration;
+        }}
+        onPointerUp={() => setScrubbing(false)}
+        onPointerCancel={() => setScrubbing(false)}
+        className="group absolute inset-x-0 bottom-0 z-20 cursor-pointer px-0 py-2.5 touch-none"
+      >
+        <div className={`bg-white/20 transition-all ${scrubbing ? "h-1.5" : "h-0.5 group-hover:h-1.5"}`}>
+          <div
+            className="relative h-full bg-white"
+            style={{ width: `${progress}%`, transition: scrubbing ? "none" : "width 150ms linear" }}
+          >
+            <span
+              className={`absolute -right-1.5 top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow transition-opacity ${
+                scrubbing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              }`}
+            />
+          </div>
+        </div>
       </div>
 
       {/* caption + author */}
@@ -474,13 +781,13 @@ function ReelCard({
             </span>
             <button
               onClick={onFollow}
-              aria-label={isFollowing ? `Unfollow @${reel.author}` : `Follow @${reel.author}`}
-              title={isFollowing ? "Following" : "Follow"}
+              aria-label={reel.following ? `Unfollow @${reel.author}` : `Follow @${reel.author}`}
+              title={reel.following ? "Following" : "Follow"}
               className={`absolute -bottom-2.5 grid h-5 w-5 place-items-center rounded-full border border-white/70 transition active:scale-90 ${
-                isFollowing ? "bg-white text-black" : "bg-red-500 text-white"
+                reel.following ? "bg-white text-black" : "bg-red-500 text-white"
               }`}
             >
-              {isFollowing ? <Check size={12} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
+              {reel.following ? <Check size={12} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
             </button>
           </div>
         )}
@@ -490,6 +797,12 @@ function ReelCard({
           label={reel.liked ? "Unlike" : "Like"}
           active={reel.liked}
           onClick={() => onLike(reel.id)}
+        />
+        <RailButton
+          icon={<MessageCircle size={20} />}
+          count={reel.comments}
+          label="Comments"
+          onClick={() => onComment(reel)}
         />
         <RailButton
           icon={<Bookmark size={19} className={reel.saved ? "fill-white" : ""} />}
@@ -571,41 +884,25 @@ export default function ReelPage() {
   const [effect, setEffect] = useState("none");
   const [speed, setSpeed] = useState(1);
   const [autoCaptions, setAutoCaptions] = useState(false);
-  // Creators you follow — a light, local-only preference that powers the
-  // TikTok-style follow badge on each reel. Persisted so it survives reloads.
-  const [following, setFollowing] = useState<Set<string>>(new Set());
+  const [commentFor, setCommentFor] = useState<Reel | null>(null);
+  // Which card is on screen — drives neighbour preloading (±1) so the next
+  // swipe plays instantly instead of showing a spinner.
+  const [activeIdx, setActiveIdx] = useState(0);
 
   const flash = useCallback((t: string) => {
     setMsg(t);
     window.setTimeout(() => setMsg(""), 4000);
   }, []);
 
-  // Restore who you follow (local-only preference, see `following` above).
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("mood.reel.following");
-      if (raw) setFollowing(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      /* corrupted preference — start fresh */
-    }
-  }, []);
-
-  const toggleFollow = useCallback((author: string) => {
-    setFollowing((prev) => {
-      const next = new Set(prev);
-      if (next.has(author)) next.delete(author);
-      else next.add(author);
-      try {
-        window.localStorage.setItem("mood.reel.following", JSON.stringify([...next]));
-      } catch {
-        /* private mode — keep it in-memory only */
-      }
-      return next;
-    });
-  }, []);
-
   const query = useMemo(
-    () => (tab === "saved" ? "?saved=true" : tab === "mine" ? "?mine=true" : ""),
+    () =>
+      tab === "saved"
+        ? "?saved=true"
+        : tab === "mine"
+          ? "?mine=true"
+          : tab === "following"
+            ? "?following=true"
+            : "",
     [tab],
   );
 
@@ -839,6 +1136,58 @@ export default function ReelPage() {
     apiFetch(`/reels/${id}/view`, { method: "POST" }).catch(() => {});
   }, []);
 
+  /** ⏱ Report watch time. Fire-and-forget: this is telemetry, and a failed
+   *  report must never surface as an error to someone who just swiped. */
+  const watch = useCallback(
+    (id: string, m: { watched_ms: number; duration_s: number; replays: number }) => {
+      apiFetch(`/reels/${id}/watch`, { method: "POST", body: JSON.stringify(m) }).catch(() => {});
+    },
+    [],
+  );
+
+  /** ➕ Follow/unfollow — optimistic across EVERY card by that creator, since
+   *  the same author can appear several times in one feed. */
+  const toggleFollow = useCallback(
+    async (r: Reel) => {
+      const next = !r.following;
+      setReels((rs) =>
+        (rs ?? []).map((x) => (x.author_id === r.author_id ? { ...x, following: next } : x)),
+      );
+      try {
+        const j = await apiFetch<{ following: boolean }>(
+          `/reels/authors/${r.author_id}/follow`,
+          { method: "POST" },
+        );
+        setReels((rs) =>
+          (rs ?? []).map((x) =>
+            x.author_id === r.author_id ? { ...x, following: j.following } : x,
+          ),
+        );
+        flash(j.following ? `➕ Following @${r.author}` : `Unfollowed @${r.author}`);
+        // Unfollowing from inside the Following tab should drop their cards.
+        if (!j.following && tab === "following") {
+          setReels((rs) => (rs ?? []).filter((x) => x.author_id !== r.author_id));
+        }
+      } catch (e) {
+        setReels((rs) =>
+          (rs ?? []).map((x) =>
+            x.author_id === r.author_id ? { ...x, following: r.following } : x,
+          ),
+        );
+        flash(e instanceof Error ? e.message : "Couldn't update follow");
+      }
+    },
+    [flash, tab],
+  );
+
+  const setCommentCount = useCallback(
+    (id: string, n: number) => {
+      patch(id, { comments: n });
+      setCommentFor((c) => (c && c.id === id ? { ...c, comments: n } : c));
+    },
+    [patch],
+  );
+
   const visibility = useCallback(
     async (r: Reel) => {
       const live = r.status !== "live";
@@ -896,12 +1245,14 @@ export default function ReelPage() {
 
   const TABS: [Tab, string][] = [
     ["foryou", "For you"],
+    ["following", "Following"],
     ["saved", "Saved"],
     ["mine", "My reels"],
   ];
 
   const empty = {
     foryou: ["📺", "The reel is quiet", "Post a clip from your camera roll, or share a film you made in Mood — it lands here for every creator to watch."],
+    following: ["➕", "You're not following anyone yet", "Tap the + on a creator's avatar and their newest reels land here first."],
     saved: ["🔖", "Nothing saved yet", "Tap the bookmark on any reel and it'll wait for you here."],
     mine: ["🎬", "You haven't posted yet", "Your posts — live and unposted — collect here with their views, likes, shares and saves."],
   }[tab];
@@ -956,16 +1307,19 @@ export default function ReelPage() {
 
       {/* 📊 creator totals — the profile strip, shown on your own tab */}
       {tab === "mine" && stats && (
-        <div className="grid shrink-0 grid-cols-5 gap-px border-b border-line bg-line text-center">
+        <div className="grid shrink-0 grid-cols-6 gap-px border-b border-line bg-line text-center">
           {([
-            ["Posts", stats.posts],
-            ["Live", stats.live],
-            ["Views", stats.views],
-            ["Likes", stats.likes],
-            ["Shares", stats.shares],
-          ] as [string, number][]).map(([label, value]) => (
+            ["Followers", compact(stats.followers)],
+            ["Posts", compact(stats.posts)],
+            ["Views", compact(stats.views)],
+            ["Likes", compact(stats.likes)],
+            ["Comments", compact(stats.comments)],
+            // Completion is a rate, not a tally — the one number that tells a
+            // creator whether the ranker will carry their work.
+            ["Watched", `${Math.round((stats.completion ?? 0) * 100)}%`],
+          ] as [string, string][]).map(([label, value]) => (
             <div key={label} className="bg-base px-1 py-2.5">
-              <p className="text-sm font-semibold text-gray-100">{compact(value)}</p>
+              <p className="text-sm font-semibold text-gray-100">{value}</p>
               <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
             </div>
           ))}
@@ -1032,10 +1386,12 @@ export default function ReelPage() {
             }
           }}
         >
-          {reels.map((r) => (
+          {reels.map((r, i) => (
             <div key={r.id} className="h-full w-full bg-black">
               <ReelCard
                 reel={r}
+                eager={Math.abs(i - activeIdx) <= 1}
+                onActive={() => setActiveIdx(i)}
                 muted={muted}
                 toggleMute={() => setMuted((m) => !m)}
                 onLike={like}
@@ -1049,8 +1405,9 @@ export default function ReelPage() {
                 onDelete={remove}
                 onVisibility={visibility}
                 onView={view}
-                isFollowing={following.has(r.author)}
-                onFollow={() => toggleFollow(r.author)}
+                onWatch={watch}
+                onComment={setCommentFor}
+                onFollow={() => toggleFollow(r)}
               />
             </div>
           ))}
@@ -1084,6 +1441,16 @@ export default function ReelPage() {
           reel={shareFor}
           onClose={() => setShareFor(null)}
           onShared={(platform) => countShare(shareFor, platform)}
+        />
+      )}
+
+      {/* ------------------------------------------------ 💬 comments */}
+      {commentFor && (
+        <CommentSheet
+          reel={commentFor}
+          onClose={() => setCommentFor(null)}
+          onCount={setCommentCount}
+          flash={flash}
         />
       )}
 

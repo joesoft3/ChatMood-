@@ -28,14 +28,25 @@ already know from Reels/TikTok/Shorts:
 - Likes are optimistic and reconcile against the server's authoritative count,
   rolling back if the request fails.
 - A view is counted once per card per mount, when it first becomes visible.
-- **For you** shows the shared live feed; **My reels** shows your own posts,
-  including unposted ones so you can put them back.
+- **Neighbour preloading**: the active card and its immediate neighbours (±1)
+  use `preload="auto"` while distant cards stay on `"metadata"`. This is most of
+  what makes a feed feel *instant* rather than *loading* — the next reel is
+  already buffered when your thumb lands — without pulling the whole feed over
+  someone's mobile data.
+- **Buffering spinner** instead of a frozen play icon: a play button over a
+  stalled video reads as "broken", a spinner reads as "loading".
+- **Scrubbable progress bar** — drag (or arrow-key) back to the bit you liked.
+  The old one was a read-only 2 px sliver; the bar keeps a generous invisible
+  hit area and grows on hover/drag so it's usable with a thumb.
+- Four tabs: **For you** (ranked), **Following** (creators you follow, newest
+  first), **Saved**, and **My reels** — which includes unposted ones so you can
+  put them back.
 
 ## API
 
 | Endpoint | Notes |
 |---|---|
-| `GET /api/v1/reels` | feed, newest first, 20 per page (`?mine=true`, `?offset=`) |
+| `GET /api/v1/reels` | 🏆 **ranked** For You feed, 20 per page (`?sort=new` for chronological, `?mine=true`, `?following=true`, `?offset=`) |
 | `POST /api/v1/reels/upload` | multipart `file` + `caption` → new post |
 | `POST /api/v1/reels/share` | `{film_id}` or `{url}` + `caption` → new post |
 | `GET /api/v1/reels?saved=true` | 🔖 your saved collection, newest **save** first |
@@ -47,6 +58,12 @@ already know from Reels/TikTok/Shorts:
 | `POST /api/v1/reels/{id}/duet` | 🎭 multipart clip + `layout`/`audio`/`effect` → new duet reel |
 | `POST /api/v1/reels/{id}/repost` | 🔁 repost to your profile, crediting the root author |
 | `POST /api/v1/reels/{id}/view` | bump the view counter |
+| `POST /api/v1/reels/{id}/watch` | ⏱ watch telemetry `{watched_ms, duration_s, replays}` → ranking signal |
+| `GET /api/v1/reels/{id}/comments` | 💬 comments, newest first, 30 per page |
+| `POST /api/v1/reels/{id}/comments` | `{body}` → new comment (≤ 500 chars, 10/min) |
+| `DELETE /api/v1/reels/{id}/comments/{cid}` | yours anywhere; any comment on a reel you own |
+| `POST /api/v1/reels/authors/{author_id}/follow` | ➕ idempotent follow toggle → `{following, followers}` |
+| `GET /api/v1/reels/following` | author ids you follow |
 | `POST /api/v1/reels/{id}/visibility` | `{"live": false}` unposts; author only |
 | `DELETE /api/v1/reels/{id}` | deletes the row **and** uploaded bytes; author only |
 | `GET /api/v1/reels/files/{name}` | public streaming (see below) |
@@ -82,8 +99,80 @@ is *not* counted — only a completed share or a successful copy increments.
   on `status == "live"`), and deleting clears both join tables explicitly:
   SQLite doesn't honour `ON DELETE CASCADE` unless `PRAGMA foreign_keys` is on,
   so orphan likes/saves would otherwise break other users' Saved tabs.
-- **My reels** shows a stats strip — posts · live · views · likes · shares —
-  from `GET /reels/stats`, plus per-card **unpost** and **delete**.
+- **My reels** shows a stats strip — followers · posts · views · likes ·
+  comments · **% watched** — from `GET /reels/stats`, plus per-card **unpost**
+  and **delete**. Mean completion is there because it is the number that
+  actually predicts reach, where views only describe the past.
+- Your own live cards carry a small **analytics chip** (`% watched · views`) so
+  you can see *why* a reel is or isn't travelling, green above 60 %.
+
+## 🏆 The "For You" algorithm
+
+`services/reel_rank.py`. A reverse-chronological list is the difference between
+a demo and a product: the newest upload always wins, a great reel is buried
+within the hour, and one creator posting ten times owns the whole feed. The
+ranked feed replaces that with the model short-video apps actually use:
+
+```
+score = log10(1 + weighted_engagement) × (1 + 2·completion) × time_decay × affinity × diversity
+```
+
+| Term | Why it's there |
+|---|---|
+| **Weighted engagement** | Actions are weighted by *intent*: view `0.05` < like `1` < comment `2.5` < save `3` < share `4` < repost `5`. A thousand passive autoplays should not outrank fifteen people who put their name on it. |
+| **`log10` compression** | Without it one runaway hit outscores everything posted since by so much that no decay curve can retire it, and the feed freezes around last week's winner. Same reason Reddit/HN compress their vote term. |
+| **Completion rate** | The strongest quality signal there is, and the one metric you can't farm by posting more. A reel people finish beats one with equal likes that everybody swipes away from. |
+| **Time decay** | `(2/(age_h + 2))^1.6` — a gravity curve. Fresh surfaces, but proven work stays competitive for about a day. |
+| **Affinity** | `×2.2` if you follow the creator, `×1.35` if you've liked their work before (implicit taste — this is what personalizes the feed on day one, before anyone presses Follow). Your own reels are damped `×0.55` in your own For You. |
+| **Diversity** | The *k*-th consecutive reel by one author is multiplied by `0.55^k`, so a prolific creator can't wall off the feed. Deterministic, so pagination stays stable. |
+| **Exploration floor** | A brand-new reel with zero engagement still scores `0.25`, fading over 6 h — otherwise nothing new ever earns the impressions it needs to prove itself. |
+
+The floor is **calibrated, not vibes**: a strong reel (5k views / 800 likes /
+200 shares / 90 % completion) scores ≈ 0.42 at 12 h and ≈ 0.008 at 7 days, so a
+floor of 0.25 lets it beat fresh uploads for its first day and retires it inside
+a week. `test_reel_ranking.py` pins that window down.
+
+Ranking runs over a **candidate window** (the 500 freshest live reels) rather
+than the whole table — ranking is only meaningful among plausible candidates,
+and pulling everything into Python to sort it is how feeds fall over. Viewer
+terms (affinity, diversity) are applied in Python because they differ per
+viewer; everything else is denormalized onto the row.
+
+> `?sort=new` keeps the old reverse-chronological feed — "show me the latest" is
+> a legitimate thing to want, it just isn't a good *default*.
+
+## ⏱ Watch telemetry — the signal that makes ranking work
+
+A view tally can't tell a masterpiece from something people bail on in 400 ms,
+so the player reports real watch time on swipe-away (`POST /reels/{id}/watch`).
+
+- `watched_ms` accumulates **playing time**, summed from `timeupdate` deltas —
+  not wall-clock, so a paused or buffering reel can't inflate it.
+- Reported on swipe-away, unmount, `visibilitychange` **and** `pagehide`: a
+  swipe is often a page teardown, and an unreported watch is a lost signal.
+- Aggregates are adjusted **by delta** per `(reel, viewer)`, so re-watching a
+  reel twenty times refines the number instead of stacking twenty samples.
+- Everything is clamped server-side (≤ 6 h, completion ≤ 1.0). A hostile client
+  reporting `completion: 50` cannot buy the top slot.
+
+## ➕ Follow — now a real graph
+
+Follow used to be a `localStorage` set: the badge flipped to "Following" and
+nothing else in the product ever knew — it didn't change the feed and it
+vanished when you switched device. That is the single most "cheap demo" tell in
+a short-video app, because following is supposed to *change what you see*.
+
+`reel_follows` is keyed by author **user id**, not display name (names are
+editable and non-unique, so a name-keyed graph silently re-points at another
+creator). It powers the **Following** tab and the affinity term above.
+
+## 💬 Comments
+
+Flat, not threaded — one level is the 90 % case and threading turns the feed
+query into a recursive CTE for very little gain. The count is denormalized onto
+the reel row so a feed card needs no extra request. You can always delete your
+own comment; the **reel's author can delete any comment on their own post**,
+which is the minimum viable moderation story.
 
 ## 🎬 Reel Studio — duet, effects, captions
 

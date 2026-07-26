@@ -7,6 +7,65 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🏆 Reel: a real "For You" algorithm, follow graph, comments & watch telemetry
+
+The reel looked the part but behaved like a demo underneath: the feed was a
+plain `ORDER BY created_at DESC`, and **Follow was a `localStorage` set** that
+flipped a badge and changed nothing. This is the pass that makes it behave like
+the product it resembles.
+
+- **🏆 Ranked For You feed** (`services/reel_rank.py`) —
+  `log10(1 + weighted_engagement) × (1 + 2·completion) × time_decay × affinity ×
+  diversity`. Actions are weighted by intent (view `0.05` → repost `5`), so a
+  thousand passive autoplays don't outrank fifteen people who shared it.
+  `?sort=new` keeps the chronological feed — a legitimate thing to want, just a
+  bad *default*.
+  - **Log compression** was added after a test caught the failure mode: with
+    linear engagement one runaway hit outscored everything posted since, and no
+    decay curve could retire it — the feed froze around last week's winner.
+  - The exploration floor (`0.25`) is **calibrated, not guessed**: a strong reel
+    scores ≈0.42 at 12 h and ≈0.008 at 7 days, so it beats fresh uploads for a
+    day and retires inside a week. Tests pin that window.
+  - **Author diversity** damps the *k*-th consecutive reel by one creator
+    (`0.55^k`) so nobody can wall off the feed; deterministic, so pagination
+    stays stable.
+  - Ranking runs over a 500-reel candidate window — flat cost as the corpus
+    grows, instead of sorting the whole table in Python.
+- **➕ Follow is a real graph** (`reel_follows`, keyed by user **id** — display
+  names are editable and non-unique). Drives a new **Following** tab and the
+  affinity boost. Optimistic across every card by that creator at once.
+- **⏱ Watch telemetry** (`reel_watches` + `POST /reels/{id}/watch`) — the signal
+  ranking actually needs, since a view tally can't tell a masterpiece from
+  something people bail on in 400 ms. Accumulates real *playing* time from
+  `timeupdate` deltas (a paused reel can't inflate it), flushes on swipe-away,
+  unmount, `visibilitychange` **and** `pagehide`, and adjusts aggregates **by
+  delta** per viewer so re-watching refines rather than stacks. Clamped
+  server-side: a client reporting `completion: 50` cannot buy the top slot.
+- **💬 Comments** — flat, denormalized count on the feed card, 500-char limit,
+  rate-limited. You can delete your own anywhere; a reel's author can moderate
+  any comment on their own post.
+- **📺 Playback that feels expensive** — neighbour preloading (`±1` card on
+  `preload="auto"`) so the next swipe plays instantly; a buffering spinner
+  instead of a play icon frozen over a stalled video; and a **scrubbable**
+  progress bar (drag or arrow keys) replacing the read-only 2 px sliver.
+- **📊 Creator analytics** — the profile strip now leads with **followers** and
+  **% watched** (the number that predicts reach) beside the vanity counters, and
+  your own live cards carry an inline `% watched · views` chip so you can see
+  *why* a reel is or isn't travelling.
+- **Migration `0024_reel_ranking`** — guarded/idempotent like 0022–0023, with
+  all four paths tested (legacy table, re-run, downgrade, `create_all`). Fixed a
+  downgrade bug found in testing: SQLite batch mode re-creates an index over a
+  column being dropped in the same batch, so `ix_reels_hot_score` is now dropped
+  first.
+- **Deleting a reel** now clears its comments and watch rows too — SQLite
+  doesn't honour `ON DELETE CASCADE` by default, so those would have been
+  orphaned and kept feeding the ranker for a reel nobody can watch.
+- **23 new tests** (`test_reel_ranking.py`), asserting behaviour rather than
+  arithmetic: quality beats freshness but not forever, following changes the
+  feed, one author can't dominate, hostile watch reports are neutralised.
+  Verified end-to-end against a live server with a seeded 4-creator feed —
+  the 97 %-watched reel moves from 3rd chronologically to 1st ranked.
+
 ### 🎙 One-command voice key setup + self-check (`scripts/set-voice-key.sh`)
 
 - **Voice is the one feature gated behind `OPENAI_API_KEY`** (Whisper STT, TTS,

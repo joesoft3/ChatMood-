@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -25,9 +26,18 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
-from ...db.models import Film, Reel, ReelLike, ReelSave, User
+from ...db.models import (
+    Film,
+    Reel,
+    ReelComment,
+    ReelFollow,
+    ReelLike,
+    ReelSave,
+    ReelWatch,
+    User,
+)
 from ...db.session import get_db
-from ...services import reel_studio as studio, soundtrack
+from ...services import reel_rank, reel_studio as studio, soundtrack
 from ...services.editor import transcribe_srt
 from ...services.metering import plan_rate_mult, record_usage
 from ..deps import enforce_rate_limit, get_current_user
@@ -61,6 +71,12 @@ REEL_AUDIO_MAX_BYTES = 25 * 1024 * 1024
 DRAFT_RE = re.compile(r"^[a-f0-9]{32}_ra\.(mp4|webm|mov|mp3|m4a|wav|ogg|flac)$")
 CAPTION_MAX = 300
 FEED_PAGE = 20
+# How many recent live reels the ranker considers. Ranking is only meaningful
+# among plausible candidates, and this keeps For You O(pool) rather than
+# O(everything ever posted).
+CANDIDATE_POOL = 500
+COMMENT_MAX = 500
+COMMENT_PAGE = 30
 
 
 def _author_label(u: User) -> str:
@@ -76,7 +92,15 @@ def _media_url(name: str) -> str:
     return f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/reels/files/{name}"
 
 
-def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool = False) -> dict:
+def _reel_out(
+    r: Reel,
+    *,
+    liked: bool = False,
+    saved: bool = False,
+    mine: bool = False,
+    following: bool = False,
+    score: float | None = None,
+) -> dict:
     """Serialize a reel for the feed.
 
     Defensive about filenames for the same reason the films gallery is: one
@@ -104,6 +128,7 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
         "shares": r.shares or 0,
         "saves": r.saves or 0,
         "reposts": r.reposts or 0,
+        "comments": r.comments or 0,
         "parent_id": r.parent_id or "",
         "parent_author": r.parent_author or "",
         "effect": r.effect or "",
@@ -111,6 +136,17 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
         "liked": liked,
         "saved": saved,
         "mine": mine,
+        "following": following,
+        "author_id": r.user_id,
+        "duration_s": round(float(r.duration_s or 0.0), 2),
+        # Mean completion rate, surfaced so creators can see *why* a reel is
+        # ranking (the analytics sheet reads it straight off the card).
+        "completion": round(
+            reel_rank.mean_completion(r.completion_sum or 0.0, r.completion_n or 0), 4
+        ),
+        # Only populated on ranked feeds — the UI shows it in the creator's own
+        # analytics, never on someone else's card.
+        "score": round(score, 3) if score is not None else None,
         "status": r.status,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     }
@@ -125,6 +161,34 @@ async def _liked_ids(db: AsyncSession, user_id: str, reel_ids: list[str]) -> set
             select(ReelLike.reel_id).where(
                 ReelLike.user_id == user_id, ReelLike.reel_id.in_(reel_ids)
             )
+        )
+    ).scalars().all()
+    return set(rows)
+
+
+async def _following_ids(db: AsyncSession, user_id: str) -> set[str]:
+    """Author ids this viewer follows (one query; the graph is small per user)."""
+    rows = (
+        await db.execute(select(ReelFollow.author_id).where(ReelFollow.follower_id == user_id))
+    ).scalars().all()
+    return set(rows)
+
+
+async def _affinity_ids(db: AsyncSession, user_id: str, author_ids: list[str]) -> set[str]:
+    """Authors whose work this viewer has liked before — implicit taste.
+
+    Following is explicit and rare; liking is implicit and common, so this is
+    what makes the feed feel personalized on day one, before anyone has pressed
+    Follow at all.
+    """
+    if not author_ids:
+        return set()
+    rows = (
+        await db.execute(
+            select(Reel.user_id)
+            .join(ReelLike, ReelLike.reel_id == Reel.id)
+            .where(ReelLike.user_id == user_id, Reel.user_id.in_(author_ids))
+            .distinct()
         )
     ).scalars().all()
     return set(rows)
@@ -149,18 +213,61 @@ async def _saved_ids(db: AsyncSession, user_id: str, reel_ids: list[str]) -> set
 async def list_reels(
     mine: bool = False,
     saved: bool = False,
+    following: bool = False,
+    sort: str = "foryou",
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """The shared creator feed, newest first.
+    """The creator feed.
 
-    `mine=true`  → only your posts (including unposted ones, so you can
-                   restore them from your profile).
-    `saved=true` → only reels you bookmarked, newest *save* first (not newest
-                   post — a save is its own event with its own timestamp).
+    `sort=foryou`   → 🏆 **ranked** (default): engagement velocity × freshness ×
+                      affinity, with an author-diversity pass. See
+                      `services/reel_rank.py` for the model.
+    `sort=new`      → reverse-chronological (the old behaviour, kept because
+                      "show me the latest" is a legitimate thing to want).
+    `following=true`→ only creators you follow, newest first.
+    `mine=true`     → only your posts (including unposted ones, so you can
+                      restore them from your profile).
+    `saved=true`    → only reels you bookmarked, newest *save* first (not newest
+                      post — a save is its own event with its own timestamp).
     """
     offset = max(0, min(offset, 5000))
+
+    if following:
+        # Your subscriptions, newest first — chronology is the right order here
+        # precisely *because* you asked for these creators specifically.
+        author_ids = await _following_ids(db, user.id)
+        if not author_ids:
+            return {"reels": [], "total": 0, "next_offset": None, "sort": "following"}
+        q = (
+            select(Reel)
+            .where(Reel.status == "live", Reel.user_id.in_(author_ids))
+            .order_by(Reel.created_at.desc(), Reel.id.desc())
+        )
+        count_q = select(func.count(Reel.id)).where(
+            Reel.status == "live", Reel.user_id.in_(author_ids)
+        )
+        rows = (await db.execute(q.offset(offset).limit(FEED_PAGE))).scalars().all()
+        total = int(await db.scalar(count_q) or 0)
+        ids = [r.id for r in rows]
+        liked = await _liked_ids(db, user.id, ids)
+        saved_set = await _saved_ids(db, user.id, ids)
+        return {
+            "reels": [
+                _reel_out(
+                    r,
+                    liked=r.id in liked,
+                    saved=r.id in saved_set,
+                    mine=r.user_id == user.id,
+                    following=True,
+                )
+                for r in rows
+            ],
+            "total": total,
+            "next_offset": offset + len(rows) if offset + len(rows) < total else None,
+            "sort": "following",
+        }
 
     if saved:
         # Join through the bookmark table and sort by when it was saved.
@@ -176,32 +283,131 @@ async def list_reels(
             .join(ReelSave, ReelSave.reel_id == Reel.id)
             .where(ReelSave.user_id == user.id, Reel.status == "live")
         )
-    else:
-        q = select(Reel)
-        if mine:
-            q = q.where(Reel.user_id == user.id)
-            count_q = select(func.count(Reel.id)).where(Reel.user_id == user.id)
-        else:
-            q = q.where(Reel.status == "live")
-            count_q = select(func.count(Reel.id)).where(Reel.status == "live")
+    elif mine:
+        q = (
+            select(Reel)
+            .where(Reel.user_id == user.id)
+            .order_by(Reel.created_at.desc(), Reel.id.desc())
+        )
+        count_q = select(func.count(Reel.id)).where(Reel.user_id == user.id)
+    elif sort == "new":
         # `id` breaks ties deterministically: without it, posts sharing a
         # timestamp could shuffle between pages and the reader would skip or
         # re-see one.
-        q = q.order_by(Reel.created_at.desc(), Reel.id.desc())
+        q = (
+            select(Reel)
+            .where(Reel.status == "live")
+            .order_by(Reel.created_at.desc(), Reel.id.desc())
+        )
+        count_q = select(func.count(Reel.id)).where(Reel.status == "live")
+    else:
+        # ── 🏆 For You ────────────────────────────────────────────────────────
+        return await _ranked_feed(db, user, offset)
 
     rows = (await db.execute(q.offset(offset).limit(FEED_PAGE))).scalars().all()
 
     ids = [r.id for r in rows]
     liked = await _liked_ids(db, user.id, ids)
     saved_set = await _saved_ids(db, user.id, ids)
+    follows = await _following_ids(db, user.id)
     total = int(await db.scalar(count_q) or 0)
     return {
         "reels": [
-            _reel_out(r, liked=r.id in liked, saved=r.id in saved_set, mine=r.user_id == user.id)
+            _reel_out(
+                r,
+                liked=r.id in liked,
+                saved=r.id in saved_set,
+                mine=r.user_id == user.id,
+                following=r.user_id in follows,
+            )
             for r in rows
         ],
         "total": total,
         "next_offset": offset + len(rows) if offset + len(rows) < total else None,
+        "sort": "saved" if saved else ("mine" if mine else "new"),
+    }
+
+
+async def _ranked_feed(db: AsyncSession, user: User, offset: int) -> dict:
+    """🏆 The For You feed: score a candidate window, personalize, diversify.
+
+    Why a *window* and not the whole table: ranking is only meaningful among
+    plausible candidates, and pulling every reel ever posted to sort it in
+    Python is how feeds fall over at scale. We take the freshest
+    `CANDIDATE_POOL` live reels (an indexed scan on `created_at`), score them,
+    and page through the result. That keeps the cost flat as the corpus grows
+    while still letting an older-but-excellent reel beat a new-but-empty one.
+
+    Pagination is offset-based over a *deterministically* scored list: the score
+    depends only on stored counters and the request timestamp, so two pages of
+    the same feed agree with each other as long as the counters hold still.
+    """
+    pool = (
+        await db.execute(
+            select(Reel)
+            .where(Reel.status == "live")
+            .order_by(Reel.created_at.desc(), Reel.id.desc())
+            .limit(CANDIDATE_POOL)
+        )
+    ).scalars().all()
+
+    if not pool:
+        return {"reels": [], "total": 0, "next_offset": None, "sort": "foryou"}
+
+    follows = await _following_ids(db, user.id)
+    author_ids = list({r.user_id for r in pool})
+    affinity = await _affinity_ids(db, user.id, author_ids)
+
+    now = datetime.now(timezone.utc)
+    by_id = {r.id: r for r in pool}
+    scored: list[tuple[str, float, str]] = []
+    for r in pool:
+        base = reel_rank.hot_score(
+            created_at=r.created_at,
+            views=r.views or 0,
+            likes=r.likes or 0,
+            comments=r.comments or 0,
+            saves=r.saves or 0,
+            shares=r.shares or 0,
+            reposts=r.reposts or 0,
+            completion=reel_rank.mean_completion(r.completion_sum or 0.0, r.completion_n or 0),
+            now=now,
+        )
+        scored.append((
+            r.id,
+            reel_rank.personalize(
+                base,
+                is_following=r.user_id in follows,
+                has_affinity=r.user_id in affinity,
+                is_own=r.user_id == user.id,
+            ),
+            r.user_id,
+        ))
+
+    scored.sort(key=lambda t: t[1], reverse=True)
+    scored = reel_rank.diversify(scored)
+
+    total = len(scored)
+    page = scored[offset : offset + FEED_PAGE]
+    ids = [rid for rid, _, _ in page]
+    liked = await _liked_ids(db, user.id, ids)
+    saved_set = await _saved_ids(db, user.id, ids)
+
+    return {
+        "reels": [
+            _reel_out(
+                by_id[rid],
+                liked=rid in liked,
+                saved=rid in saved_set,
+                mine=by_id[rid].user_id == user.id,
+                following=by_id[rid].user_id in follows,
+                score=score,
+            )
+            for rid, score, _ in page
+        ],
+        "total": total,
+        "next_offset": offset + len(page) if offset + len(page) < total else None,
+        "sort": "foryou",
     }
 
 
@@ -854,6 +1060,224 @@ async def count_share(
     return {"shares": r.shares, "url": _reel_out(r)["url"]}
 
 
+# ------------------------------------------------------------------ follow
+@router.post("/authors/{author_id}/follow")
+async def toggle_follow(
+    author_id: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+):
+    """➕ Follow / unfollow a creator — idempotent toggle, like/save semantics.
+
+    This used to live in `localStorage`, which meant the badge flipped and the
+    product forgot the moment you switched device. Persisted, it drives both the
+    Following tab and the affinity term in the ranker.
+    """
+    if author_id == user.id:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "You already follow yourself")
+    author = await db.get(User, author_id)
+    if not author:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Creator not found")
+    await enforce_rate_limit(f"reelfollow:{user.id}", 30 * plan_rate_mult(user.plan))
+
+    existing = await db.get(ReelFollow, {"follower_id": user.id, "author_id": author_id})
+    if existing:
+        await db.delete(existing)
+        is_following = False
+    else:
+        db.add(ReelFollow(follower_id=user.id, author_id=author_id))
+        is_following = True
+    await db.commit()
+
+    followers = int(
+        await db.scalar(select(func.count()).select_from(ReelFollow).where(
+            ReelFollow.author_id == author_id)) or 0
+    )
+    return {"following": is_following, "followers": followers, "author_id": author_id}
+
+
+@router.get("/following")
+async def my_following(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    """Who you follow — ids only; the feed already carries display names."""
+    ids = await _following_ids(db, user.id)
+    return {"author_ids": sorted(ids), "count": len(ids)}
+
+
+# ------------------------------------------------------------------- watch
+@router.post("/{reel_id}/watch")
+async def report_watch(
+    reel_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """⏱ Report watch telemetry when the viewer swipes away.
+
+    Body: `{"watched_ms": int, "duration_s": float, "replays": int}`.
+
+    This is the signal that makes ranking meaningful — a view tally can't tell a
+    reel people finish from one they bail on in 400 ms. Sent with `sendBeacon`
+    so it survives the page teardown that a swipe-away often is.
+
+    Reports are clamped and per-(reel, viewer): the aggregate on the reel row is
+    adjusted by the *delta*, so replaying a reel twenty times can't inflate the
+    mean completion twenty-fold.
+    """
+    r = await db.get(Reel, reel_id)
+    if not r or r.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+
+    try:
+        watched_ms = int(body.get("watched_ms") or 0)
+        duration_s = float(body.get("duration_s") or 0.0)
+        replays = int(body.get("replays") or 0)
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Malformed watch report")
+
+    # Clamp everything: a hostile or buggy client must not be able to move the
+    # ranking. 6 h is far beyond any legitimate single-reel session.
+    watched_ms = max(0, min(watched_ms, 6 * 3600 * 1000))
+    duration_s = max(0.0, min(duration_s, 6 * 3600.0))
+    replays = max(0, min(replays, 1000))
+    completion = 0.0
+    if duration_s > 0:
+        completion = min(1.0, (watched_ms / 1000.0) / duration_s)
+
+    # Learn the duration from the player the first time we see it — uploads
+    # don't always carry a probe-able duration (and ffmpeg may be absent).
+    if duration_s > 0 and not (r.duration_s or 0):
+        r.duration_s = duration_s
+
+    row = await db.get(ReelWatch, {"reel_id": reel_id, "user_id": user.id})
+    if row is None:
+        row = ReelWatch(
+            reel_id=reel_id, user_id=user.id,
+            watched_ms=watched_ms, completion=completion, replays=replays,
+        )
+        db.add(row)
+        r.watch_ms = (r.watch_ms or 0) + watched_ms
+        r.completion_sum = (r.completion_sum or 0.0) + completion
+        r.completion_n = (r.completion_n or 0) + 1
+    else:
+        # Adjust the aggregate by the delta so repeat sessions from the same
+        # viewer refine the number instead of stacking new samples onto it.
+        r.watch_ms = max(0, (r.watch_ms or 0) + max(0, watched_ms - (row.watched_ms or 0)))
+        best = max(row.completion or 0.0, completion)
+        r.completion_sum = max(0.0, (r.completion_sum or 0.0) - (row.completion or 0.0) + best)
+        row.completion = best
+        row.watched_ms = max(row.watched_ms or 0, watched_ms)
+        row.replays = (row.replays or 0) + replays
+
+    r.hot_score = reel_rank.hot_score(
+        created_at=r.created_at,
+        views=r.views or 0, likes=r.likes or 0, comments=r.comments or 0,
+        saves=r.saves or 0, shares=r.shares or 0, reposts=r.reposts or 0,
+        completion=reel_rank.mean_completion(r.completion_sum or 0.0, r.completion_n or 0),
+    )
+    r.ranked_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {
+        "ok": True,
+        "completion": round(
+            reel_rank.mean_completion(r.completion_sum or 0.0, r.completion_n or 0), 4
+        ),
+    }
+
+
+# ---------------------------------------------------------------- comments
+def _comment_out(c: ReelComment, *, mine: bool) -> dict:
+    return {
+        "id": c.id,
+        "author": c.author_name or "creator",
+        "author_id": c.user_id,
+        "body": c.body or "",
+        "likes": c.likes or 0,
+        "mine": mine,
+        "created_at": c.created_at.isoformat() if c.created_at else None,
+    }
+
+
+@router.get("/{reel_id}/comments")
+async def list_comments(
+    reel_id: str,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """💬 Comments on a reel, newest first."""
+    r = await db.get(Reel, reel_id)
+    if not r or (r.status != "live" and r.user_id != user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    offset = max(0, min(offset, 5000))
+    rows = (
+        await db.execute(
+            select(ReelComment)
+            .where(ReelComment.reel_id == reel_id)
+            .order_by(ReelComment.created_at.desc(), ReelComment.id.desc())
+            .offset(offset)
+            .limit(COMMENT_PAGE)
+        )
+    ).scalars().all()
+    total = int(
+        await db.scalar(
+            select(func.count(ReelComment.id)).where(ReelComment.reel_id == reel_id)
+        ) or 0
+    )
+    return {
+        "comments": [_comment_out(c, mine=c.user_id == user.id) for c in rows],
+        "total": total,
+        "next_offset": offset + len(rows) if offset + len(rows) < total else None,
+    }
+
+
+@router.post("/{reel_id}/comments", status_code=status.HTTP_201_CREATED)
+async def add_comment(
+    reel_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """💬 Post a comment. Rate-limited — comments are the classic spam surface."""
+    r = await db.get(Reel, reel_id)
+    if not r or r.status != "live":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Reel not found")
+    text = str(body.get("body") or "").strip()
+    if not text:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Say something first")
+    if len(text) > COMMENT_MAX:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, f"Comments are limited to {COMMENT_MAX} characters"
+        )
+    await enforce_rate_limit(f"reelcomment:{user.id}", 10 * plan_rate_mult(user.plan))
+
+    c = ReelComment(
+        reel_id=reel_id, user_id=user.id, author_name=_author_label(user), body=text
+    )
+    db.add(c)
+    r.comments = (r.comments or 0) + 1
+    await db.commit()
+    await db.refresh(c)
+    return {"comment": _comment_out(c, mine=True), "comments": r.comments}
+
+
+@router.delete("/{reel_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_comment(
+    reel_id: str,
+    comment_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Delete a comment — yours anywhere, anyone's on a reel you own (moderation)."""
+    c = await db.get(ReelComment, comment_id)
+    if not c or c.reel_id != reel_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comment not found")
+    r = await db.get(Reel, reel_id)
+    if c.user_id != user.id and not (r and r.user_id == user.id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Comment not found")
+    await db.delete(c)
+    if r:
+        r.comments = max(0, (r.comments or 0) - 1)
+    await db.commit()
+
+
 @router.get("/stats")
 async def my_stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     """📊 Totals across everything you've posted — the profile header numbers."""
@@ -878,6 +1302,34 @@ async def my_stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_
         await db.scalar(select(func.count(ReelSave.reel_id)).where(ReelSave.user_id == user.id))
         or 0
     )
+    followers = int(
+        await db.scalar(
+            select(func.count()).select_from(ReelFollow).where(ReelFollow.author_id == user.id)
+        ) or 0
+    )
+    following_n = int(
+        await db.scalar(
+            select(func.count()).select_from(ReelFollow).where(ReelFollow.follower_id == user.id)
+        ) or 0
+    )
+    comments_n = int(
+        await db.scalar(
+            select(func.coalesce(func.sum(Reel.comments), 0)).where(Reel.user_id == user.id)
+        ) or 0
+    )
+    # ⏱ Mean completion across your live posts — the single number that best
+    # predicts whether the ranker will carry a reel, so it belongs on the
+    # profile strip next to the vanity counters.
+    csum = float(
+        await db.scalar(
+            select(func.coalesce(func.sum(Reel.completion_sum), 0.0)).where(Reel.user_id == user.id)
+        ) or 0.0
+    )
+    cn = int(
+        await db.scalar(
+            select(func.coalesce(func.sum(Reel.completion_n), 0)).where(Reel.user_id == user.id)
+        ) or 0
+    )
     return {
         "posts": int(row[0] or 0),
         "live": live,
@@ -885,6 +1337,10 @@ async def my_stats(db: AsyncSession = Depends(get_db), user: User = Depends(get_
         "likes": int(row[2] or 0),
         "shares": int(row[3] or 0),
         "saves": int(row[4] or 0),
+        "comments": comments_n,
+        "followers": followers,
+        "following": following_n,
+        "completion": round(reel_rank.mean_completion(csum, cn), 4),
         "saved_by_me": saved_count,
     }
 
@@ -952,11 +1408,15 @@ async def delete_reel(
         parent = await db.get(Reel, r.parent_id)
         if parent and r.source == "repost":
             parent.reposts = max(0, (parent.reposts or 0) - 1)
-    # Clear both join tables explicitly: SQLite doesn't enforce ON DELETE
+    # Clear every child table explicitly: SQLite doesn't enforce ON DELETE
     # CASCADE unless PRAGMA foreign_keys is on, so a deleted reel could
-    # otherwise leave orphan likes/saves that break other users' Saved tabs.
+    # otherwise leave orphan likes/saves that break other users' Saved tabs —
+    # and orphan comments/watch rows that would resurface against a recycled id
+    # and keep feeding the ranker signal for a reel nobody can watch.
     await db.execute(delete(ReelLike).where(ReelLike.reel_id == r.id))
     await db.execute(delete(ReelSave).where(ReelSave.reel_id == r.id))
+    await db.execute(delete(ReelComment).where(ReelComment.reel_id == r.id))
+    await db.execute(delete(ReelWatch).where(ReelWatch.reel_id == r.id))
     await db.delete(r)
     await db.commit()
 

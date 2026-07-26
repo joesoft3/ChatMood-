@@ -412,6 +412,20 @@ class Reel(Base):
     shares: Mapped[int] = mapped_column(Integer, default=0)
     saves: Mapped[int] = mapped_column(Integer, default=0)
     reposts: Mapped[int] = mapped_column(Integer, default=0)
+    comments: Mapped[int] = mapped_column(Integer, default=0)
+    # ⏱ Watch aggregates — denormalized from reel_watches so ranking a page of
+    # 20 stays one indexed scan instead of 20 correlated subqueries.
+    # `completion_sum / completion_n` is the mean completion rate; keeping the
+    # pair (rather than a running average) means a late data fix can't skew it.
+    watch_ms: Mapped[int] = mapped_column(Integer, default=0)
+    completion_sum: Mapped[float] = mapped_column(Float, default=0.0)
+    completion_n: Mapped[int] = mapped_column(Integer, default=0)
+    duration_s: Mapped[float] = mapped_column(Float, default=0.0)   # probed at publish
+    # 🏆 Cached ranking score + when it was last recomputed. Stored so the feed
+    # can ORDER BY in the database (keyset-friendly) rather than pulling the
+    # whole table into Python to sort it.
+    hot_score: Mapped[float] = mapped_column(Float, default=0.0, index=True)
+    ranked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Python-side default (microseconds) in ADDITION to the server default:
     # SQLite's CURRENT_TIMESTAMP only has 1-second resolution, so two posts in
     # the same second would tie and the paginated feed could skip or repeat
@@ -444,6 +458,90 @@ class ReelSave(Base):
 
     reel_id: Mapped[str] = mapped_column(ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+
+
+class ReelComment(Base):
+    """💬 Comments — the conversation layer a short-video feed lives or dies on.
+
+    Flat (no threading) on purpose: one level of replies is the 90% case and
+    threading turns the feed query into a recursive CTE for very little gain.
+    The author of the *reel* may delete any comment on their own post; the
+    author of the *comment* may always delete their own.
+    """
+
+    __tablename__ = "reel_comments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    reel_id: Mapped[str] = mapped_column(
+        ForeignKey("reels.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    author_name: Mapped[str] = mapped_column(String(80), default="")  # denormalized like the feed
+    body: Mapped[str] = mapped_column(Text, default="")
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        index=True,
+    )
+
+
+class ReelFollow(Base):
+    """➕ The follow graph — one row per (follower, author).
+
+    Follow used to be a `localStorage` set in the browser: the badge flipped to
+    "Following" and nothing else in the product ever knew. That is the single
+    most "cheap demo" tell in a short-video app, because following is supposed
+    to *change the feed*. Persisting it server-side makes the Following tab and
+    the affinity term of the ranker possible.
+
+    Keyed by author **user id**, not display name: names are editable and not
+    unique, so a name-keyed graph would silently re-point at another creator.
+    """
+
+    __tablename__ = "reel_follows"
+
+    follower_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    author_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+    )
+
+
+class ReelWatch(Base):
+    """⏱ Per-(reel, viewer) watch telemetry — the signal TikTok actually ranks on.
+
+    A raw view tally cannot tell a masterpiece from a thumb-stopper people swipe
+    away from in 400 ms. Completion rate (watched ÷ duration) and replays are
+    what separate them, so the player reports them on swipe-away and we keep the
+    running aggregate here, one row per viewer per reel.
+
+    `watched_ms` accumulates across repeat sessions while `completion` keeps the
+    BEST single-session ratio — averaging it would let a long tail of partial
+    re-watches drag a genuinely great reel below a mediocre one.
+    """
+
+    __tablename__ = "reel_watches"
+
+    reel_id: Mapped[str] = mapped_column(
+        ForeignKey("reels.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    watched_ms: Mapped[int] = mapped_column(Integer, default=0)
+    completion: Mapped[float] = mapped_column(Float, default=0.0)  # best session, 0..1
+    replays: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
