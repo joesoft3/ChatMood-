@@ -1,3 +1,5 @@
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from ..config import settings
@@ -41,18 +43,34 @@ def _sqlite_date_trunc(unit, ts) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
 
+@event.listens_for(Engine, "connect")
+def _register_sqlite_compat(dbapi_conn, connection_record):
+    """Attach the Postgres-compatibility shims to **every** sqlite connection.
+
+    This used to bind to `engine.sync_engine` only, so the shim existed on the
+    one module-level engine and nowhere else. Any other engine — every test
+    fixture, any tool or script that builds its own — silently lost
+    `date_trunc`, and the admin/analytics endpoints blew up with
+    "no such function" the moment they were exercised through one. Listening on
+    the `Engine` class covers all of them; the dialect check keeps it inert for
+    Postgres.
+    """
+    # aiosqlite hands back an AsyncAdapt_* wrapper, not a raw sqlite3 module
+    # object, so sniffing the connection's module misses the async driver
+    # entirely. Duck-type on `create_function` instead: sqlite exposes it and
+    # asyncpg/psycopg do not.
+    create_function = getattr(dbapi_conn, "create_function", None)
+    if create_function is None:
+        return
+    create_function("date_trunc", 2, _sqlite_date_trunc)
+
+
 engine = create_async_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     echo=settings.DEBUG,
     connect_args=engine_connect_args(settings.DATABASE_URL),
 )
-if engine.url.get_backend_name() == "sqlite":
-    from sqlalchemy import event
-
-    @event.listens_for(engine.sync_engine, "connect")
-    def _sqlite_compat(dbapi_conn, _unused):
-        dbapi_conn.create_function("date_trunc", 2, _sqlite_date_trunc)
 
 
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)

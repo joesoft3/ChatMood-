@@ -163,10 +163,19 @@ def running_count() -> int:
     return sum(1 for t in _TASKS.values() if not t.done())
 
 
-async def resumable_orphans() -> list[Film]:
-    """Films stuck 'rendering' (e.g. process restarted mid-render) — retryable."""
+async def resumable_orphans(db=None) -> list[Film]:
+    """Films stuck 'rendering' (e.g. process restarted mid-render) — retryable.
+
+    Accepts an optional session so a request handler can pass the one it was
+    already given. Ignoring it and opening `SessionLocal()` meant the endpoint
+    bypassed the caller's session entirely — including `get_db` overrides — and
+    dialled the globally-configured database instead of the one serving the
+    request. Background callers still get the module session by default.
+    """
+    stmt = select(Film).where(Film.status == "rendering").order_by(Film.created_at.desc())
+    if db is not None:
+        rows = (await db.execute(stmt)).scalars().all()
+        return [f for f in rows if f.id not in _TASKS]
     async with SessionLocal() as s:
-        rows = (
-            await s.execute(select(Film).where(Film.status == "rendering").order_by(Film.created_at.desc()))
-        ).scalars().all()
+        rows = (await s.execute(stmt)).scalars().all()
         return [f for f in rows if f.id not in _TASKS]

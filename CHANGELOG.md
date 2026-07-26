@@ -7,6 +7,74 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-26
 
+### 🧪 The "sandbox-only" failures were mostly real bugs
+
+The authenticated sweep reported 7 failures; six were initially dismissed as
+environment noise. Re-examined properly, **three were genuine defects** that a
+production Postgres deployment merely papers over.
+
+- **`date_trunc` was registered on one engine, not all of them.** The sqlite
+  compatibility shim bound to `engine.sync_engine` — the module-level engine
+  alone. Every other engine (all 34 test fixtures, any script or self-hoster
+  tool) silently lacked it, so `/admin/overview`, `/admin/users` and
+  `/admin/analytics` raised `no such function: date_trunc` through any of them.
+  Now registered on the `Engine` class so every sqlite connection gets it.
+  (First attempt sniffed the connection's module and **broke the previously
+  working path** — aiosqlite returns an `AsyncAdapt_*` wrapper, not a raw
+  `sqlite3` object. Now duck-types on `create_function`.)
+- **`GET /media/films/resumable` ignored the session it was handed.** It
+  declares `db: AsyncSession = Depends(get_db)` and then called
+  `resumable_orphans()`, which opens its own `SessionLocal()` — bypassing the
+  caller's session, including `get_db` overrides, and querying the globally
+  configured database rather than the one serving the request. The session is
+  now threaded through; background callers keep the old default.
+- **pgvector logged a fake outage.** `_ensure()` ran Postgres-only DDL on
+  sqlite, retried it, and surfaced `syntax error near "EXTENSION"` twice —
+  indistinguishable from a broken deployment, when it is really an
+  unconfigured optional feature. It now fails fast naming the actual cause.
+- **Confirmed genuinely correct:** `/memory` → 503 (verified it returns 200 the
+  moment a store is reachable) and `/readyz` → 503 (that *is* the signal when
+  Redis/Postgres are down).
+- **Tests: +8** (626 total) in `tests/test_sandbox_parity.py`, each
+  mutation-verified by reverting its fix. One pins the engine to sqlite rather
+  than trusting the ambient `DATABASE_URL` — the settings default is Postgres,
+  so a bare `pytest` run skipped the guard entirely and the test passed while
+  proving nothing, a trap caught only by running the full suite.
+
+### 🎨 Brand Kit app-icon download was a guaranteed 500 — fixed
+
+A full A–Z re-verification (backend compile · 618 tests · web typecheck ·
+production build · wiring gate · docs gate · authenticated runtime sweep) turned
+up one **live production bug** the existing gates could not see.
+
+- `GET /media/brand/icon` declared `size: int = Query(default=512,
+  pattern="^(192|512)$")`. `pattern` is a **string** constraint; pydantic raises
+  `TypeError` while *building* the validator, so the route returned **500 on
+  every single request — including the default**, with no input that could
+  succeed. The ⭐ "app icon" download in the Design studio had never worked.
+- Fixed with an `IconSize(IntEnum)` (192 / 512). It keeps the original
+  whitelist, **coerces the `"192"` string a real query string delivers**, and
+  returns a clean 422 for anything else.
+- **A near-miss worth recording:** the first fix used `Literal[192, 512]`. That
+  passes static checks and the OpenAPI schema assertion, but `Literal` does
+  **not** coerce — so every genuine `?size=192` request would have 422'd. Only
+  driving a real authenticated request to actual PNG bytes exposed it.
+- **Why no gate caught it:** the route is authenticated, so the unauthenticated
+  sweep saw 401 and moved on. `check-wiring.mjs` verifies the path *exists*, not
+  that it returns successfully.
+- **Tests: +3** (618 total), each mutation-verified:
+  - a **generic** scan flagging string-only constraints (`pattern` /
+    `min_length` / `max_length`) on numeric params and the mirrored mistake —
+    this whole bug class, not just one route;
+  - a schema guard on the 192/512 whitelist;
+  - an **end-to-end render test** that signs in, saves a Brand Kit and asserts
+    real PNG bytes at both sizes — the only check that catches the `Literal`
+    trap.
+  - Two bugs in the guards themselves were found and fixed while validating
+    them: constraints live in pydantic's `.metadata` (not attributes), and
+    `app.routes` only exposes 3 of 153 routes because routers mount as
+    `_IncludedRouter` wrappers. Both made the scan silently pass everything.
+
 ### ⬇✏️🗑 Generated images & videos are downloadable, editable and deletable
 
 Every generation was already archived as a `FileAsset` — but the id was thrown
