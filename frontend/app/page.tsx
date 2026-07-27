@@ -96,13 +96,20 @@ export default function Home() {
           <h3 className="text-center text-lg font-semibold">ChatMood Home Interface</h3>
           <div className="rounded-2xl border border-line bg-panel p-5 shadow-lg">
             <div className="text-sm text-gray-400 mb-3">Ask ChatMood</div>
-            <div className="flex gap-2">
-              <button onClick={() => alert('Camera: scanning object... and analysing...')}
-                className="rounded-xl bg-accent/20 px-3 py-2 text-sm hover:bg-accent/30">📷 Camera</button>
-              <button onClick={() => alert('Voice input started')}
-                className="rounded-xl bg-accent/20 px-3 py-2 text-sm hover:bg-accent/30">🎤 Mic</button>
-              <button onClick={() => alert('Send message / perform task according to prompt')}
-                className="rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-black hover:brightness-110">✈️ Send</button>
+            <div className="flex flex-wrap gap-2">
+              {/* This is a server-rendered marketing page, so these are real
+                  destinations—not client-only alert handlers. Besides being
+                  useful, that keeps this route prerenderable for a production
+                  deploy. */}
+              <Link href="/images" className="rounded-xl bg-accent/20 px-3 py-2 text-sm transition hover:bg-accent/30">
+                📷 Create with camera
+              </Link>
+              <Link href="/voice" className="rounded-xl bg-accent/20 px-3 py-2 text-sm transition hover:bg-accent/30">
+                🎤 Talk with voice
+              </Link>
+              <Link href="/chat" className="rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-black transition hover:brightness-110">
+                ✈️ Start a chat
+              </Link>
             </div>
           </div>
         </div>
