@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Telescope } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, Lightbulb, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -666,7 +666,7 @@ export default function ChatPage() {
   const homeActions = [
     {
       icon: Sparkles,
-      label: "Write or brainstorm",
+      label: "Help me write",
       onClick: () => setDraft({ text: "Help me write ", nonce: Date.now() }),
     },
     {
@@ -681,6 +681,21 @@ export default function ChatPage() {
       icon: ImageIcon,
       label: "Create an image",
       onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
+    },
+    {
+      icon: PenLine,
+      label: "Brainstorm ideas",
+      onClick: () => setDraft({ text: "Brainstorm ideas for ", nonce: Date.now() }),
+    },
+    {
+      icon: ListChecks,
+      label: "Make a plan",
+      onClick: () => setDraft({ text: "Make a plan for ", nonce: Date.now() }),
+    },
+    {
+      icon: FileText,
+      label: "Summarize text",
+      onClick: () => setDraft({ text: "Summarize the following: ", nonce: Date.now() }),
     },
   ] as const;
 
@@ -825,29 +840,35 @@ export default function ChatPage() {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
         <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
-            <div className="flex min-h-[calc(100dvh-10rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
-              <div className="flex flex-col items-center gap-2 text-center select-none">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/icon.png"
-                  alt="ChatMood"
-                  className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
-                />
-                <p className="text-base font-semibold tracking-tight text-gray-200">ChatMood</p>
+            <div className="flex min-h-[calc(100dvh-11rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
+              {/* 🏠 ChatGPT-style greeting: centered headline, no logo clutter */}
+              <div className="flex flex-col items-center gap-3 text-center select-none">
+                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#141415] border border-white/8 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icon.png" alt="" className="h-6 w-6 rounded-lg" />
+                </span>
+                <h2 className="text-center text-[clamp(1.85rem,4.6vw,2.6rem)] font-semibold tracking-tight text-white">
+                  What can I help with?
+                </h2>
               </div>
-              <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
+              {/* centered composer */}
               <div className="w-full max-w-xl">{composerEl(true)}</div>
-              <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Start with an action">
-                {homeActions.map(({ icon: Icon, label, onClick }) => (
-                  <button
-                    key={label}
-                    onClick={onClick}
-                    className="touch-manipulation flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-[#141415] px-3 py-3 text-xs text-gray-400 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
-                  >
-                    <Icon size={14} className="text-accent" />
-                    {label}
-                  </button>
-                ))}
+              {/* centered model / mode pill row — ChatGPT shows the model selector just under the input */}
+              <div className="flex w-full max-w-xl justify-center">{pickerEl(true)}</div>
+              {/* ChatGPT-style suggestion pills */}
+              <div className="w-full max-w-2xl px-2">
+                <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Start with an action">
+                  {homeActions.map(({ icon: Icon, label, onClick }) => (
+                    <button
+                      key={label}
+                      onClick={onClick}
+                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#141415] px-4 py-2.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
+                    >
+                      <Icon size={15} className="text-accent" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}
