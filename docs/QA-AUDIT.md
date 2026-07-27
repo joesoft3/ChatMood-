@@ -91,7 +91,7 @@ the sandbox was just the only place anything exercised the affected code path.
 | `/media/films/resumable` dialling Postgres | **real** | The route declares `db: AsyncSession = Depends(get_db)` and then ignores it, calling `resumable_orphans()` which opens its own `SessionLocal()`. It bypassed the caller's session — including `get_db` overrides — and hit the globally-configured database instead of the one serving the request. The session is now passed through. |
 | `CREATE EXTENSION` syntax error | **real (noise, not an outage)** | `PgVectorStore._ensure()` ran Postgres-only DDL on sqlite, **retried it**, then logged `syntax error near "EXTENSION"` twice. Reads like a broken deployment; is actually an unconfigured optional feature. Now fails fast with a message naming the cause. |
 | `/memory` → 503 | **correct** | Verified: returns 200 the moment a store is reachable. Honest degradation. |
-| `/readyz` → 503 | **correct** | Per-dependency reporting with latency. 503 *is* the signal when Redis/Postgres are down. |
+| `/readyz` → 503 | **partly wrong — since fixed** | Per-dependency reporting with latency was right, but 503-ing on *Redis* was not: the rate limiter fails open, so a Redis-less machine serves fine. Fly sets no `REDIS_URL`, which made `/readyz` a permanent 503 in production and blocked the deploy probes from ever moving off `/healthz`. Readiness now fails only on `READINESS_REQUIRED` deps (default `postgres`); optional ones report `degraded` at 200. |
 
 The lesson: "it only fails in the sandbox" is a hypothesis, not a diagnosis. A
 shim scoped to one engine and a route ignoring its injected session are real

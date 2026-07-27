@@ -158,37 +158,62 @@ async def healthz():
 
 @app.get("/readyz")
 async def readyz():
-    """Readiness probe: are dependencies (postgres, redis, qdrant) reachable?
+    """Readiness probe: are the dependencies this deployment *needs* reachable?
 
     Returns structured JSON with per-service status + latency in ms so ops
     tooling can pinpoint which dependency is slow or down.
+
+    Only the dependencies named in `READINESS_REQUIRED` (default: postgres) can
+    drive the 503. Redis and the vector store are reported but marked optional,
+    because the app is explicitly built to survive losing them: the rate limiter
+    fails open and memory/RAG degrade to "no recall" rather than erroring. A
+    machine with no Redis still serves every request correctly, so failing its
+    health check would take down a healthy deployment — which is exactly what
+    happens on Fly, where REDIS_URL is never set.
+
+    Statuses:
+      ok       — every probe passed
+      degraded — an OPTIONAL dependency is down; still 200, still serving
+      unready  — a REQUIRED dependency is down; 503, pull me from the pool
     """
+    required = settings.readiness_required_set
     checks: dict[str, dict[str, str]] = {}
-    ok = True
+    ready = True      # required deps all healthy?
+    degraded = False  # any optional dep down?
 
     async def _probe(name: str, factory):
-        nonlocal ok
+        nonlocal ready, degraded
+        is_required = name in required
         t0 = time.perf_counter()
         try:
             await factory()
             ms = round((time.perf_counter() - t0) * 1000, 1)
-            checks[name] = {"status": "ok", "ms": str(ms)}
+            checks[name] = {"status": "ok", "ms": str(ms), "required": str(is_required).lower()}
         except Exception as e:
-            ok = False
             ms = round((time.perf_counter() - t0) * 1000, 1)
-            checks[name] = {"status": "fail", "error": str(e)[:200], "ms": str(ms)}
+            checks[name] = {
+                "status": "fail",
+                "error": str(e)[:200],
+                "ms": str(ms),
+                "required": str(is_required).lower(),
+            }
+            if is_required:
+                ready = False
+            else:
+                degraded = True
 
     await _probe("postgres", lambda: _pg_ping())
     await _probe("redis", lambda: _redis_ping())
     await _probe("qdrant", lambda: qdrant().get_collections())
 
     payload = {
-        "status": "ok" if ok else "degraded",
+        "status": "ok" if ready and not degraded else ("degraded" if ready else "unready"),
+        "ready": ready,
         "version": app.version,
         "checks": checks,
         "timestamp": time.time(),
     }
-    return JSONResponse(payload, status_code=200 if ok else 503)
+    return JSONResponse(payload, status_code=200 if ready else 503)
 
 
 async def _pg_ping():

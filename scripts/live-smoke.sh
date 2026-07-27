@@ -49,7 +49,15 @@ echo "────────────────────────�
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 10 "$BASE/healthz")
 [ "$code" = "200" ] && pass "GET /healthz" || fail "GET /healthz" "HTTP $code"
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 15 "$BASE/readyz")
-[ "$code" = "200" ] && pass "GET /readyz (db/redis/qdrant)" || fail "GET /readyz" "HTTP $code — $(head -c 160 "$BODY")"
+# 200 covers "ok" and "degraded" (optional dep down — Fly runs without Redis by
+# design); only a required dep failing yields 503.
+if [ "$code" = "200" ]; then
+  [ "$(json_get status)" = "degraded" ] \
+    && pass "GET /readyz (degraded — optional dep down: $(head -c 160 "$BODY"))" \
+    || pass "GET /readyz (required deps reachable)"
+else
+  fail "GET /readyz" "HTTP $code — $(head -c 160 "$BODY")"
+fi
 
 # ── 2. gated register → token ────────────────────────────────────────────────
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 15 -X POST "$API/auth/register" \

@@ -231,8 +231,10 @@ alembic stamp 0001_initial && alembic upgrade head  # adopt migrations on a PRE-
 alembic revision --autogenerate -m "add table x"    # new migration after changing db/models.py
 
 # Observability
-curl localhost:8000/healthz                        # liveness
-curl localhost:8000/readyz                         # postgres+redis+qdrant connectivity
+curl localhost:8000/healthz                        # liveness only (200 even if the DB is down)
+curl localhost:8000/readyz                         # readiness — what deploy probes gate on
+                                                   #   200 ok | 200 degraded (optional dep down)
+                                                   #   503 unready (READINESS_REQUIRED dep down)
 curl localhost:8000/metrics                        # Prometheus scrape (Grafana-ready)
 
 # Tracing (optional): spin up Jaeger, then set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318

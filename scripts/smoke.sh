@@ -35,9 +35,20 @@ echo "────────────────────────�
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 10 "$BASE/healthz")
 if [ "$code" = "200" ]; then pass "GET /healthz → 200"; else fail "GET /healthz" "HTTP $code"; fi
 
-# ── 2. readiness (DB/Redis/Qdrant) ───────────────────────────────────────────
+# ── 2. readiness (required deps up; optional ones reported) ──────────────────
+# 200 = serving. "degraded" still passes: an optional dep (Redis/Qdrant) is down
+# but the app is designed to serve without it. 503 = a required dep is gone.
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 15 "$BASE/readyz")
-if [ "$code" = "200" ]; then pass "GET /readyz → 200 (deps reachable)"; else fail "GET /readyz" "HTTP $code — $(head -c 200 "$BODY")"; fi
+rstatus=$(json_get status)
+if [ "$code" = "200" ]; then
+  if [ "$rstatus" = "degraded" ]; then
+    pass "GET /readyz → 200 (degraded — optional dep down: $(head -c 160 "$BODY"))"
+  else
+    pass "GET /readyz → 200 (all deps reachable)"
+  fi
+else
+  fail "GET /readyz" "HTTP $code — $(head -c 200 "$BODY")"
+fi
 
 # ── 3. register a fresh account ──────────────────────────────────────────────
 code=$(curl -s -o "$BODY" -w '%{http_code}' --max-time 15 -X POST "$API/auth/register" \

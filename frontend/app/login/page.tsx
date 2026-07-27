@@ -70,16 +70,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.14),transparent_34%)] px-4 py-8 sm:px-6">
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+    /* Height uses dvh, not vh. iOS Safari's 100vh includes the collapsible URL
+       bar, so `min-h-screen` + `calc(100vh-4rem)` reserved more space than the
+       screen actually shows and pushed the card's lower half (submit button,
+       "Sign up" toggle, Terms links) below the fold on first paint. The rest of
+       the app already avoids raw vh via .app-height / --app-h (globals.css);
+       this page bypasses AppShell, so it opts into dvh directly. */
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.14),transparent_34%)] px-4 py-8 sm:px-6">
+      <div className="mx-auto grid min-h-[calc(100dvh-4rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="hidden lg:flex flex-col gap-6 pr-6">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-500">
               <BrandMark brand={brand} /> {brand?.brand_name ?? "ChatMood"}
             </div>
-            <h1 className="text-4xl xl:text-5xl font-semibold tracking-tight text-white leading-[1.05]">
+            {/* Deliberately not an <h1>: this whole section is `hidden lg:flex`,
+                so an h1 here would disappear below lg AND compete with the sign-in
+                card's h1 above it. It's a tagline, styled large — the heading role
+                lives on the card, which renders at every breakpoint. */}
+            <p className="text-4xl xl:text-5xl font-semibold tracking-tight text-white leading-[1.05]">
               A focused AI workspace for chat, research, images and video.
-            </h1>
+            </p>
             <p className="max-w-xl text-base text-gray-400 leading-relaxed">
               Sign in to keep every conversation, source, generation, team workflow and approval in one clean workspace that feels fast on mobile and desktop.
             </p>
@@ -104,6 +114,11 @@ export default function LoginPage() {
             <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/8">
               <BrandMark brand={brand} />
             </div>
+            {/* The page's single <h1>. The marketing headline in the left panel
+                is visually larger, but it lives in a `hidden lg:flex` section —
+                so making *it* the h1 would leave the page with no h1 at all
+                below lg. This card renders at every breakpoint, so the heading
+                belongs here. */}
             <h1 className="text-2xl font-semibold text-white">{brand?.brand_name ?? "ChatMood"}</h1>
             {brand && <p className="text-[10px] text-gray-500">powered by ChatMood</p>}
             <p className="text-sm text-gray-500">
@@ -111,28 +126,66 @@ export default function LoginPage() {
             </p>
           </div>
 
+          {/* Every field carries a real <label>. Placeholders were doing the
+              labelling job, and they disappear the moment the user types — no
+              persistent accessible name, nothing for voice control to target
+              (WCAG 3.3.2 / 2.5.3). Labels are visually hidden to keep the
+              original compact look. */}
           <form onSubmit={submit} className="space-y-3">
             {mode === "register" && (
-              <input className={inputCls} placeholder="Display name" value={name} onChange={(e) => setName(e.target.value)} />
+              <>
+                <label htmlFor="login-name" className="sr-only">
+                  Display name
+                </label>
+                <input
+                  id="login-name"
+                  className={inputCls}
+                  // Autofill hints: without these, password managers and iOS/Android
+                  // autofill can't reliably identify the fields on the app's front door.
+                  autoComplete="name"
+                  placeholder="Display name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </>
             )}
+            <label htmlFor="login-email" className="sr-only">
+              Email
+            </label>
             <input
+              id="login-email"
               className={inputCls}
               type="email"
               required
+              autoComplete="email"
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <label htmlFor="login-password" className="sr-only">
+              Password
+            </label>
             <input
+              id="login-password"
               className={inputCls}
               type="password"
               required
-              minLength={8}
-              placeholder="Password (8+ chars)"
+              // minLength only applies when CREATING a password. On sign-in it
+              // blocked existing shorter passwords at the browser level, with a
+              // native tooltip that reads like the password is wrong.
+              minLength={mode === "register" ? 8 : undefined}
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
+              placeholder={mode === "register" ? "Password (8+ chars)" : "Password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {/* role="alert": a failed sign-in was rendered silently, so a screen
+                reader user got no feedback that anything had gone wrong. */}
+            {error && (
+              <p role="alert" className="text-sm text-red-400">
+                {error}
+              </p>
+            )}
             <button
               disabled={busy}
               className="w-full rounded-2xl bg-accent text-black font-semibold py-3 disabled:opacity-40 hover:brightness-110 transition shadow-[0_10px_24px_rgb(var(--mood-accent)/0.3)]"

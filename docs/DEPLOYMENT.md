@@ -50,7 +50,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=      # optional tracing collector, e.g. http://jaeg
 automatically; with `AUTO_CREATE_TABLES=false` migrations are the single source of truth).
 Adopting migrations on an existing database: `alembic stamp 0001_initial && alembic upgrade head`.
 
-**Kubernetes probes:** `livenessProbe → /healthz`, `readinessProbe → /readyz`.
+**Kubernetes probes:** `livenessProbe → /healthz`, `readinessProbe → /readyz`
+(the same split Fly/Render/Compose use). `/readyz` 503s only when a dependency
+named in `READINESS_REQUIRED` (default `postgres`) is unreachable; a missing
+Redis/Qdrant reports `degraded` at 200 because the app is built to serve without
+them. Never point a *liveness* probe at `/readyz` — a DB blip would restart-loop
+otherwise-healthy pods.
 **Monitoring:** scrape `/metrics` with Prometheus; dashboard panels: LLM latency by model,
 active SSE streams, request rate/error rate per route.
 

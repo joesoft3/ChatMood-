@@ -7,6 +7,122 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-27
 
+### 🔐 Sign-in page — autofill, labels, and a heading that isn't a duplicate
+
+`/login` is the app's front door and the one page that bypasses `AppShell`, so
+it missed conventions the rest of the app already follows.
+
+- **Password managers couldn't fill it.** Not one input carried an
+  `autocomplete` attribute, so browser/iOS/Android autofill had nothing to key
+  off. Now `email`, `current-password` / `new-password` (mode-aware) and `name`
+  — matching what Settings already does for its password fields.
+- **No field had a `<label>`.** All three relied on placeholders, which vanish
+  as soon as the user types and give voice control nothing to target
+  (WCAG 3.3.2 / 2.5.3). Real `<label>`s now, `sr-only` so the compact look is
+  unchanged.
+- **Two `<h1>`s on one page.** At `lg` the marketing headline and the card
+  heading both rendered. The headline lives in a `hidden lg:flex` section, so
+  promoting *it* would leave no `<h1>` below `lg` — the card renders at every
+  breakpoint, so it keeps the heading and the tagline became a `<p>`.
+- **Failed sign-ins were silent.** The error `<p>` had no `role="alert"`, so a
+  screen-reader user got no feedback that anything went wrong.
+- **`minLength={8}` applied when signing in**, so an existing shorter password
+  was blocked by the browser with a native tooltip that reads like the password
+  is wrong. Now only enforced when creating an account.
+- **`100vh` → `100dvh`.** iOS Safari counts the collapsible URL bar in `100vh`,
+  so `min-h-screen` + `calc(100vh-4rem)` reserved more than the visible screen
+  and pushed the submit button and Terms links below the fold on first paint.
+  The rest of the app avoids raw `vh` via `.app-height` / `--app-h`; this page
+  now opts into `dvh` directly.
+
+Verified against a production build: exactly one `<h1>`, both `sr-only` labels
+wired via `htmlFor`/`id`, `.sr-only` present in the emitted CSS, and no stray
+`100vh` outside Next's own error page.
+
+### 🏠 ChatGPT-style chat home — real centering, real heading, reachable starters
+
+The empty chat home was already ChatGPT-shaped (greeting → composer → model row
+→ starter pills); these are the fixes that make it behave like one.
+
+- **It wasn't actually centered.** The block used
+  `min-h-[calc(100dvh-11rem)]`, but it lives *inside* a flex column that has
+  already subtracted the mobile header, the bottom tab bar and its own padding.
+  One hardcoded `11rem` can't be right at every breakpoint: on desktop it
+  over-subtracted (content floated high above dead space), and on a phone with
+  safe-area insets it *under*-subtracted, so the min-height exceeded the box and
+  the "centered" column overflowed into a scroll. It now centers with `flex-1`
+  against the real remaining space, measured at every size.
+- **The page had no `<h1>`.** On the empty home `headerCenter` replaces
+  AppShell's mobile `<h1>`, leaving "What can I help with?" as an `<h2>` — the
+  only heading on the page, at a skipped level, with nothing for a screen reader
+  to anchor to. Promoted to `<h1>`.
+- **Starter pills announced nothing useful.** Six buttons labelled "Help me
+  write", "Make a plan"… with no indication they *prefill the composer*. Each
+  now carries an `aria-label` naming the exact prompt it types, sourced from the
+  same `prompt` string the composer receives, so the two can't drift. The group
+  is a `<nav aria-label="Conversation starters">` (the label previously sat on a
+  plain `<div>`, where it announced nothing), icons are `aria-hidden`, and the
+  pills have a visible focus ring.
+- **The stack lines up.** Starters were `max-w-2xl` under a `max-w-xl`
+  composer — visibly wider than the input they feed. Greeting, composer, model
+  row and starters now share one width token, which also softens the jump when
+  the first message swaps in the conversation composer.
+- **`prefers-reduced-motion` is respected.** `.mood-fade-up` wraps the chat
+  surface and several premium cards and animated unconditionally; it's now
+  disabled (element still visible) when the OS asks for reduced motion.
+- Dropped a dead `Lightbulb` import.
+
+Verified against a production build served locally: `/chat` returns the `<h1>`,
+the `nav`, the per-pill aria labels and the flex chain; the old `100dvh-11rem`
+calc is gone; `/`, `/chat`, `/images`, `/reel` and `/settings` all 200 with a
+clean server log. `npm run typecheck` and `npm run build` pass.
+
+> Note: PRs #22 and #27 also rewrite this same block, in conflicting directions
+> (#22 keeps the pills, #27 deletes them). Both branch from before project mode,
+> media edit/delete and `?c=`/`?billing=` deep-link handling landed, so merging
+> #22 as-is would silently revert those. This change is built on current `main`
+> and keeps all of them.
+
+### 🚦 Health checks now detect a broken deploy (readiness ≠ liveness)
+
+Every deployment probe — `fly.toml`, `render.yaml`, `docker-compose.yml` — gated
+on `/healthz`, which returns 200 whenever the uvicorn process is alive. A machine
+whose **database was unreachable kept a green health check while serving 500s**;
+nothing in the platform noticed, and `frontend` in compose would start against a
+half-wired backend.
+
+The obvious fix — repoint the probes at `/readyz` — would have **taken production
+down**. `/readyz` 503'd if *any* of postgres/redis/qdrant failed, and Fly
+provisions no Redis (no `REDIS_URL` secret → the `redis://localhost:6379/0`
+default → nothing listening). `/readyz` was already a permanent 503 in
+production; gating on it would have failed every machine's check and stalled the
+next rolling deploy.
+
+- **Readiness now separates required from optional deps.** New
+  `READINESS_REQUIRED` setting (default `postgres`). Only those deps can 503.
+  Redis and the vector store are optional *by design* — the rate limiter fails
+  open (`api/deps.py`) and memory/RAG degrade to "no recall" — so losing them
+  reports `degraded` at 200 rather than pulling a still-serving machine.
+- **Three states instead of two:** `ok` (200), `degraded` (200, optional dep
+  down, still serving), `unready` (503, required dep down). Every check reports
+  `status`, latency `ms`, and `required`, so an operator sees the degraded
+  dependency instead of just a green light.
+- **Probes repointed at `/readyz`** — Fly (timeout 5s → 10s, since a DB probe on
+  a waking Neon compute needs more than a liveness budget), Render, and compose,
+  which gates on all three because it actually runs all three and `frontend`
+  waits on that healthcheck.
+- **Smoke scripts** (`smoke.sh`, `live-smoke.sh`) treat `degraded` as a pass and
+  say which dependency is down, instead of failing a healthy Fly deployment.
+- **15 regression tests** (`backend/tests/test_readiness.py`) covering the state
+  machine and the probe wiring — verified to fail against the old code, 9 of
+  them including the Redis-down outage case. Suite: 641 passed, 0 regressions.
+
+> ⚠️ **One follow-up needs a human.** The `deploy-fly` workflow's step summary
+> still advertises `/healthz → {"ok":true}`, which no longer describes what the
+> machine check watches. The Arena app token lacks GitHub's `workflows`
+> permission, so that file is unchanged here. It is cosmetic — the summary text
+> only, no deploy behaviour — but worth a one-line edit when convenient.
+
 ### 🚀 Redeployed the updated layout, and made "is it live?" answerable
 
 The redesigned chat home layout was merged to `main`, but the last production

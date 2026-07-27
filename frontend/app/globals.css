@@ -353,3 +353,14 @@ svg {
 .mood-fade-up {
   animation: mood-fade-up 280ms ease-out;
 }
+
+/* Respect the OS "reduce motion" setting. .mood-fade-up wraps the chat
+   transcript/home and several premium cards, so a motion-sensitive user got a
+   slide-up on every navigation into those routes. Keep the element visible and
+   simply drop the movement — opacity/transform animation is exactly what this
+   media query exists for. */
+@media (prefers-reduced-motion: reduce) {
+  .mood-fade-up {
+    animation: none;
+  }
+}

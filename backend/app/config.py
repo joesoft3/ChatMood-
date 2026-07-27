@@ -345,11 +345,27 @@ class Settings(BaseSettings):
     # Fly machines keeps the shared endpoint hot for BOTH hosts. False = allow idling.
     DB_KEEP_WARM: bool = True
     DB_KEEP_WARM_S: float = 240.0
+    # 🚦 Readiness contract — which dependencies may fail the /readyz probe.
+    # Postgres is the only hard requirement: without it every request 500s. Redis
+    # and the vector store are OPTIONAL by design — the rate limiter fails open
+    # (api/deps.py) and memory/RAG degrade gracefully (services/memory.py), so the
+    # app serves chat correctly without either. Fly runs exactly that way today:
+    # no REDIS_URL secret, so REDIS_URL is the localhost default and nothing is
+    # listening. Treating that as "not ready" would fail the health check on a
+    # perfectly healthy machine and break every deploy.
+    # Set to "postgres,redis,qdrant" on stacks (docker-compose, Render) that do
+    # provision all three and want a stricter gate.
+    READINESS_REQUIRED: str = "postgres"
     OTEL_EXPORTER_OTLP_ENDPOINT: str = ""  # e.g. http://jaeger:4318 to enable tracing
 
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def readiness_required_set(self) -> set[str]:
+        """Dependency names whose failure makes /readyz return 503."""
+        return {p.strip().lower() for p in self.READINESS_REQUIRED.split(",") if p.strip()}
 
     @property
     def serverless(self) -> bool:

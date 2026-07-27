@@ -8,7 +8,11 @@ services:
     runtime: docker
     rootDir: backend
     plan: starter
-    healthCheckPath: /healthz
+    # Readiness, not liveness: /healthz is 200 whenever the process is alive, so a
+    # broken DATABASE_URL used to sail through the check and serve 500s. /readyz
+    # 503s when a REQUIRED dependency (READINESS_REQUIRED, default postgres) is
+    # unreachable, so a bad deploy is caught here instead of by users.
+    healthCheckPath: /readyz
     autoDeploy: true
     envVars:
       - key: DATABASE_URL
@@ -22,6 +26,12 @@ services:
           property: connectionString
       - key: QDRANT_URL
         value: http://mood-qdrant:6333
+      # This blueprint provisions Redis + Qdrant, so you *may* gate readiness on
+      # all three. Left at the default (postgres) on purpose: the app degrades
+      # gracefully without Redis/Qdrant, and a transient blip in either should
+      # not pull a still-serving instance out of the load balancer.
+      # - key: READINESS_REQUIRED
+      #   value: postgres,redis,qdrant
       - key: UPLOAD_DIR
         value: /data/storage
       # --- secrets: fill in the Render dashboard when prompted ---
