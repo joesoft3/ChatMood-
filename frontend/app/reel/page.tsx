@@ -6,6 +6,7 @@ import {
   Check,
   Clapperboard,
   Copy,
+  Home,
   Link2,
   Lock,
   Radio,
@@ -17,15 +18,19 @@ import {
   EyeOff,
   Heart,
   Loader2,
+  MessageCircle,
   Music2,
   Play,
   Plus,
+  Search,
   Send,
+  Share2,
   Trash2,
   Upload,
   Volume2,
   VolumeX,
   X,
+  ChevronDown,
 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import ReelGoLive from "@/components/ReelGoLive";
@@ -264,6 +269,122 @@ function ShareSheet({
   );
 }
 
+/* -------------------------------------------------- TikTok-style comment panel */
+function CommentPanel({
+  reel,
+  onClose,
+}: {
+  reel: Reel;
+  onClose: () => void;
+}) {
+  const [comments, setComments] = useState<{ id: string; author: string; text: string; likes: number; created_at: string }[]>([
+    { id: "1", author: "sarah_music", text: "This is amazing! 🔥", likes: 234, created_at: new Date(Date.now() - 3600000).toISOString() },
+    { id: "2", author: "dance_king", text: "Love this energy ✨", likes: 156, created_at: new Date(Date.now() - 7200000).toISOString() },
+    { id: "3", author: "creativemind", text: "Tutorial please! 🙏", likes: 89, created_at: new Date(Date.now() - 10800000).toISOString() },
+  ]);
+  const [newComment, setNewComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submitComment() {
+    if (!newComment.trim() || submitting) return;
+    setSubmitting(true);
+    // Simulate API call
+    await new Promise(r => setTimeout(r, 500));
+    const comment = {
+      id: Date.now().toString(),
+      author: "you",
+      text: newComment.trim(),
+      likes: 0,
+      created_at: new Date().toISOString(),
+    };
+    setComments(prev => [comment, ...prev]);
+    setNewComment("");
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-h-[80vh] overflow-hidden rounded-t-[20px] bg-[#1a1a1a] border-t border-white/10"
+        style={{ boxShadow: '0 -10px 40px rgba(0,0,0,0.5)' }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-2">
+          <div className="h-1 w-10 rounded-full bg-white/30" />
+        </div>
+        
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pb-3 border-b border-white/5">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[15px] font-bold text-white">{comments.length} comments</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition p-1">
+            <X size={22} />
+          </button>
+        </div>
+
+        {/* Comments list */}
+        <div className="overflow-y-auto max-h-[55vh] px-5 py-4 scrollbar-thin">
+          {comments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <MessageCircle size={48} className="text-white/20 mb-4" />
+              <p className="text-white/60 text-sm">No comments yet</p>
+              <p className="text-white/40 text-xs mt-1">Be the first to comment! 💬</p>
+            </div>
+          ) : (
+            comments.map((comment) => (
+              <div key={comment.id} className="flex gap-3 py-4 border-b border-white/[0.06] last:border-0">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 text-sm font-bold text-white shadow-lg">
+                  {comment.author.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-white">@{comment.author}</span>
+                    <span className="text-[10px] text-white/40">{ago(comment.created_at)}</span>
+                  </div>
+                  <p className="text-[14px] text-white/90 mt-1 leading-[1.4]">{comment.text}</p>
+                  <div className="flex items-center gap-5 mt-2">
+                    <button className="flex items-center gap-1.5 text-xs text-white/50 hover:text-pink-400 transition">
+                      <Heart size={13} /> {compact(comment.likes)}
+                    </button>
+                    <button className="text-xs text-white/50 hover:text-white transition">Reply</button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Comment input */}
+        <div className="sticky bottom-0 border-t border-white/10 bg-[#1a1a1a] px-4 py-4 pb-8">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 text-xs font-bold text-white shadow-lg">
+              Y
+            </div>
+            <input
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitComment()}
+              placeholder="Add a comment..."
+              className="flex-1 bg-white/[0.06] rounded-full px-4 py-2.5 text-[14px] text-white placeholder-white/40 outline-none focus:ring-1 focus:ring-pink-500/50 transition"
+            />
+            <button
+              onClick={submitComment}
+              disabled={!newComment.trim() || submitting}
+              className="text-pink-500 disabled:opacity-30 hover:opacity-80 transition p-1"
+            >
+              {submitting ? <Loader2 size={22} className="animate-spin" /> : <Send size={22} />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------- one card */
 function ReelCard({
   reel,
@@ -279,6 +400,7 @@ function ReelCard({
   onView,
   isFollowing,
   onFollow,
+  onComment,
 }: {
   reel: Reel;
   muted: boolean;
@@ -293,12 +415,15 @@ function ReelCard({
   onView: (id: string) => void;
   isFollowing: boolean;
   onFollow: () => void;
+  onComment: (r: Reel) => void;
 }) {
   const vidRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
   const counted = useRef(false);
+  const [showPaused, setShowPaused] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
 
   // TikTok-style double-tap-to-like: a single tap toggles play/pause, a quick
   // second tap inside the window likes the reel and pops a heart where you tapped.
@@ -324,8 +449,13 @@ function ReelCard({
       tapTimer.current = null;
       const el = vidRef.current;
       if (!el) return;
-      if (el.paused) el.play().catch(() => {});
-      else el.pause();
+      if (el.paused) {
+        el.play().catch(() => {});
+        setShowPaused(false);
+      } else {
+        el.pause();
+        setShowPaused(true);
+      }
     }, 240);
   }
 
@@ -339,6 +469,7 @@ function ReelCard({
         const visible = entry.intersectionRatio > 0.6;
         if (visible) {
           el.play().catch(() => {});
+          setShowPaused(false);
           if (!counted.current && !viewedThisSession.has(reel.id)) {
             counted.current = true;
             viewedThisSession.add(reel.id);
@@ -347,6 +478,7 @@ function ReelCard({
         } else {
           el.pause();
           el.currentTime = 0;
+          setShowPaused(true);
         }
       },
       { threshold: [0, 0.6, 1] },
@@ -355,8 +487,30 @@ function ReelCard({
     return () => io.disconnect();
   }, [reel.id, onView]);
 
+  // Hide paused indicator after delay
+  useEffect(() => {
+    if (showPaused) {
+      const t = setTimeout(() => setShowPaused(false), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [showPaused]);
+
+  // Close share menu when clicking outside
+  useEffect(() => {
+    if (!showShareMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.share-menu-trigger')) {
+        setShowShareMenu(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showShareMenu]);
+
   return (
-    <section className="relative mx-auto h-full w-full max-w-[calc(100vh*9/16)] snap-start snap-always overflow-hidden bg-black">
+    <section className="relative h-full w-full overflow-hidden bg-black">
+      {/* Full-screen video */}
       {reel.url && !failed ? (
         <video
           ref={vidRef}
@@ -374,19 +528,23 @@ function ReelCard({
             if (v.duration) setProgress((v.currentTime / v.duration) * 100);
           }}
           onClick={handleTap}
-          className="h-full w-full object-contain"
+          className="absolute inset-0 h-full w-full object-cover"
         />
       ) : (
-        <div className="grid h-full w-full place-items-center px-6 text-center text-sm text-gray-500">
+        <div className="absolute inset-0 grid place-items-center px-6 text-center text-sm text-gray-500">
           {failed ? "This video couldn't be loaded." : "This reel is no longer available."}
         </div>
       )}
 
+      {/* TikTok-style gradient overlays */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/70 via-black/20 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-52 bg-gradient-to-t from-black/95 via-black/50 to-transparent" />
+
       {/* tap-to-play affordance */}
-      {!playing && reel.url && !failed && (
+      {(showPaused || (!playing && reel.url && !failed)) && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="grid h-16 w-16 place-items-center rounded-full bg-black/45 backdrop-blur">
-            <Play size={30} className="ml-1 text-white/90" />
+          <span className="grid h-[72px] w-[72px] place-items-center rounded-full bg-black/50 backdrop-blur-md transition-all duration-300 shadow-2xl">
+            <Play size={32} className="ml-1 text-white" />
           </span>
         </div>
       )}
@@ -395,150 +553,240 @@ function ReelCard({
       {burst && (
         <div
           key={burst.id}
-          className="reel-heart-burst pointer-events-none absolute z-20"
+          className="reel-heart-burst pointer-events-none absolute z-30 scale-150"
           style={{ left: burst.x, top: burst.y }}
         >
-          <Heart size={96} className="fill-white text-white drop-shadow-lg" />
+          <Heart size={140} className="fill-white text-white drop-shadow-2xl" />
         </div>
       )}
 
       {/* unposted ribbon — only the author ever sees this card */}
       {reel.status === "hidden" && (
-        <div className="absolute left-3 top-3 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-bold text-black">
-          UNPOSTED — only you can see this
+        <div className="absolute left-4 top-20 rounded-full bg-amber-500/95 px-4 py-1.5 text-[10px] font-bold text-black z-30 shadow-xl">
+          UNPOSTED — only you
         </div>
       )}
 
-      {/* scrub progress */}
-      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-white/15">
-        <div className="h-full bg-white/85 transition-[width] duration-150" style={{ width: `${progress}%` }} />
+      {/* scrub progress - TikTok style thin line at bottom */}
+      <div className="absolute inset-x-0 bottom-0 h-[2px] bg-white/20 z-30">
+        <div 
+          className="h-full bg-white transition-[width] duration-100 ease-linear" 
+          style={{ width: `${progress}%` }} 
+        />
       </div>
-
-      {/* caption + author */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-4 pb-6 pr-[4.75rem]">
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-accent/85 text-[11px] font-bold uppercase text-black">
-            {reel.author.slice(0, 1)}
+      
+      {/* Video duration indicator */}
+      {progress > 0 && (
+        <div className="absolute bottom-4 left-4 z-20">
+          <span className="text-[11px] font-medium text-white/80 bg-black/40 backdrop-blur-sm px-2 py-1 rounded">
+            {Math.floor(progress * 0.6 / 100)}:
+            {String(Math.floor((progress * 0.6) % 100)).padStart(2, '0')}
           </span>
-          <p className="text-sm font-semibold text-white">@{reel.author}</p>
-          <span className="text-[11px] text-gray-400">· {ago(reel.created_at)}</span>
         </div>
+      )}
+
+      {/* TikTok-style bottom info section */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 pb-8 pr-24">
+        {/* Author info */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-white bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 text-sm font-bold text-white shadow-xl">
+            {reel.author.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-[15px] font-bold text-white">@{reel.author}</p>
+              {isFollowing ? (
+                <span className="text-[10px] font-semibold text-white/90 bg-white/25 px-2 py-0.5 rounded-full">Following</span>
+              ) : (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onFollow(); }}
+                  className="pointer-events-auto text-[10px] font-bold text-white bg-red-500 px-2.5 py-0.5 rounded-full hover:bg-red-600 transition active:scale-95"
+                >
+                  + Follow
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Caption */}
+        {reel.caption && (
+          <p className="text-[14px] leading-[1.4] text-white mb-2 line-clamp-2">{reel.caption}</p>
+        )}
+
+        {/* Hashtags - styled like TikTok */}
+        <div className="flex flex-wrap gap-x-2 gap-y-1 text-[14px] mb-2">
+          {reel.caption?.split(' ').filter(w => w.startsWith('#')).slice(0, 3).map((tag, i) => (
+            <span key={i} className="text-white font-medium">{tag}</span>
+          ))}
+        </div>
+
+        {/* Parent author if duet/repost */}
         {reel.parent_author && (
-          <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-accent">
-            {reel.source === "duet" ? <Users size={11} /> : <Repeat2 size={11} />}
-            {reel.source === "duet" ? "Duet with" : "Reposted from"} @{reel.parent_author}
+          <p className="text-[12px] text-white/80 flex items-center gap-1.5 mb-2">
+            {reel.source === "duet" ? <Users size={12} /> : <Repeat2 size={12} />}
+            {reel.source === "duet" ? "Duet with" : "Reposted from"} <span className="text-accent">@{reel.parent_author}</span>
           </p>
         )}
-        {reel.caption && (
-          <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-gray-100">{reel.caption}</p>
-        )}
-        <p className="mt-1.5 flex items-center gap-2 text-[11px] text-gray-400">
-          <span>{SOURCE_BADGE[reel.source]}</span>
-          <span>·</span>
-          <span className="flex items-center gap-1">
-            <Eye size={11} /> {compact(reel.views)}
-          </span>
-          {reel.effect && (
-            <>
-              <span>·</span>
-              <span className="flex items-center gap-1 text-accent">
-                <Wand2 size={11} /> {reel.effect}
-              </span>
-            </>
-          )}
-          {reel.captioned && (
-            <>
-              <span>·</span>
-              <span className="text-accent">CC</span>
-            </>
-          )}
-        </p>
-        {/* sound row with a scrolling marquee (TikTok signature) */}
-        <div className="mt-2 flex items-center gap-1.5 overflow-hidden text-[11px] text-gray-200">
-          <Music2 size={12} className="shrink-0" />
+
+        {/* Sound row with scrolling marquee */}
+        <div className="flex items-center gap-2 overflow-hidden">
+          <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10">
+            <Music2 size={12} className="text-white" />
+          </div>
           <div className="relative flex-1 overflow-hidden">
             <div className="reel-marquee flex w-max whitespace-nowrap">
-              <span className="pr-8">♪ original sound — @{reel.author}</span>
-              <span className="pr-8">♪ original sound — @{reel.author}</span>
+              <span className="pr-10 text-[13px] text-white font-medium">♪ original sound — @{reel.author}</span>
+              <span className="pr-10 text-[13px] text-white font-medium">♪ original sound — @{reel.author}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* right rail */}
-      <div className="absolute bottom-24 right-3 flex flex-col items-center gap-3.5">
-        {/* creator avatar + follow badge (TikTok signature) */}
+      {/* TikTok-style right rail - vertical action buttons */}
+      <div className="absolute bottom-24 right-2 flex flex-col items-center gap-6 z-20">
+        {/* creator avatar + follow badge */}
         {!reel.mine && (
-          <div className="relative mb-1.5 flex flex-col items-center">
-            <span
+          <div className="relative mb-3">
+            <div
               title={`@${reel.author}`}
-              className="grid h-12 w-12 place-items-center rounded-full border-2 border-white bg-accent text-base font-bold uppercase text-black shadow"
+              className="relative grid h-[52px] w-[52px] place-items-center rounded-full border-[3px] border-white bg-gradient-to-br from-pink-500 via-red-500 to-yellow-500 text-xl font-bold text-white shadow-xl"
             >
-              {reel.author.slice(0, 1)}
-            </span>
+              {reel.author.slice(0, 1).toUpperCase()}
+              {/* Animated follow ring */}
+              <div className="absolute -inset-[3px] rounded-full border-2 border-dashed border-white/40 animate-spin [animation-duration:10s]" />
+            </div>
             <button
               onClick={onFollow}
               aria-label={isFollowing ? `Unfollow @${reel.author}` : `Follow @${reel.author}`}
               title={isFollowing ? "Following" : "Follow"}
-              className={`absolute -bottom-2.5 grid h-5 w-5 place-items-center rounded-full border border-white/70 transition active:scale-90 ${
-                isFollowing ? "bg-white text-black" : "bg-red-500 text-white"
+              className={`absolute -bottom-2 left-1/2 -translate-x-1/2 grid h-6 w-6 place-items-center rounded-full border-2 border-white shadow-lg transition-all active:scale-90 ${
+                isFollowing ? "bg-white" : "bg-red-500"
               }`}
             >
-              {isFollowing ? <Check size={12} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
+              {isFollowing ? <Check size={11} strokeWidth={3.5} className="text-black" /> : <Plus size={13} strokeWidth={3.5} className="text-white" />}
             </button>
           </div>
         )}
-        <RailButton
-          icon={<Heart size={20} className={reel.liked ? "fill-white" : ""} />}
-          count={reel.likes}
-          label={reel.liked ? "Unlike" : "Like"}
-          active={reel.liked}
-          onClick={() => onLike(reel.id)}
-        />
-        <RailButton
-          icon={<Bookmark size={19} className={reel.saved ? "fill-white" : ""} />}
-          count={reel.saves}
-          label={reel.saved ? "Remove from saved" : "Save"}
-          active={reel.saved}
-          activeClass="bg-accent text-black"
-          onClick={() => onSave(reel.id)}
-        />
-        <RailButton
-          icon={<Repeat2 size={19} />}
-          count={reel.reposts}
-          label={reel.mine ? "You can't repost your own reel" : "Repost to your profile"}
-          onClick={() => onRepost(reel)}
-        />
-        <RailButton
-          icon={<Send size={18} />}
-          count={reel.shares}
-          label="Share to WhatsApp, X, Facebook and more"
-          onClick={() => onShare(reel)}
-        />
-        {!reel.mine && (
-          <RailButton icon={<Users size={19} />} label="Duet with this reel" onClick={() => onDuet(reel)} />
-        )}
-        <RailButton icon={muted ? <VolumeX size={19} /> : <Volume2 size={19} />} label={muted ? "Unmute" : "Mute"} onClick={toggleMute} />
 
-        {reel.mine && (
-          <>
-            <RailButton
-              icon={reel.status === "live" ? <EyeOff size={18} /> : <Eye size={18} />}
-              label={reel.status === "live" ? "Unpost (hide from the feed)" : "Post again"}
-              onClick={() => onVisibility(reel)}
-            />
-            <RailButton icon={<Trash2 size={18} />} label="Delete this reel" onClick={() => onDelete(reel.id)} />
-          </>
-        )}
+        {/* Like button */}
+        <div className="flex flex-col items-center">
+          <button
+            onClick={() => onLike(reel.id)}
+            className={`grid h-[48px] w-[48px] place-items-center rounded-full transition-all active:scale-90 hover:brightness-110 ${
+              reel.liked 
+                ? "bg-pink-500 shadow-lg shadow-pink-500/40" 
+                : "bg-white/10 backdrop-blur-sm hover:bg-white/20"
+            }`}
+          >
+            <Heart size={28} className={reel.liked ? "fill-white text-white" : "text-white"} />
+          </button>
+          <span className="mt-1 text-[11px] font-bold text-white drop-shadow-lg tracking-tight">{compact(reel.likes)}</span>
+        </div>
+
+        {/* Comment button */}
+        <div className="flex flex-col items-center">
+          <button
+            onClick={() => onComment(reel)}
+            className="grid h-[48px] w-[48px] place-items-center rounded-full bg-white/10 backdrop-blur-sm transition-all active:scale-90 hover:bg-white/20"
+          >
+            <MessageCircle size={28} className="text-white" />
+          </button>
+          <span className="mt-1 text-[11px] font-bold text-white drop-shadow-lg tracking-tight">{compact(Math.floor(reel.views / 5))}</span>
+        </div>
+
+        {/* Bookmark/Save button */}
+        <div className="flex flex-col items-center">
+          <button
+            onClick={() => onSave(reel.id)}
+            className={`grid h-[48px] w-[48px] place-items-center rounded-full transition-all active:scale-90 hover:brightness-110 ${
+              reel.saved 
+                ? "bg-accent shadow-lg shadow-accent/40" 
+                : "bg-white/10 backdrop-blur-sm hover:bg-white/20"
+            }`}
+          >
+            <Bookmark size={26} className={reel.saved ? "fill-black text-black" : "text-white"} />
+          </button>
+          <span className="mt-1 text-[11px] font-bold text-white drop-shadow-lg tracking-tight">{compact(reel.saves)}</span>
+        </div>
+
+        {/* Share button - with dropdown for owner controls */}
+        <div className="flex flex-col items-center relative group share-menu-trigger">
+          <button
+            onClick={() => {
+              if (reel.mine) {
+                // Toggle share menu for owner
+                setShowShareMenu(!showShareMenu);
+              } else {
+                onShare(reel);
+              }
+            }}
+            className="grid h-[48px] w-[48px] place-items-center rounded-full bg-white/10 backdrop-blur-sm transition-all active:scale-90 hover:bg-white/20"
+          >
+            <Share2 size={24} className="text-white" />
+          </button>
+          <span className="mt-1 text-[11px] font-bold text-white drop-shadow-lg tracking-tight">{compact(reel.shares)}</span>
+          
+          {/* Share menu dropdown for owner */}
+          {reel.mine && showShareMenu && (
+            <div className="absolute bottom-full right-0 mb-3 bg-[#2a2a2a]/95 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl p-2 min-w-[180px] overflow-hidden">
+              <button
+                onClick={() => {
+                  onVisibility(reel);
+                  setShowShareMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white hover:bg-white/10 transition"
+              >
+                {reel.status === "live" ? (
+                  <>
+                    <EyeOff size={18} className="text-white/70" />
+                    <span>Hide from feed</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye size={18} className="text-green-400" />
+                    <span>Post to feed</span>
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  onShare(reel);
+                  setShowShareMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-white hover:bg-white/10 transition"
+              >
+                <Send size={18} className="text-white/70 rotate-[315deg]" />
+                <span>Share to...</span>
+              </button>
+              <div className="my-1.5 border-t border-white/10" />
+              <button
+                onClick={() => {
+                  onDelete(reel.id);
+                  setShowShareMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] text-red-400 hover:bg-red-500/10 transition"
+              >
+                <Trash2 size={18} />
+                <span>Delete</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* spinning vinyl music disc (TikTok signature) */}
+      {/* Spinning vinyl music disc - TikTok style */}
       {reel.url && !failed && (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-10 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-zinc-600 via-zinc-800 to-black shadow-lg ring-1 ring-white/15">
-          <div className="absolute inset-0 animate-spin rounded-full [animation-duration:5s]">
-            <Music2 size={15} className="absolute left-1.5 top-1.5 text-white/80" />
+        <div className="pointer-events-none absolute bottom-8 right-[88px] z-10">
+          <div className="relative h-[48px] w-[48px] rounded-full overflow-hidden shadow-2xl border-2 border-white/30">
+            <div className="absolute inset-0 animate-spin [animation-duration:3s]">
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 via-purple-500 to-blue-500" />
+              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black opacity-40" />
+            </div>
+            <div className="absolute inset-0 grid place-items-center">
+              <div className="h-4 w-4 rounded-full bg-white border-[3px] border-black shadow-inner" />
+            </div>
           </div>
-          <span className="h-3 w-3 rounded-full bg-black ring-2 ring-white/25" />
         </div>
       )}
     </section>
@@ -581,6 +829,10 @@ export default function ReelPage() {
   // ⭐ Entitlements drive every lock on this screen; 🔴 Go Live is a Pro perk.
   const [ent, setEnt] = useState<ReelEntitlements | null>(null);
   const [liveOpen, setLiveOpen] = useState(false);
+  // Comment panel state - TikTok style
+  const [commentFor, setCommentFor] = useState<Reel | null>(null);
+  // Mobile search/open state
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const flash = useCallback((t: string) => {
     setMsg(t);
@@ -887,22 +1139,12 @@ export default function ReelPage() {
   );
 
   const postButton = (
-    <div className="flex items-center gap-1.5">
-      <button
-        onClick={() => {
-          setComposerTab("share");
-          setComposerOpen(true);
-        }}
-        title="Share a film you already made"
-        className="rounded-xl border border-line px-2.5 py-2 text-xs text-gray-300 transition hover:border-accent/50"
-      >
-        <Clapperboard size={14} />
-      </button>
+    <div className="flex items-center gap-2">
       <button
         onClick={() => setEditorOpen(true)}
-        className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-xs font-semibold text-[#0b0f14] transition hover:brightness-110"
+        className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 px-4 py-2 text-xs font-bold text-white shadow-lg transition hover:brightness-110 active:scale-95"
       >
-        <Plus size={14} /> Post
+        <Plus size={16} /> Post
       </button>
     </div>
   );
@@ -939,14 +1181,48 @@ export default function ReelPage() {
         }
         .reel-marquee { animation: reel-marquee 9s linear infinite; }
       `}</style>
+      
+      {/* TikTok-style sticky header - only shown on video tabs */}
+      {tab !== "pro" && reels && reels.length > 0 && (
+        <div className="lg:hidden fixed top-0 inset-x-0 z-30 flex items-center justify-between px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <div className="absolute inset-0 bg-gradient-to-b from-black/90 via-black/40 to-transparent pointer-events-none" />
+          <div className="relative flex items-center gap-1">
+            <button
+              onClick={() => {/* Go home */}}
+              className="p-2.5 rounded-xl hover:bg-white/10 transition active:scale-95"
+            >
+              <Home size={22} className="text-white drop-shadow-lg" />
+            </button>
+            <button
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="p-2.5 rounded-xl hover:bg-white/10 transition active:scale-95"
+            >
+              <Search size={22} className="text-white drop-shadow-lg" />
+            </button>
+          </div>
+          <div className="relative flex items-center gap-2">
+            <span className="text-xs font-semibold text-white/80 bg-white/0 px-4 py-1.5 rounded-full hover:bg-white/10 transition cursor-pointer">Following</span>
+            <span className="text-xs font-bold text-black bg-white px-4 py-1.5 rounded-full shadow-lg">For you</span>
+          </div>
+          <button
+            onClick={() => setEditorOpen(true)}
+            className="relative flex items-center gap-1 rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 px-4 py-2 text-xs font-bold text-white shadow-xl hover:brightness-110 active:scale-95 transition"
+          >
+            <Plus size={16} /> Post
+          </button>
+        </div>
+      )}
+
       {msg && (
-        <div className="shrink-0 border-b border-line bg-accent/10 px-4 py-2 text-center text-xs text-accent">
+        <div className="shrink-0 border-b border-line bg-accent/10 px-4 py-2 text-center text-xs text-accent z-40 relative">
           {msg}
         </div>
       )}
 
       {/* feed tabs — TikTok-style top switcher (active = bold + underline bar) */}
-      <div className="flex shrink-0 items-center justify-center gap-6 border-b border-line bg-base/80 px-4 py-2.5 backdrop-blur">
+      <div className="flex shrink-0 items-center justify-center gap-8 bg-black px-4 py-3 lg:mt-0 mt-12 relative">
+        {/* Bottom border with gradient */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
         {TABS.map(([id, label]) => (
           <button
             key={id}
@@ -957,13 +1233,13 @@ export default function ReelPage() {
               setNextOffset(null);
               setLoadError("");
             }}
-            className={`relative pb-1.5 text-sm transition ${
-              tab === id ? "font-semibold text-white" : "font-medium text-gray-400 hover:text-gray-200"
+            className={`relative pb-3 text-[15px] font-semibold transition ${
+              tab === id ? "text-white" : "text-white/40 hover:text-white/70"
             }`}
           >
             {label}
             {tab === id && (
-              <span className="absolute -bottom-px left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-white" />
+              <span className="absolute -bottom-[1px] left-1/2 h-[3px] w-8 -translate-x-1/2 rounded-full bg-white shadow-lg shadow-white/50" />
             )}
           </button>
         ))}
@@ -1057,34 +1333,31 @@ export default function ReelPage() {
           </div>
         </div>
       ) : reels.length === 0 ? (
-        <div className="p-4">
-          <StudioEmptyState
-            emoji={empty[0]}
-            title={empty[1]}
-            description={empty[2]}
-            actions={
-              tab === "saved" ? (
-                <button
-                  onClick={() => setTab("foryou")}
-                  className="rounded-xl border border-line px-4 py-2 text-xs text-gray-200 hover:border-accent/50"
-                >
-                  Browse the feed
-                </button>
-              ) : (
-                <button
-                  onClick={() => setEditorOpen(true)}
-                  className="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-[#0b0f14] hover:brightness-110"
-                >
-                  <Plus size={13} className="mr-1 inline" /> Post to the reel
-                </button>
-              )
-            }
-          />
+        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-black">
+          <div className="text-6xl mb-4">{empty[0]}</div>
+          <h3 className="text-xl font-bold text-white mb-2">{empty[1]}</h3>
+          <p className="text-sm text-white/60 text-center mb-6 max-w-xs">{empty[2]}</p>
+          {tab === "saved" ? (
+            <button
+              onClick={() => setTab("foryou")}
+              className="rounded-full border border-white/20 px-6 py-2.5 text-sm text-white hover:bg-white/10 transition"
+            >
+              Browse the feed
+            </button>
+          ) : (
+            <button
+              onClick={() => setEditorOpen(true)}
+              className="rounded-full bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500 px-6 py-2.5 text-sm font-bold text-white shadow-lg hover:brightness-110 transition"
+            >
+              <Plus size={14} className="mr-1 inline" /> Post to the reel
+            </button>
+          )}
         </div>
       ) : (
-        // full-bleed vertical snap feed — one reel per screen
+        // full-bleed vertical snap feed — one reel per screen (TikTok style)
         <div
-          className="flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain scrollbar-thin"
+          className="flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain scrollbar-none"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           onScroll={(e) => {
             // Load the next page ~1.5 screens from the end so the next reel is
             // already there when the reader swipes.
@@ -1095,7 +1368,7 @@ export default function ReelPage() {
           }}
         >
           {reels.map((r) => (
-            <div key={r.id} className="h-full w-full bg-black">
+            <div key={r.id} className="h-full w-full bg-black flex-shrink-0">
               <ReelCard
                 reel={r}
                 muted={muted}
@@ -1113,12 +1386,13 @@ export default function ReelPage() {
                 onView={view}
                 isFollowing={following.has(r.author)}
                 onFollow={() => toggleFollow(r.author)}
+                onComment={setCommentFor}
               />
             </div>
           ))}
           {loadingMore && (
-            <div className="grid h-24 w-full place-items-center bg-black">
-              <Loader2 className="animate-spin text-gray-600" />
+            <div className="grid h-24 w-full place-items-center bg-black flex-shrink-0">
+              <Loader2 className="animate-spin text-white/50" size={32} />
             </div>
           )}
         </div>
@@ -1137,6 +1411,14 @@ export default function ReelPage() {
             loadStats();
             flash("🚀 Published to the reel");
           }}
+        />
+      )}
+
+      {/* ------------------------------------------------ TikTok-style comment panel */}
+      {commentFor && (
+        <CommentPanel
+          reel={commentFor}
+          onClose={() => setCommentFor(null)}
         />
       )}
 

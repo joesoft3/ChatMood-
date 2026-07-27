@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Image as ImageIcon, Link2Off, Share2, Sparkles, Telescope } from "lucide-react";
+import { Download, Link2Off, Share2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -621,27 +621,6 @@ export default function ChatPage() {
     />
   );
 
-  const homeActions = [
-    {
-      icon: Sparkles,
-      label: "Write or brainstorm",
-      onClick: () => setDraft({ text: "Help me write ", nonce: Date.now() }),
-    },
-    {
-      icon: Telescope,
-      label: "Research a topic",
-      onClick: () => {
-        setDeepMode(true);
-        setDraft({ text: "Research ", nonce: Date.now() });
-      },
-    },
-    {
-      icon: ImageIcon,
-      label: "Create an image",
-      onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
-    },
-  ] as const;
-
   const chatTabs = (
     <div className="flex items-center justify-center gap-7 h-full">
       <span className="py-1 text-sm font-semibold text-white">Ask</span>
@@ -783,29 +762,25 @@ export default function ChatPage() {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
         <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
           {emptyHome && (
-            <div className="flex min-h-[calc(100dvh-10rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
-              <div className="flex flex-col items-center gap-2 text-center select-none">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/icon.png"
-                  alt="ChatMood"
-                  className="h-14 w-14 rounded-2xl ring-1 ring-white/10 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] sm:h-16 sm:w-16"
-                />
-                <p className="text-base font-semibold tracking-tight text-gray-200">ChatMood</p>
+            <div className="flex min-h-[calc(100dvh-12rem)] flex-col items-center justify-center py-8 sm:py-10">
+              {/* Centered logo with glow effect - ChatGPT style */}
+              <div className="flex flex-col items-center gap-5 select-none mb-8">
+                <div className="relative">
+                  {/* Glow effect behind logo */}
+                  <div className="absolute inset-0 blur-3xl bg-gradient-to-r from-accent/30 via-purple-500/20 to-pink-500/30 scale-150 opacity-60" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/icon.png"
+                    alt="ChatMood"
+                    className="relative h-16 w-16 rounded-2xl ring-1 ring-white/10 shadow-2xl sm:h-[72px] sm:w-[72px]"
+                  />
+                </div>
+                <p className="text-xl font-semibold tracking-tight text-white sm:text-2xl">ChatMood</p>
               </div>
-              <h2 className="text-center text-[clamp(2rem,4vw,2.75rem)] font-semibold tracking-tight text-white">How can I help?</h2>
-              <div className="w-full max-w-xl">{composerEl(true)}</div>
-              <div className="grid w-full max-w-xl grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Start with an action">
-                {homeActions.map(({ icon: Icon, label, onClick }) => (
-                  <button
-                    key={label}
-                    onClick={onClick}
-                    className="touch-manipulation flex items-center justify-center gap-2 rounded-xl border border-white/8 bg-[#141415] px-3 py-3 text-xs text-gray-400 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
-                  >
-                    <Icon size={14} className="text-accent" />
-                    {label}
-                  </button>
-                ))}
+              
+              {/* Composer at center - ChatGPT style */}
+              <div className="w-full max-w-2xl px-4">
+                {composerEl(true)}
               </div>
             </div>
           )}
