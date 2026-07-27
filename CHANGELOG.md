@@ -7,6 +7,38 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-27
 
+### 🔐 Sign-in page — autofill, labels, and a heading that isn't a duplicate
+
+`/login` is the app's front door and the one page that bypasses `AppShell`, so
+it missed conventions the rest of the app already follows.
+
+- **Password managers couldn't fill it.** Not one input carried an
+  `autocomplete` attribute, so browser/iOS/Android autofill had nothing to key
+  off. Now `email`, `current-password` / `new-password` (mode-aware) and `name`
+  — matching what Settings already does for its password fields.
+- **No field had a `<label>`.** All three relied on placeholders, which vanish
+  as soon as the user types and give voice control nothing to target
+  (WCAG 3.3.2 / 2.5.3). Real `<label>`s now, `sr-only` so the compact look is
+  unchanged.
+- **Two `<h1>`s on one page.** At `lg` the marketing headline and the card
+  heading both rendered. The headline lives in a `hidden lg:flex` section, so
+  promoting *it* would leave no `<h1>` below `lg` — the card renders at every
+  breakpoint, so it keeps the heading and the tagline became a `<p>`.
+- **Failed sign-ins were silent.** The error `<p>` had no `role="alert"`, so a
+  screen-reader user got no feedback that anything went wrong.
+- **`minLength={8}` applied when signing in**, so an existing shorter password
+  was blocked by the browser with a native tooltip that reads like the password
+  is wrong. Now only enforced when creating an account.
+- **`100vh` → `100dvh`.** iOS Safari counts the collapsible URL bar in `100vh`,
+  so `min-h-screen` + `calc(100vh-4rem)` reserved more than the visible screen
+  and pushed the submit button and Terms links below the fold on first paint.
+  The rest of the app avoids raw `vh` via `.app-height` / `--app-h`; this page
+  now opts into `dvh` directly.
+
+Verified against a production build: exactly one `<h1>`, both `sr-only` labels
+wired via `htmlFor`/`id`, `.sr-only` present in the emitted CSS, and no stray
+`100vh` outside Next's own error page.
+
 ### 🏠 ChatGPT-style chat home — real centering, real heading, reachable starters
 
 The empty chat home was already ChatGPT-shaped (greeting → composer → model row
