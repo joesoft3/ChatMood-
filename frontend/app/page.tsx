@@ -91,6 +91,23 @@ export default function Home() {
         </p>
       </section>
 
+      <section className="border-t border-line px-4 sm:px-6 py-10">
+        <div className="mx-auto max-w-2xl space-y-4">
+          <h3 className="text-center text-lg font-semibold">ChatMood Home Interface</h3>
+          <div className="rounded-2xl border border-line bg-panel p-5 shadow-lg">
+            <div className="text-sm text-gray-400 mb-3">Ask ChatMood</div>
+            <div className="flex gap-2">
+              <button onClick={() => alert('Camera: scanning object... and analysing...')}
+                className="rounded-xl bg-accent/20 px-3 py-2 text-sm hover:bg-accent/30">📷 Camera</button>
+              <button onClick={() => alert('Voice input started')}
+                className="rounded-xl bg-accent/20 px-3 py-2 text-sm hover:bg-accent/30">🎤 Mic</button>
+              <button onClick={() => alert('Send message / perform task according to prompt')}
+                className="rounded-xl bg-accent px-3 py-2 text-sm font-semibold text-black hover:brightness-110">✈️ Send</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* --------------------------------------------------- feature grid */}
       <section className="px-4 sm:px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-4xl 2xl:max-w-6xl">
