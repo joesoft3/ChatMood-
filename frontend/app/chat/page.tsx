@@ -281,7 +281,7 @@ export default function ChatPage() {
         { role: "assistant", content: `Generating ${kind}...`, media: [{ kind, prompt: itemText, pending: true }] },
       ]);
       // Simulate generation result
-      setTimeout(() => {
+        setTimeout(() => {
         setMsgs((prev) => {
           const a = [...prev];
           const last = a[a.length - 1];
@@ -294,6 +294,13 @@ export default function ChatPage() {
         });
         setBusy(false);
         busyRef.current = false;
+        // After work done: move to history and clear chat screen
+        setTimeout(async () => {
+          await refresh();
+          setActiveId(null);
+          setMsgs([]);
+          setFiles([]);
+        }, 500);
       }, 1500);
       return;
     }
