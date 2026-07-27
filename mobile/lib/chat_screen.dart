@@ -821,30 +821,34 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  // ─────────────────────────────────────────── 🏠 Grok-clean centered home (web parity)
+  // ─────────────────────────────────────────── 🏠 ChatGPT-style centered home (web parity)
   Widget _brandHero() {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 84,
-          height: 84,
+          width: 44,
+          height: 44,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
+            color: MoodColors.panel,
+            border: Border.all(color: MoodColors.line),
             boxShadow: [
               BoxShadow(color: MoodColors.accent.withOpacity(0.35), blurRadius: 46, spreadRadius: -12),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
             child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.cover),
           ),
         ),
-        const SizedBox(height: 14),
-        const Text('ChatMood', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: .2)),
-        const SizedBox(height: 5),
-        Text('UNDERSTAND · ADAPT · ELEVATE',
-            style: TextStyle(fontSize: 11, letterSpacing: 2.4, color: Colors.grey.shade500)),
+        const SizedBox(height: 16),
+        const Text('What can I help with?',
+            style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -.6,
+                color: Colors.white)),
       ],
     );
   }
@@ -877,26 +881,76 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   _filesRow(),
                 ],
                 const SizedBox(height: 14),
+                // Centered model / mode pill row (like ChatGPT's selector under input)
                 Wrap(
                   alignment: WrapAlignment.center,
-                  spacing: 2,
+                  spacing: 8,
                   runSpacing: 6,
                   children: [
-                    // 🎨🎬 in-chat creation: prefill the composer, never leave chat
-                    _quickChip(Icons.image_outlined, 'Create image', () {
-                      setState(() => _input.text = 'create an image of ');
+                    ActionChip(
+                      avatar: const Icon(Icons.tune, size: 14, color: Colors.grey),
+                      label: Text(_modelLabel(), style: const TextStyle(fontSize: 11)),
+                      onPressed: _showModelPicker,
+                      backgroundColor: Colors.white.withOpacity(0.06),
+                      side: BorderSide(color: Colors.white.withOpacity(0.08)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    ActionChip(
+                      avatar: Icon(
+                        _thinkOn ? Icons.psychology : Icons.psychology_outlined,
+                        size: 14,
+                        color: _thinkOn ? MoodColors.accent : Colors.grey,
+                      ),
+                      label: Text('Thinking', style: TextStyle(fontSize: 11, color: _thinkOn ? MoodColors.accent : Colors.grey)),
+                      onPressed: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1')
+                          ? () => setState(() => _thinkOn = !_thinkOn)
+                          : null,
+                      backgroundColor: Colors.white.withOpacity(0.06),
+                      side: BorderSide(color: _thinkOn ? MoodColors.accent.withOpacity(0.35) : BorderSide(color: Colors.white.withOpacity(0.08))),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    ActionChip(
+                      avatar: Icon(
+                        _arenaMode ? Icons.shield : Icons.shield_outlined,
+                        size: 14,
+                        color: _arenaMode ? MoodColors.accent : Colors.grey,
+                      ),
+                      label: Text('Arena', style: TextStyle(fontSize: 11, color: _arenaMode ? MoodColors.accent : Colors.grey)),
+                      onPressed: () => setState(() {
+                        _arenaMode = !_arenaMode;
+                        if (_arenaMode) _agentMode = false;
+                      }),
+                      backgroundColor: Colors.white.withOpacity(0.06),
+                      side: BorderSide(color: _arenaMode ? MoodColors.accent.withOpacity(0.35) : BorderSide(color: Colors.white.withOpacity(0.08))),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                  ],
+                ),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    // ChatGPT-style suggestion pills (matches web PR #29)
+                    _quickChip(Icons.auto_awesome, 'Help me write', () {
+                      setState(() => _input.text = 'Help me write ');
                     }),
-                    _quickChip(Icons.movie_creation_outlined, 'Create video', () {
-                      setState(() => _input.text = 'create a video of ');
+                    _quickChip(Icons.search, 'Research a topic', () {
+                      setState(() => _search = true);
+                      setState(() => _input.text = 'Research ');
                     }),
-                    _quickChip(Icons.palette_outlined, 'Create design', () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen()));
+                    _quickChip(Icons.image, 'Create an image', () {
+                      setState(() => _input.text = 'Create an image of ');
                     }),
-                    _quickChip(Icons.content_cut, 'Edit clip', () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditScreen()));
+                    _quickChip(Icons.lightbulb_outline, 'Brainstorm ideas', () {
+                      setState(() => _input.text = 'Brainstorm ideas for ');
                     }),
-                    _quickChip(Icons.mic_none, 'Voice', _busy ? null : _toggleVoice),
-                    _quickChip(Icons.tune, _modelLabel(), _showModelPicker),
+                    _quickChip(Icons.checklist, 'Make a plan', () {
+                      setState(() => _input.text = 'Make a plan for ');
+                    }),
+                    _quickChip(Icons.article, 'Summarize text', () {
+                      setState(() => _input.text = 'Summarize the following: ');
+                    }),
                   ],
                 ),
               ],
