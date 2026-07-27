@@ -5,6 +5,29 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ---
 
+## 2026-07-27
+
+### 🚀 Redeployed the updated layout, and made "is it live?" answerable
+
+The redesigned chat home layout was merged to `main`, but the last production
+deploy predated it — so the live site was still serving the older build.
+
+- **Re-triggered the production deploy.** `deploy-vercel-web` fires only on
+  pushes touching `frontend/**`, and the app token is 403 on
+  `workflow_dispatch`, so a real `frontend/` change is the way to ship. This
+  push re-runs the `--prod` Vercel deploy against current `main`.
+- **Build provenance in the served HTML.** The root layout now emits
+  `<meta name="build-commit">`, baked in at build time from
+  `VERCEL_GIT_COMMIT_SHA` (falling back to `GIT_COMMIT_SHA`, then `dev`
+  locally). Until now there was no way to tell from outside whether production
+  was running the merged commit or a stale build — exactly the ambiguity that
+  hid this one. Verify with
+  `curl -s https://<site>/ | grep build-commit`.
+- **Verified before pushing:** `npm ci`, `npm run typecheck` and
+  `npm run build` all clean against the current `frontend/` tree.
+
+---
+
 ## 2026-07-26
 
 ### 🧪 The "sandbox-only" failures were mostly real bugs

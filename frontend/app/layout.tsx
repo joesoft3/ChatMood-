@@ -40,6 +40,16 @@ export const viewport: Viewport = {
   interactiveWidget: "resizes-content",
 };
 
+// 🔎 Build provenance — baked in at build time so you can verify *which* commit
+// is actually being served in production:  curl -s https://…/ | grep build-commit
+// Vercel sets VERCEL_GIT_COMMIT_SHA; other builders can pass GIT_COMMIT_SHA.
+// "dev" locally, where neither is set.
+const BUILD_COMMIT = (
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  process.env.GIT_COMMIT_SHA ??
+  "dev"
+).slice(0, 7);
+
 const themeInit = `try {
   var t = localStorage.getItem("mood_theme");
   document.documentElement.dataset.theme = t || "dark";
@@ -51,6 +61,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* 🌓 apply stored/system theme before first paint — no flash */}
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <meta name="build-commit" content={BUILD_COMMIT} />
       </head>
       <body className="bg-base text-gray-100 antialiased">
         <ConversationsProvider>{children}</ConversationsProvider>
