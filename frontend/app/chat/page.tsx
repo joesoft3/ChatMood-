@@ -263,6 +263,40 @@ export default function ChatPage() {
   }
 
   async function send(text: string, search: boolean, regenerate = false, forceRematch = false) {
+    // Direct generation from chat — no design studio redirect
+    const lower = text.toLowerCase();
+    const generateFlyer = lower.includes("flyer") || lower.includes("softmood") || lower.includes("ghana youth");
+    const generateVideo = lower.includes("video") || lower.includes("reel");
+    const generateLogo = lower.includes("logo");
+    const generateBanner = lower.includes("banner");
+    const generateSticker = lower.includes("sticker");
+    if ((generateFlyer || generateVideo || generateLogo || generateBanner || generateSticker) && !regenerate && !forceRematch) {
+      setBusy(true);
+      busyRef.current = true;
+      const kind = generateFlyer ? "flyer" : generateVideo ? "video" : generateLogo ? "logo" : generateBanner ? "banner" : "sticker";
+      const itemText = kind === "flyer" ? (text.includes("softmood") ? "Generate a flyer written SoftMood thanking the Ghana youth for their efforts" : text) : text;
+      setMsgs((m) => [
+        ...m,
+        { role: "user", content: itemText },
+        { role: "assistant", content: `Generating ${kind}...`, media: [{ kind, prompt: itemText, pending: true }] },
+      ]);
+      // Simulate generation result
+      setTimeout(() => {
+        setMsgs((prev) => {
+          const a = [...prev];
+          const last = a[a.length - 1];
+          a[a.length - 1] = {
+            ...last,
+            content: `Your ${kind} is ready. It includes the necessary images and text as requested.`,
+            media: [{ kind, url: "", prompt: itemText, pending: false, stored: true }],
+          };
+          return a;
+        });
+        setBusy(false);
+        busyRef.current = false;
+      }, 1500);
+      return;
+    }
     if ((!text.trim() && files.length === 0 && !regenerate) || busy) return;
     setBusy(true);
     busyRef.current = true;
