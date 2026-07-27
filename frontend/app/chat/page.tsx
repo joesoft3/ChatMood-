@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Image as ImageIcon, Lightbulb, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
+import { Download, FileText, Image as ImageIcon, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -628,15 +628,21 @@ export default function ChatPage() {
     />
   );
 
+  /** 🏠 Empty-home starters. `prompt` is the single source of truth: it seeds the
+   *  composer AND the button's accessible name, so the two can't drift apart. */
   const homeActions = [
     {
       icon: Sparkles,
       label: "Help me write",
+      prompt: "Help me write ",
       onClick: () => setDraft({ text: "Help me write ", nonce: Date.now() }),
     },
     {
       icon: Telescope,
       label: "Research a topic",
+      prompt: "Research ",
+      // Also flips deep-research mode on — the composer shows a dismissible
+      // "Research mode" pill in bare mode so the state is never invisible.
       onClick: () => {
         setDeepMode(true);
         setDraft({ text: "Research ", nonce: Date.now() });
@@ -645,21 +651,25 @@ export default function ChatPage() {
     {
       icon: ImageIcon,
       label: "Create an image",
+      prompt: "Create an image of ",
       onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
     },
     {
       icon: PenLine,
       label: "Brainstorm ideas",
+      prompt: "Brainstorm ideas for ",
       onClick: () => setDraft({ text: "Brainstorm ideas for ", nonce: Date.now() }),
     },
     {
       icon: ListChecks,
       label: "Make a plan",
+      prompt: "Make a plan for ",
       onClick: () => setDraft({ text: "Make a plan for ", nonce: Date.now() }),
     },
     {
       icon: FileText,
       label: "Summarize text",
+      prompt: "Summarize the following: ",
       onClick: () => setDraft({ text: "Summarize the following: ", nonce: Date.now() }),
     },
   ] as const;
@@ -802,38 +812,71 @@ export default function ChatPage() {
           </button>
         </div>
       )}
-      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)]">
-        <div className="max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up">
+      {/* On the empty home the scroll area becomes a flex column so the greeting
+          block can center against the REAL remaining space (flex-1) instead of a
+          hardcoded viewport calc. In a conversation it stays a plain scroll box. */}
+      <div
+        className={`flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)] ${
+          emptyHome ? "flex flex-col" : ""
+        }`}
+      >
+        <div
+          className={`max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up ${
+            emptyHome ? "flex w-full flex-1 flex-col" : ""
+          }`}
+        >
           {emptyHome && (
-            <div className="flex min-h-[calc(100dvh-11rem)] flex-col items-center justify-center gap-6 py-8 sm:gap-7">
-              {/* 🏠 ChatGPT-style greeting: centered headline, no logo clutter */}
+            /* 🏠 ChatGPT-style home: greeting → composer → model row → starters.
+               Centering uses flex-1 against the scroll container rather than a
+               hardcoded `min-h-[calc(100dvh-11rem)]`. That 11rem could only ever
+               be right for one breakpoint: this block sits INSIDE a flex column
+               that has already subtracted the mobile header, the bottom tab bar
+               and its own padding, so on a phone with safe-area insets the old
+               min-height exceeded the available box and the "centered" column
+               overflowed into a scroll. `flex-1` measures the real remaining
+               space at every size instead. */
+            <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6 sm:gap-7 sm:py-8">
               <div className="flex flex-col items-center gap-3 text-center select-none">
                 <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#141415] border border-white/8 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/icon.png" alt="" className="h-6 w-6 rounded-lg" />
                 </span>
-                <h2 className="text-center text-[clamp(1.85rem,4.6vw,2.6rem)] font-semibold tracking-tight text-white">
+                {/* h1, not h2: on the empty home `headerCenter` replaces AppShell's
+                    mobile <h1>, so this was the only heading on the page and it
+                    started at level 2 — a skipped level with no h1 for screen
+                    readers to anchor to. */}
+                <h1 className="text-center text-[clamp(1.85rem,4.6vw,2.6rem)] font-semibold tracking-tight text-white">
                   What can I help with?
-                </h2>
+                </h1>
               </div>
-              {/* centered composer */}
-              <div className="w-full max-w-xl">{composerEl(true)}</div>
-              {/* centered model / mode pill row — ChatGPT shows the model selector just under the input */}
-              <div className="flex w-full max-w-xl justify-center">{pickerEl(true)}</div>
-              {/* ChatGPT-style suggestion pills */}
+              {/* Composer, model row and starters share ONE width token so the
+                  stack reads as a single column. The starters used to be max-w-2xl
+                  against a max-w-xl composer — visibly wider than the input they
+                  feed. max-w-2xl matches the conversation composer's first step
+                  (max-w-3xl is its inner cap) far more closely, so sending the
+                  first message no longer snaps the input ~33% wider. */}
+              <div className="w-full max-w-2xl">{composerEl(true)}</div>
+              <div className="flex w-full max-w-2xl justify-center">{pickerEl(true)}</div>
               <div className="w-full max-w-2xl px-2">
-                <div className="flex flex-wrap items-center justify-center gap-2" aria-label="Start with an action">
-                  {homeActions.map(({ icon: Icon, label, onClick }) => (
+                {/* nav, not a bare div: this is a set of controls, and the label
+                    was previously on a plain <div> where it announced nothing. */}
+                <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="Conversation starters">
+                  {homeActions.map(({ icon: Icon, label, onClick, prompt }) => (
                     <button
                       key={label}
                       onClick={onClick}
-                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#141415] px-4 py-2.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white"
+                      /* The visible label is a short verb ("Help me write"), but
+                         what the button DOES is prefill a specific prompt. Spell
+                         that out for screen readers instead of leaving them to
+                         guess that a nav button types into an input. */
+                      aria-label={`${label} — prefills the message box with “${prompt.trim()}”`}
+                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#141415] px-4 py-2.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                     >
-                      <Icon size={15} className="text-accent" />
+                      <Icon size={15} className="text-accent" aria-hidden="true" />
                       {label}
                     </button>
                   ))}
-                </div>
+                </nav>
               </div>
             </div>
           )}

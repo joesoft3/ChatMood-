@@ -7,6 +7,50 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-27
 
+### 🏠 ChatGPT-style chat home — real centering, real heading, reachable starters
+
+The empty chat home was already ChatGPT-shaped (greeting → composer → model row
+→ starter pills); these are the fixes that make it behave like one.
+
+- **It wasn't actually centered.** The block used
+  `min-h-[calc(100dvh-11rem)]`, but it lives *inside* a flex column that has
+  already subtracted the mobile header, the bottom tab bar and its own padding.
+  One hardcoded `11rem` can't be right at every breakpoint: on desktop it
+  over-subtracted (content floated high above dead space), and on a phone with
+  safe-area insets it *under*-subtracted, so the min-height exceeded the box and
+  the "centered" column overflowed into a scroll. It now centers with `flex-1`
+  against the real remaining space, measured at every size.
+- **The page had no `<h1>`.** On the empty home `headerCenter` replaces
+  AppShell's mobile `<h1>`, leaving "What can I help with?" as an `<h2>` — the
+  only heading on the page, at a skipped level, with nothing for a screen reader
+  to anchor to. Promoted to `<h1>`.
+- **Starter pills announced nothing useful.** Six buttons labelled "Help me
+  write", "Make a plan"… with no indication they *prefill the composer*. Each
+  now carries an `aria-label` naming the exact prompt it types, sourced from the
+  same `prompt` string the composer receives, so the two can't drift. The group
+  is a `<nav aria-label="Conversation starters">` (the label previously sat on a
+  plain `<div>`, where it announced nothing), icons are `aria-hidden`, and the
+  pills have a visible focus ring.
+- **The stack lines up.** Starters were `max-w-2xl` under a `max-w-xl`
+  composer — visibly wider than the input they feed. Greeting, composer, model
+  row and starters now share one width token, which also softens the jump when
+  the first message swaps in the conversation composer.
+- **`prefers-reduced-motion` is respected.** `.mood-fade-up` wraps the chat
+  surface and several premium cards and animated unconditionally; it's now
+  disabled (element still visible) when the OS asks for reduced motion.
+- Dropped a dead `Lightbulb` import.
+
+Verified against a production build served locally: `/chat` returns the `<h1>`,
+the `nav`, the per-pill aria labels and the flex chain; the old `100dvh-11rem`
+calc is gone; `/`, `/chat`, `/images`, `/reel` and `/settings` all 200 with a
+clean server log. `npm run typecheck` and `npm run build` pass.
+
+> Note: PRs #22 and #27 also rewrite this same block, in conflicting directions
+> (#22 keeps the pills, #27 deletes them). Both branch from before project mode,
+> media edit/delete and `?c=`/`?billing=` deep-link handling landed, so merging
+> #22 as-is would silently revert those. This change is built on current `main`
+> and keeps all of them.
+
 ### 🚦 Health checks now detect a broken deploy (readiness ≠ liveness)
 
 Every deployment probe — `fly.toml`, `render.yaml`, `docker-compose.yml` — gated
