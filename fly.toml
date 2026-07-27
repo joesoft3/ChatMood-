@@ -26,8 +26,14 @@ primary_region = "jnb"          # Johannesburg — closest to 🇬🇭 Accra
     interval = "30s"
     grace_period = "40s"   # boot runs alembic first
     method = "GET"
-    path = "/healthz"
-    timeout = "5s"
+    # Readiness, not liveness: /healthz returns 200 as long as the process is up,
+    # so a machine with a dead Postgres kept serving 500s while its check stayed
+    # green. /readyz pings the DB and 503s when it is unreachable.
+    # Only READINESS_REQUIRED deps (default: postgres) can 503 — Redis/Qdrant are
+    # NOT provisioned on Fly and are optional by design, so they report
+    # "degraded" at 200 instead of failing every machine's health check.
+    path = "/readyz"
+    timeout = "10s"        # DB probe on a waking Neon compute > the old 5s liveness budget
 
 [vm]
   memory = "1gb"           # ffmpeg pays its rent here; 512mb works for chat-only

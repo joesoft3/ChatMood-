@@ -53,16 +53,23 @@ services:
       QDRANT_URL: http://qdrant:6333
       UPLOAD_DIR: /app/storage
       CORS_ORIGINS: http://localhost:3000
+      # This stack really does run all three, and `frontend` waits on this
+      # healthcheck — so gate readiness on the full set here. A local stack where
+      # Redis or Qdrant failed to come up should report itself broken, not
+      # silently start the UI against a half-wired backend.
+      READINESS_REQUIRED: postgres,redis,qdrant
     ports:
       - "8000:8000"
     volumes:
       - uploads:/app/storage
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/healthz || exit 1"]
+      # /readyz (not /healthz): `frontend` gates on service_healthy, so the check
+      # must mean "dependencies wired", not merely "uvicorn is listening".
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/readyz || exit 1"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
-      start_period: 20s
+      start_period: 30s   # alembic + pgvector DDL run before the first ready 200
     depends_on:
       db:
         condition: service_healthy

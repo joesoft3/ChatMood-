@@ -84,6 +84,27 @@ Web app talks to it already if you keep using the same API URL — else update
 `NEXT_PUBLIC_API_URL=https://moodai-api.fly.dev/api/v1` on the web project
 (Vercel → moodai-web → env) and redeploy.
 
+> ### 🚦 What the machine health check watches
+> `fly.toml` gates on **`/readyz`**, not `/healthz`: liveness returns 200 while
+> the process is alive, so a machine with an unreachable database used to keep a
+> green check while serving 500s.
+>
+> **This deployment provisions no Redis and no Qdrant** — there is no `REDIS_URL`
+> secret in the table above, so it falls back to a `localhost` default that
+> nothing is listening on. That is fine and intentional: the rate limiter fails
+> open and memory/RAG fall back to pgvector on the Neon database. `/readyz`
+> therefore reports:
+>
+> ```json
+> {"status":"degraded","ready":true,"checks":{"postgres":{"status":"ok",…},
+>  "redis":{"status":"fail","required":"false",…}}}
+> ```
+>
+> **`degraded` at HTTP 200 is the healthy steady state here.** Only Postgres
+> (`READINESS_REQUIRED`, default `postgres`) can 503 the probe. If you ever do
+> attach a Redis, add `REDIS_URL` as a secret and the check flips to `ok` on its
+> own — and set `READINESS_REQUIRED=postgres,redis` if you want it enforced.
+
 ## Step 4 — Auto-deploys (optional)
 
 1. 💻 `fly tokens create deploy` → copy token

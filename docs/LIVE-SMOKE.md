@@ -8,7 +8,7 @@ not mocks. Use it after every deploy/env change, or wire it into CI
 
 | # | Path | Pass criteria |
 |---|---|---|
-| 1 | `GET /healthz` · `/readyz` | 200, deps reachable |
+| 1 | `GET /healthz` · `/readyz` | both 200. `/readyz` may report `degraded` (an optional dep is down — Fly runs with no Redis by design); only `503 unready` fails |
 | 2 | `POST /auth/register` | fresh account + token (honors the `APP_PASSWORD` sign-up gate) |
 | 3 | `POST /chat/stream` | real model tokens + `done` |
 | 4 | Think mode (`think: true`) | `thinking_start` → final `thinking` event (traces if the model emits `reasoning_content`) |

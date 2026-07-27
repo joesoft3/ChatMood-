@@ -7,6 +7,46 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-07-27
 
+### 🚦 Health checks now detect a broken deploy (readiness ≠ liveness)
+
+Every deployment probe — `fly.toml`, `render.yaml`, `docker-compose.yml` — gated
+on `/healthz`, which returns 200 whenever the uvicorn process is alive. A machine
+whose **database was unreachable kept a green health check while serving 500s**;
+nothing in the platform noticed, and `frontend` in compose would start against a
+half-wired backend.
+
+The obvious fix — repoint the probes at `/readyz` — would have **taken production
+down**. `/readyz` 503'd if *any* of postgres/redis/qdrant failed, and Fly
+provisions no Redis (no `REDIS_URL` secret → the `redis://localhost:6379/0`
+default → nothing listening). `/readyz` was already a permanent 503 in
+production; gating on it would have failed every machine's check and stalled the
+next rolling deploy.
+
+- **Readiness now separates required from optional deps.** New
+  `READINESS_REQUIRED` setting (default `postgres`). Only those deps can 503.
+  Redis and the vector store are optional *by design* — the rate limiter fails
+  open (`api/deps.py`) and memory/RAG degrade to "no recall" — so losing them
+  reports `degraded` at 200 rather than pulling a still-serving machine.
+- **Three states instead of two:** `ok` (200), `degraded` (200, optional dep
+  down, still serving), `unready` (503, required dep down). Every check reports
+  `status`, latency `ms`, and `required`, so an operator sees the degraded
+  dependency instead of just a green light.
+- **Probes repointed at `/readyz`** — Fly (timeout 5s → 10s, since a DB probe on
+  a waking Neon compute needs more than a liveness budget), Render, and compose,
+  which gates on all three because it actually runs all three and `frontend`
+  waits on that healthcheck.
+- **Smoke scripts** (`smoke.sh`, `live-smoke.sh`) treat `degraded` as a pass and
+  say which dependency is down, instead of failing a healthy Fly deployment.
+- **15 regression tests** (`backend/tests/test_readiness.py`) covering the state
+  machine and the probe wiring — verified to fail against the old code, 9 of
+  them including the Redis-down outage case. Suite: 641 passed, 0 regressions.
+
+> ⚠️ **One follow-up needs a human.** The `deploy-fly` workflow's step summary
+> still advertises `/healthz → {"ok":true}`, which no longer describes what the
+> machine check watches. The Arena app token lacks GitHub's `workflows`
+> permission, so that file is unchanged here. It is cosmetic — the summary text
+> only, no deploy behaviour — but worth a one-line edit when convenient.
+
 ### 🚀 Redeployed the updated layout, and made "is it live?" answerable
 
 The redesigned chat home layout was merged to `main`, but the last production

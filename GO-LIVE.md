@@ -71,9 +71,23 @@ for the full setup.
 Run `scripts/live-smoke.sh` (or the `live-smoke.yml` workflow) against the live
 URL to verify chat, search, memory and `/readyz`.
 
-`/readyz` returns **503 whenever Redis or Qdrant is unreachable** — that is the
-designed signal, not a fault. It reports per-dependency status, so read the body
-before assuming the deploy is broken.
+`/readyz` is the **readiness** probe and is what the Fly/Render health checks
+gate on. `/healthz` is liveness only — it returns 200 whenever the process is
+running, even if the database is unreachable, so never gate a deploy on it.
+
+Only the dependencies listed in `READINESS_REQUIRED` (default: `postgres`) can
+fail the probe:
+
+| Body | HTTP | Meaning |
+|---|---|---|
+| `{"status":"ok","ready":true}` | 200 | Everything reachable. |
+| `{"status":"degraded","ready":true}` | 200 | An **optional** dep (Redis/Qdrant) is down. Still serving — the rate limiter fails open and memory/RAG degrade to "no recall". **Fly runs this way normally**: it provisions no Redis. |
+| `{"status":"unready"}` | 503 | A **required** dep is unreachable. Pull the instance. |
+
+Each entry in `checks` carries `status`, latency `ms`, and `required`, so read
+the body before assuming a deploy is broken. Set
+`READINESS_REQUIRED=postgres,redis,qdrant` on stacks that really do provision
+all three (docker-compose does).
 
 ## Shipping a change
 
