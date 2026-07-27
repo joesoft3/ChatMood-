@@ -191,6 +191,7 @@ export default function ChatPage() {
       lastLoaded.current = activeId;
       return;
     }
+    // Tapping history loads conversation; media cards include edit (redesign) buttons
     if (lastLoaded.current === activeId || busyRef.current) return;
     lastLoaded.current = activeId;
     setMsgs([]);
