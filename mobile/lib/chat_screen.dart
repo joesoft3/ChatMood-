@@ -21,6 +21,11 @@ import 'arena_view.dart';
 import 'login_screen.dart';
 import 'main.dart';
 
+const Color lightBase = Color(0xFFF8F9FA);
+const Color lightPanel = Colors.white;
+const Color lightLine = Color(0xFFE5E7EB);
+const Color lightAccent = Color(0xFF3F82F6);
+
 class AgentStep {
   AgentStep({required this.agent, required this.task, this.status = 'queued', this.preview});
   final String agent;
@@ -131,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   List<Workspace> _workspaces = [];
   Workspace? _workspace; // null = personal chats
   Map<String, String> _authors = {}; // user_id → display label (team conversations)
+  String _userName = 'Creator';
 
   @override
   void initState() {
@@ -139,6 +145,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _idleTimer = Timer.periodic(const Duration(minutes: 1), (_) => _checkIdle());
     _loadConversations();
     _loadWorkspaces();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final data = await Api.get('/auth/me');
+      if (data is Map) {
+        final email = data['email'] as String?;
+        if (email != null && email.isNotEmpty) {
+          setState(() {
+            _userName = email.split('@').first;
+            if (_userName.isNotEmpty) {
+              _userName = _userName[0].toUpperCase() + _userName.substring(1);
+            }
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -235,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          backgroundColor: MoodColors.panel,
+          backgroundColor: lightPanel,
           title: const Text('Join a team'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -522,7 +546,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _showModelPicker() async {
     await showModalBottomSheet(
       context: context,
-      backgroundColor: MoodColors.panel,
+      backgroundColor: lightPanel,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => SafeArea(
@@ -532,27 +556,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Premium models', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+                const Text('Premium models', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.black87)),
                 const SizedBox(height: 10),
                 for (final m in _pickerModels)
                   ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     leading: Text(m[1], style: const TextStyle(fontSize: 18)),
-                    title: Text(m[2], style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                    trailing: _model == m[0] ? const Icon(Icons.check, color: MoodColors.accent, size: 18) : null,
+                    title: Text(m[2], style: const TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500)),
+                    trailing: _model == m[0] ? const Icon(Icons.check, color: lightAccent, size: 18) : null,
                     onTap: () {
                       setState(() => _model = m[0]);
                       setSheet(() {});
                     },
                   ),
-                const Divider(color: Colors.white12, height: 18),
+                const Divider(color: lightLine, height: 18),
                 SwitchListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  activeColor: MoodColors.accent,
-                  title: Text('🧠 Extended reasoning', style: TextStyle(color: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1') ? Colors.white70 : Colors.white24, fontSize: 13)),
-                  subtitle: const Text('S1 ChatMood-4 (or code models) only', style: TextStyle(color: Colors.white24, fontSize: 11)),
+                  activeColor: lightAccent,
+                  title: Text('🧠 Extended reasoning', style: TextStyle(color: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1') ? Colors.black87 : Colors.black38, fontSize: 13, fontWeight: FontWeight.w500)),
+                  subtitle: const Text('S1 ChatMood-4 (or code models) only', style: TextStyle(color: Colors.black38, fontSize: 11)),
                   value: _thinkOn && (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1'),
                   onChanged: (_model == 'auto' || _model == 'grok-4' || _model == 'grok-code-fast-1')
                       ? (v) {
@@ -689,7 +713,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             context: context,
             barrierDismissible: false,
             builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) => AlertDialog(
-              backgroundColor: MoodColors.panel,
+              backgroundColor: lightPanel,
               title: const Text('🗑 Delete account permanently?'),
               content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text(
@@ -822,87 +846,85 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   // ─────────────────────────────────────────── 🏠 Grok-clean centered home (web parity)
-  Widget _brandHero() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 84,
-          height: 84,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: MoodColors.accent.withOpacity(0.35), blurRadius: 46, spreadRadius: -12),
-            ],
+  Widget _suggestionItem(IconData icon, String label, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.cover),
-          ),
-        ),
-        const SizedBox(height: 14),
-        const Text('ChatMood', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: .2)),
-        const SizedBox(height: 5),
-        Text('UNDERSTAND · ADAPT · ELEVATE',
-            style: TextStyle(fontSize: 11, letterSpacing: 2.4, color: Colors.grey.shade500)),
-      ],
-    );
-  }
-
-  /// Grok-clean centered home: hero + elevated pill composer + quick-launch chips,
-  /// all vertically centered (scrolls up when the keyboard opens).
-  Widget _centeredHome() {
-    return LayoutBuilder(
-      builder: (ctx, cons) => SingleChildScrollView(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: cons.maxHeight),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
               children: [
-                _brandHero(),
-                const SizedBox(height: 24),
-                Container(
-                  decoration: BoxDecoration(
-                    color: MoodColors.panel,
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: MoodColors.line),
+                Icon(icon, color: Colors.black87, size: 22),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: _composerRow(),
                 ),
-                if (_files.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _filesRow(),
-                ],
-                const SizedBox(height: 14),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 2,
-                  runSpacing: 6,
-                  children: [
-                    // 🎨🎬 in-chat creation: prefill the composer, never leave chat
-                    _quickChip(Icons.image_outlined, 'Create image', () {
-                      setState(() => _input.text = 'create an image of ');
-                    }),
-                    _quickChip(Icons.movie_creation_outlined, 'Create video', () {
-                      setState(() => _input.text = 'create a video of ');
-                    }),
-                    _quickChip(Icons.palette_outlined, 'Create design', () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen()));
-                    }),
-                    _quickChip(Icons.content_cut, 'Edit clip', () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditScreen()));
-                    }),
-                    _quickChip(Icons.mic_none, 'Voice', _busy ? null : _toggleVoice),
-                    _quickChip(Icons.tune, _modelLabel(), _showModelPicker),
-                  ],
-                ),
+                const Icon(Icons.chevron_right, color: Colors.black26, size: 18),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// ChatGPT-style clean empty home: suggestion pills aligned above the bottom composer.
+  Widget _centeredHome() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Spacer(),
+          ScrollingGreeting(text: 'How can I assist you today, $_userName?'),
+          const SizedBox(height: 40),
+          _suggestionItem(
+            Icons.image_outlined,
+            'Create an image',
+            () => setState(() => _input.text = 'create an image of '),
+          ),
+          const SizedBox(height: 8),
+          _suggestionItem(
+            Icons.edit_outlined,
+            'Write or edit',
+            () => setState(() => _input.text = 'help me write a '),
+          ),
+          const SizedBox(height: 8),
+          _suggestionItem(
+            Icons.language_outlined,
+            'Look something up',
+            () {
+              setState(() {
+                _search = true;
+                _input.text = 'search the web for ';
+              });
+            },
+          ),
+        ],
       ),
     );
   }
@@ -925,314 +947,492 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   Widget _composerRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.attach_file, size: 20),
-          tooltip: 'Attach file',
-          onPressed: _busy ? null : _attach,
-        ),
-        Expanded(
-          child: TextField(
-            controller: _input,
-            minLines: 1,
-            maxLines: 5,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => _send(),
-            decoration: InputDecoration(
-              hintText: _agentMode ? 'Give the agent team a goal…' : 'Ask ChatMood anything…',
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-            ),
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _input,
+      builder: (context, val, _) {
+        final hasText = val.text.trim().isNotEmpty;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add, color: Colors.black54, size: 22),
+                        tooltip: 'Attach file',
+                        onPressed: _busy ? null : _attach,
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _input,
+                          minLines: 1,
+                          maxLines: 5,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _send(),
+                          style: const TextStyle(color: Colors.black87, fontSize: 15),
+                          decoration: InputDecoration(
+                            hintText: _agentMode ? 'Give the agent team a goal…' : 'Ask ChatMood',
+                            hintStyle: const TextStyle(color: Colors.black38, fontSize: 15),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                          ),
+                        ),
+                      ),
+                      // Inside on the right of the chat box: show Send button if typing, otherwise Mic
+                      _busy
+                          ? const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3F82F6)),
+                              ),
+                            )
+                          : hasText
+                              ? Container(
+                                  margin: const EdgeInsets.only(right: 4),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3F82F6),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: IconButton(
+                                    icon: const Icon(Icons.arrow_upward, color: Colors.white, size: 16),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                    onPressed: _send,
+                                  ),
+                                )
+                              : IconButton(
+                                  icon: Icon(_recording ? Icons.stop : Icons.mic_none,
+                                      size: 22, color: _recording ? Colors.redAccent : Colors.black54),
+                                  tooltip: _recording ? 'Stop & send' : 'Voice message',
+                                  onPressed: _busy && !_recording ? null : _toggleVoice,
+                                ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Always-visible Blue circular Voice Orb Wave button next to the chat box!
+              GestureDetector(
+                onTap: _busy ? null : _toggleVoice,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF3F82F6),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(width: 2, height: 12, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                      const SizedBox(width: 2),
+                      Container(width: 2, height: 18, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                      const SizedBox(width: 2),
+                      Container(width: 2, height: 14, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                      const SizedBox(width: 2),
+                      Container(width: 2, height: 10, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        IconButton(
-          icon: Icon(_recording ? Icons.stop : Icons.mic,
-              size: 20, color: _recording ? Colors.redAccent : null),
-          tooltip: _recording ? 'Stop & send' : 'Voice message',
-          onPressed: _busy && !_recording ? null : _toggleVoice,
-        ),
-        IconButton.filled(
-          onPressed: _busy ? null : _send,
-          style: IconButton.styleFrom(backgroundColor: MoodColors.accent),
-          icon: _busy
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.send, color: Colors.black, size: 20),
-        ),
-      ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final lightTheme = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: lightBase,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      colorScheme: const ColorScheme.light(
+        primary: lightAccent,
+        surface: lightPanel,
+        onSurface: Colors.black87,
+        outline: lightLine,
+      ),
+    );
+
     // any touch counts as activity for the 5-minute idle auto-home timer
     return Listener(
       onPointerDown: (_) => _poke(),
       behavior: HitTestBehavior.translucent,
-      child: Scaffold(
-      appBar: AppBar(
-        // 🏠 Grok-clean top bar: hamburger = everything moved to the menu,
-        // Ask | Imagine tabs centered, ⚔ Arena as the single right icon.
-        automaticallyImplyLeading: false,
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: 'Menu — chats, studios, AI modes',
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
-        ),
-        centerTitle: true,
-        titleSpacing: 0,
-        title: _modeTabs(),
-        actions: [
-          IconButton(
-            tooltip: '⚔️ Arena — models debate, S1 ChatMood-4 judges',
-            icon: Icon(_arenaMode ? Icons.shield : Icons.shield_outlined,
-                color: _arenaMode ? MoodColors.accent : Colors.grey[700]),
-            onPressed: () => setState(() {
-              _arenaMode = !_arenaMode;
-              if (_arenaMode) _agentMode = false;
-            }),
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        backgroundColor: MoodColors.panel,
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton.icon(
-                  onPressed: _newChat,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text('New chat'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MoodColors.accent,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Theme(
+        data: lightTheme,
+        child: Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            automaticallyImplyLeading: false,
+            leadingWidth: 70,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+              child: Builder(
+                builder: (ctx) => GestureDetector(
+                  onTap: () => Scaffold.of(ctx).openDrawer(),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(width: 14, height: 2, color: Colors.black87),
+                          const SizedBox(height: 3),
+                          Container(width: 9, height: 2, color: Colors.black87),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
-              // ── AI modes (moved off the home bar for a Grok-clean home) ──
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
-                child: Text('AI MODES', style: TextStyle(fontSize: 10, letterSpacing: 1.2, color: Colors.grey)),
-              ),
-              SwitchListTile.adaptive(
-                dense: true,
-                secondary: const Icon(Icons.smart_toy_outlined, size: 18),
-                title: const Text('Agent team', style: TextStyle(fontSize: 13)),
-                subtitle: const Text('planner → specialists → writer',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
-                value: _agentMode,
-                onChanged: (v) => setState(() {
-                  _agentMode = v;
-                  if (v) _arenaMode = false;
-                }),
-              ),
-              SwitchListTile.adaptive(
-                dense: true,
-                secondary: const Icon(Icons.public, size: 18),
-                title: const Text('Live search', style: TextStyle(fontSize: 13)),
-                subtitle: const Text('cite fresh web sources in answers',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
-                value: _search,
-                onChanged: (v) => setState(() => _search = v),
-              ),
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.tune, size: 18),
-                title: const Text('Model & reasoning', style: TextStyle(fontSize: 13)),
-                subtitle: Text(_modelLabel(), style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).maybePop();
-                  _showModelPicker();
-                },
-              ),
-              // Teams: switch between personal chats and shared team workspaces,
-              // or redeem an invite link/code.
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  dense: true,
-                  tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                  childrenPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    _workspace == null ? Icons.person_outline : Icons.group_outlined,
-                    size: 18,
-                  ),
-                  title: Text(
-                    _workspace?.name ?? 'Personal',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    _workspace == null ? 'Personal chats · switch to a team' : 'Team workspace · shared',
-                    style: const TextStyle(fontSize: 10, color: Colors.grey),
-                  ),
-                  children: [
-                    ListTile(
-                      dense: true,
-                      selected: _workspace == null,
-                      leading: const Icon(Icons.person_outline, size: 16),
-                      title: const Text('Personal', style: TextStyle(fontSize: 13)),
-                      onTap: () => _selectWorkspace(null),
+            ),
+            centerTitle: true,
+            title: GestureDetector(
+              onTap: () {
+                _toast('Premium features & reasoning models unlocked! 🚀');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 3,
+                      offset: const Offset(0, 1),
                     ),
-                    for (final w in _workspaces)
-                      ListTile(
-                        dense: true,
-                        selected: _workspace?.id == w.id,
-                        leading: const Icon(Icons.group_outlined, size: 16),
-                        title: Text(w.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
-                        onTap: () => _selectWorkspace(w),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.auto_awesome, color: Colors.indigoAccent, size: 14),
+                    SizedBox(width: 6),
+                    Text(
+                      'ChatMood',
+                      style: TextStyle(
+                        color: Colors.indigo,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
                       ),
-                    ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.link, size: 16),
-                      title: const Text('Join with invite…', style: TextStyle(fontSize: 13)),
-                      onTap: () {
-                        Navigator.of(context).maybePop();
-                        _joinInvite();
-                      },
                     ),
                   ],
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: _conversations.length,
-                  itemBuilder: (context, i) {
-                    final c = _conversations[i];
-                    return ListTile(
-                      dense: true,
-                      selected: c.id == _conversationId,
-                      title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      onTap: () => _openConversation(c.id),
-                    );
+            ),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FilmsScreen()));
                   },
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.movie_creation_outlined, color: Colors.black87, size: 18),
+                  ),
                 ),
               ),
-              const Divider(height: 1, color: MoodColors.line),
-              ListTile(
-                leading: const Icon(Icons.alarm, size: 18),
-                title: const Text('⏰ Tasks', style: TextStyle(fontSize: 14)),
-                subtitle: const Text('Prompts ChatMood runs on a schedule',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).maybePop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TasksScreen()));
-                },
+            ],
+          ),
+          drawer: Drawer(
+            backgroundColor: lightPanel,
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: FilledButton.icon(
+                      onPressed: _newChat,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('New chat'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: lightAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: Text('AI MODES', style: TextStyle(fontSize: 10, letterSpacing: 1.2, color: Colors.grey)),
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.shield_outlined, size: 18),
+                    title: const Text('⚔️ Arena Mode', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('models debate, S1 ChatMood-4 judges',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _arenaMode,
+                    onChanged: (v) => setState(() {
+                      _arenaMode = v;
+                      if (v) _agentMode = false;
+                    }),
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.smart_toy_outlined, size: 18),
+                    title: const Text('Agent team', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('planner → specialists → writer',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _agentMode,
+                    onChanged: (v) => setState(() {
+                      _agentMode = v;
+                      if (v) _arenaMode = false;
+                    }),
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.public, size: 18),
+                    title: const Text('Live search', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('cite fresh web sources in answers',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _search,
+                    onChanged: (v) => setState(() => _search = v),
+                  ),
+                  ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.tune, size: 18),
+                    title: const Text('Model & reasoning', style: TextStyle(fontSize: 13)),
+                    subtitle: Text(_modelLabel(), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      _showModelPicker();
+                    },
+                  ),
+                  Theme(
+                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      dense: true,
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                      childrenPadding: EdgeInsets.zero,
+                      leading: Icon(
+                        _workspace == null ? Icons.person_outline : Icons.group_outlined,
+                        size: 18,
+                      ),
+                      title: Text(
+                        _workspace?.name ?? 'Personal',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        _workspace == null ? 'Personal chats · switch to a team' : 'Team workspace · shared',
+                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                      children: [
+                        ListTile(
+                          dense: true,
+                          selected: _workspace == null,
+                          leading: const Icon(Icons.person_outline, size: 16),
+                          title: const Text('Personal', style: TextStyle(fontSize: 13)),
+                          onTap: () => _selectWorkspace(null),
+                        ),
+                        for (final w in _workspaces)
+                          ListTile(
+                            dense: true,
+                            selected: _workspace?.id == w.id,
+                            leading: const Icon(Icons.group_outlined, size: 16),
+                            title: Text(w.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13)),
+                            onTap: () => _selectWorkspace(w),
+                          ),
+                        ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.link, size: 16),
+                          title: const Text('Join with invite…', style: TextStyle(fontSize: 13)),
+                          onTap: () {
+                            Navigator.of(context).maybePop();
+                            _joinInvite();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: _conversations.length,
+                      itemBuilder: (context, i) {
+                        final c = _conversations[i];
+                        return ListTile(
+                          dense: true,
+                          selected: c.id == _conversationId,
+                          title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          onTap: () => _openConversation(c.id),
+                        );
+                      },
+                    ),
+                  ),
+                  const Divider(height: 1, color: lightLine),
+                  ListTile(
+                    leading: const Icon(Icons.alarm, size: 18),
+                    title: const Text('⏰ Tasks', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Prompts ChatMood runs on a schedule',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TasksScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.movie_creation_outlined, size: 18),
+                    title: const Text('🎞 Films'),
+                    subtitle: const Text('Your storyboard movies', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FilmsScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.palette_outlined, size: 18),
+                    title: const Text('Design Studio', style: TextStyle(fontSize: 14)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.content_cut, size: 18),
+                    title: const Text('✂️ Auto-Edit', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Upload a clip · edit by instruction', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.request_page_outlined, size: 18),
+                    title: const Text('🛍 Client Orders', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Magic links clients order from', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.logout, size: 18),
+                    title: const Text('Sign out'),
+                    onTap: _logout,
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.delete_forever_outlined, size: 18, color: Colors.red.shade400),
+                    title: Text('Delete account', style: TextStyle(fontSize: 14, color: Colors.red.shade300)),
+                    subtitle: const Text('Erase everything — required by the app stores',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      _deleteAccountDialog();
+                    },
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.movie_creation_outlined, size: 18),
-                title: const Text('🎞 Films'),
-                subtitle: const Text('Your storyboard movies', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).maybePop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FilmsScreen()));
-                },
+            ),
+          ),
+          body: Column(
+            children: [
+              if (_agentMode)
+                Container(
+                  width: double.infinity,
+                  color: lightPanel,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: const Text(
+                    '🤖 Agent team — planner, concurrent specialists, writer & critic',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ),
+              if (_workspace != null)
+                Container(
+                  width: double.infinity,
+                  color: lightPanel,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '👥 Team · ${_workspace!.name} — conversations shared with all members',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
+                ),
+              Expanded(
+                child: _messages.isEmpty
+                    ? _centeredHome()
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, i) => _Bubble(
+                              _messages[i],
+                              canRematch: !_busy,
+                              onRematch: _rematch,
+                            ),
+                      ),
               ),
-              ListTile(
-                leading: const Icon(Icons.palette_outlined, size: 18),
-                title: const Text('Design Studio', style: TextStyle(fontSize: 14)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.content_cut, size: 18),
-                title: const Text('✂️ Auto-Edit', style: TextStyle(fontSize: 14)),
-                subtitle: const Text('Upload a clip · edit by instruction', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditScreen()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.request_page_outlined, size: 18),
-                title: const Text('🛍 Client Orders', style: TextStyle(fontSize: 14)),
-                subtitle: const Text('Magic links clients order from', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrdersScreen()));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout, size: 18),
-                title: const Text('Sign out'),
-                onTap: _logout,
-              ),
-              ListTile(
-                leading: Icon(Icons.delete_forever_outlined, size: 18, color: Colors.red.shade400),
-                title: Text('Delete account', style: TextStyle(fontSize: 14, color: Colors.red.shade300)),
-                subtitle: const Text('Erase everything — required by the app stores',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
-                onTap: () {
-                  Navigator.of(context).maybePop();
-                  _deleteAccountDialog();
-                },
+              if (_files.isNotEmpty) _filesRow(),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+                  child: _composerRow(),
+                ),
               ),
             ],
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          if (_agentMode)
-            Container(
-              width: double.infinity,
-              color: MoodColors.panel,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: const Text(
-                '🤖 Agent team — planner, concurrent specialists, writer & critic',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ),
-          if (_workspace != null)
-            Container(
-              width: double.infinity,
-              color: MoodColors.panel,
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                '👥 Team · ${_workspace!.name} — conversations shared with all members',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ),
-          Expanded(
-            child: _messages.isEmpty
-                ? _centeredHome() // 🏠 Grok-clean centered home: hero + pill composer + chips
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, i) => _Bubble(
-                          _messages[i],
-                          canRematch: !_busy,
-                          onRematch: _rematch,
-                        ),
-                  ),
-          ),
-          // bottom zone exists only inside a conversation — the home keeps everything centered
-          if (_messages.isNotEmpty) ...[
-            if (_files.isNotEmpty) _filesRow(),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-                child: _composerRow(),
-              ),
-            ),
-          ],
-        ],
-      ),
       ),
     );
   }
@@ -1253,8 +1453,8 @@ class _Bubble extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12, left: 48),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: MoodColors.accent.withOpacity(0.20),
-            border: Border.all(color: MoodColors.accent.withOpacity(0.35)),
+            color: lightAccent.withOpacity(0.12),
+            border: Border.all(color: lightAccent.withOpacity(0.25)),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -1266,10 +1466,13 @@ class _Bubble extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 3),
                   child: Text(
                     msg.author!,
-                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
                   ),
                 ),
-              Text(msg.text),
+              Text(
+                msg.text,
+                style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.4),
+              ),
             ],
           ),
         ),
@@ -1285,14 +1488,14 @@ class _Bubble extends StatelessWidget {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: MoodColors.panel,
-                border: Border.all(color: MoodColors.line),
+                color: lightPanel,
+                border: Border.all(color: lightLine),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('🤖 Agent team', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  const Text('🤖 Agent team', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.black87)),
                   const SizedBox(height: 6),
                   for (final s in msg.steps!)
                     Padding(
@@ -1305,7 +1508,7 @@ class _Bubble extends StatelessWidget {
                           Expanded(
                             child: Text(
                               '${_icon(s.agent)} ${s.agent} — ${s.task}',
-                              style: const TextStyle(fontSize: 11, color: Colors.grey),
+                              style: const TextStyle(fontSize: 11, color: Colors.black54),
                             ),
                           ),
                         ],
@@ -1317,7 +1520,7 @@ class _Bubble extends StatelessWidget {
           if (msg.think != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
-              child: Text(msg.think!, style: const TextStyle(fontSize: 11, color: MoodColors.accent)),
+              child: Text(msg.think!, style: const TextStyle(fontSize: 11, color: lightAccent, fontWeight: FontWeight.w600)),
             ),
           if (msg.arenaLive != null || msg.arenaData != null)
             ArenaPanel(
@@ -1338,7 +1541,7 @@ class _Bubble extends StatelessWidget {
                   child: MarkdownBody(
                     data: msg.text,
                     styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
-                        .copyWith(p: const TextStyle(fontSize: 15, height: 1.45)),
+                        .copyWith(p: const TextStyle(fontSize: 15, height: 1.45, color: Colors.black87)),
                   ),
                 ),
         ],
@@ -1537,6 +1740,81 @@ class _InlineVideoState extends State<_InlineVideo> {
               bottom: 0,
               child: VideoProgressIndicator(_c!, allowScrubbing: true, padding: EdgeInsets.zero),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class ScrollingGreeting extends StatefulWidget {
+  const ScrollingGreeting({super.key, required this.text});
+  final String text;
+
+  @override
+  State<ScrollingGreeting> createState() => _ScrollingGreetingState();
+}
+
+class _ScrollingGreetingState extends State<ScrollingGreeting> {
+  late ScrollController _scrollController;
+  bool _scrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loopScroll());
+  }
+
+  Future<void> _loopScroll() async {
+    if (!mounted) return;
+    _scrolling = true;
+    while (_scrolling && mounted) {
+      if (_scrollController.hasClients) {
+        final maxScroll = _scrollController.position.maxScrollExtent;
+        if (maxScroll > 0) {
+          await _scrollController.animateTo(
+            maxScroll,
+            duration: Duration(seconds: (maxScroll / 45).round() + 3),
+            curve: Curves.linear,
+          );
+          if (mounted) {
+            _scrollController.jumpTo(0);
+          }
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrolling = false;
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 36,
+      child: ListView(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          SizedBox(width: MediaQuery.of(context).size.width),
+          Center(
+            child: Text(
+              widget.text,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+          SizedBox(width: MediaQuery.of(context).size.width),
         ],
       ),
     );
