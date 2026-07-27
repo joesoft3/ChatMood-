@@ -125,7 +125,13 @@ function MediaBlock({
   }
 
   return (
-    <div className="mb-3 overflow-hidden rounded-3xl border border-white/10 bg-[#171718] shadow-[0_14px_32px_rgb(0_0_0/0.22)]">
+    <div className="mb-3 overflow-hidden rounded-3xl border border-white/10 bg-[#171718] shadow-[0_14px_32px_rgb(0_0_0/0.22)] relative group/media">
+      {/* Top overlay buttons on tap/zoom */}
+      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-2 bg-gradient-to-b from-black/60 to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity">
+        <button onClick={() => { const url = window.location.origin + (m.url || ""); navigator.clipboard.writeText(url); }} title="Share" className="text-white hover:text-accent text-xs px-2 py-1 bg-black/30 rounded-md backdrop-blur">Share</button>
+        <button onClick={async () => { const name = mediaFilename(m.prompt, m.kind); if (m.file_id) await downloadFile(m.file_id, name); else if (m.url) await downloadUrl(m.url, name); }} title="Download" className="text-white hover:text-accent text-xs px-2 py-1 bg-black/30 rounded-md backdrop-blur">Download</button>
+        {m.file_id && onDelete && <button onClick={() => onDelete(m)} title="Delete" className="text-white hover:text-red-400 text-xs px-2 py-1 bg-black/30 rounded-md backdrop-blur">Delete</button>}
+      </div>
       {m.kind === "image" ? (
         <a href={m.url} target="_blank" rel="noreferrer" title="Open full-size">
           {/* eslint-disable-next-line @next/next/no-img-element */}
