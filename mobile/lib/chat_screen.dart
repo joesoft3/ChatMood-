@@ -355,6 +355,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Home starter actions type into the composer rather than sending instantly.
+  /// Keep the caret at the end so the next character the user types continues
+  /// the suggested prompt.
+  void _prefill(String text) {
+    setState(() {
+      _input.text = text;
+      _input.selection = TextSelection.collapsed(offset: text.length);
+    });
+  }
+
   Future<void> _send() async {
     final text = _input.text.trim();
     if ((text.isEmpty && _files.isEmpty) || _busy) return;
@@ -777,15 +787,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  // 🏠 Ask | Imagine — the Grok-mirror tab pair in the top bar.
+  // 🏠 Ask | Imagine | Films — compact ChatGPT-style destination tabs
+  // shown only on the empty chat home. Conversations keep the regular title.
   Widget _modeTabs() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         _homeTabLabel('Ask', _homeTab == 0, () => setState(() => _homeTab = 0)),
-        const SizedBox(width: 20),
+        const SizedBox(width: 22),
         _homeTabLabel('Imagine', false, () {
           Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen()));
+        }),
+        const SizedBox(width: 22),
+        _homeTabLabel('Films', false, () {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FilmsScreen()));
         }),
       ],
     );
@@ -845,44 +860,38 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  // ─────────────────────────────────────────── 🏠 Grok-clean centered home (web parity)
-  Widget _suggestionItem(IconData icon, String label, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+  // ─────────────────────────────────────────── 🏠 ChatGPT-style centered home (web parity)
+  Widget _homeActionPill(IconData icon, String label, VoidCallback onTap) {
+    return SizedBox(
+      width: double.infinity,
       child: Material(
-        color: Colors.transparent,
+        color: const Color(0xFF262626),
+        borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, color: Colors.black87, size: 22),
-                const SizedBox(width: 14),
-                Expanded(
+                Icon(icon, color: const Color(0xFF35D6D0), size: 17),
+                const SizedBox(width: 10),
+                Flexible(
                   child: Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Colors.black87,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade300,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.black26, size: 18),
               ],
             ),
           ),
@@ -891,45 +900,180 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// ChatGPT-style clean empty home: suggestion pills aligned above the bottom composer.
+  /// Empty chat home. The old mobile code still showed a formal light page and
+  /// kept the composer pinned to the bottom, so it could never match the web
+  /// ChatGPT home. Here the greeting, composer, model/search row and starters
+  /// live in one centered column; the persistent bottom composer only returns
+  /// after a conversation starts.
   Widget _centeredHome() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Spacer(),
-          ScrollingGreeting(text: 'How can I assist you today, $_userName?'),
-          const SizedBox(height: 40),
-          _suggestionItem(
-            Icons.image_outlined,
-            'Create an image',
-            () => setState(() => _input.text = 'create an image of '),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(14, bottomInset > 0 ? 8 : 20, 14, 14),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight > 28 ? constraints.maxHeight - 28 : 0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.09)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF35D6D0).withOpacity(0.18),
+                        blurRadius: 42,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(7),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset('assets/icon/app_icon.png', fit: BoxFit.cover),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'ChatMood',
+                  style: TextStyle(
+                    color: Colors.grey.shade200,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 26),
+                const Text(
+                  'What can I help with?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 32,
+                    height: 1.08,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.1,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 680),
+                  child: Column(
+                    children: [
+                      if (_files.isNotEmpty) ...[
+                        _filesRow(dark: true),
+                        const SizedBox(height: 6),
+                      ],
+                      _composerRow(home: true),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _modeToggleChip(
+                            icon: Icons.language,
+                            label: _search ? 'Search on' : 'Search off',
+                            active: _search,
+                            onTap: () => setState(() => _search = !_search),
+                          ),
+                          _modeToggleChip(
+                            icon: Icons.smart_toy_outlined,
+                            label: _agentMode ? 'Agent on' : 'Agent',
+                            active: _agentMode,
+                            onTap: () => setState(() {
+                              _agentMode = !_agentMode;
+                              if (_agentMode) _arenaMode = false;
+                            }),
+                          ),
+                          _modeToggleChip(
+                            icon: Icons.shield_outlined,
+                            label: _arenaMode ? 'Arena on' : 'Arena',
+                            active: _arenaMode,
+                            onTap: () => setState(() {
+                              _arenaMode = !_arenaMode;
+                              if (_arenaMode) _agentMode = false;
+                            }),
+                          ),
+                          _modeToggleChip(
+                            icon: Icons.tune,
+                            label: _modelLabel(),
+                            active: _thinkOn,
+                            onTap: _showModelPicker,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      _homeActionPill(
+                        Icons.auto_awesome,
+                        'Write or brainstorm',
+                        () => _prefill('Help me write '),
+                      ),
+                      const SizedBox(height: 8),
+                      _homeActionPill(
+                        Icons.travel_explore,
+                        'Research a topic',
+                        () {
+                          setState(() => _search = true);
+                          _prefill('Research ');
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      _homeActionPill(
+                        Icons.image_outlined,
+                        'Create an image',
+                        () => _prefill('Create an image of '),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          _suggestionItem(
-            Icons.edit_outlined,
-            'Write or edit',
-            () => setState(() => _input.text = 'help me write a '),
+        );
+      },
+    );
+  }
+
+  Widget _modeToggleChip({required IconData icon, required String label, required bool active, required VoidCallback onTap}) {
+    return Material(
+      color: active ? const Color(0xFF173E3D) : const Color(0xFF242424),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: active ? const Color(0xFF35D6D0).withOpacity(0.38) : Colors.white.withOpacity(0.07)),
           ),
-          const SizedBox(height: 8),
-          _suggestionItem(
-            Icons.language_outlined,
-            'Look something up',
-            () {
-              setState(() {
-                _search = true;
-                _input.text = 'search the web for ';
-              });
-            },
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: active ? const Color(0xFF35D6D0) : Colors.grey.shade500),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: active ? Colors.white : Colors.grey.shade400,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _filesRow() {
+  Widget _filesRow({bool dark = false}) {
     return SizedBox(
       height: 34,
       child: ListView.separated(
@@ -938,32 +1082,45 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         itemCount: _files.length,
         separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (context, i) => Chip(
-          label: Text(_files[i].filename, style: const TextStyle(fontSize: 11)),
+          label: Text(
+            _files[i].filename,
+            style: TextStyle(fontSize: 11, color: dark ? Colors.grey.shade200 : Colors.black87),
+          ),
           onDeleted: () => setState(() => _files.removeAt(i)),
           visualDensity: VisualDensity.compact,
+          backgroundColor: dark ? const Color(0xFF262626) : null,
+          deleteIconColor: dark ? Colors.grey.shade400 : null,
+          side: dark ? BorderSide(color: Colors.white.withOpacity(0.08)) : null,
         ),
       ),
     );
   }
 
-  Widget _composerRow() {
+  Widget _composerRow({bool home = false}) {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: _input,
       builder: (context, val, _) {
         final hasText = val.text.trim().isNotEmpty;
+        final inputBg = home ? const Color(0xFF2A2A2A) : Colors.white;
+        final inputBorder = home ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E7EB);
+        final inputShadow = home ? Colors.black.withOpacity(0.20) : Colors.black.withOpacity(0.04);
+        final textColor = home ? Colors.white : Colors.black87;
+        final hintColor = home ? Colors.grey.shade500 : Colors.black38;
+        final iconColor = home ? Colors.grey.shade300 : Colors.black54;
+        final accent = home ? const Color(0xFF26706D) : const Color(0xFF3F82F6);
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: EdgeInsets.symmetric(horizontal: home ? 0 : 10, vertical: 8),
           child: Row(
             children: [
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                    color: inputBg,
+                    borderRadius: BorderRadius.circular(home ? 26 : 28),
+                    border: Border.all(color: inputBorder),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: inputShadow,
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -973,7 +1130,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.add, color: Colors.black54, size: 22),
+                        icon: Icon(Icons.add, color: iconColor, size: 22),
                         tooltip: 'Attach file',
                         onPressed: _busy ? null : _attach,
                       ),
@@ -984,10 +1141,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           maxLines: 5,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => _send(),
-                          style: const TextStyle(color: Colors.black87, fontSize: 15),
+                          style: TextStyle(color: textColor, fontSize: 15),
                           decoration: InputDecoration(
                             hintText: _agentMode ? 'Give the agent team a goal…' : 'Ask ChatMood',
-                            hintStyle: const TextStyle(color: Colors.black38, fontSize: 15),
+                            hintStyle: TextStyle(color: hintColor, fontSize: 15),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
@@ -997,19 +1154,19 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       ),
                       // Inside on the right of the chat box: show Send button if typing, otherwise Mic
                       _busy
-                          ? const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 8),
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
                               child: SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF3F82F6)),
+                                child: CircularProgressIndicator(strokeWidth: 2, color: accent),
                               ),
                             )
                           : hasText
                               ? Container(
                                   margin: const EdgeInsets.only(right: 4),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF3F82F6),
+                                  decoration: BoxDecoration(
+                                    color: accent,
                                     shape: BoxShape.circle,
                                   ),
                                   child: IconButton(
@@ -1021,7 +1178,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                                 )
                               : IconButton(
                                   icon: Icon(_recording ? Icons.stop : Icons.mic_none,
-                                      size: 22, color: _recording ? Colors.redAccent : Colors.black54),
+                                      size: 22, color: _recording ? Colors.redAccent : iconColor),
                                   tooltip: _recording ? 'Stop & send' : 'Voice message',
                                   onPressed: _busy && !_recording ? null : _toggleVoice,
                                 ),
@@ -1029,35 +1186,139 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // Always-visible Blue circular Voice Orb Wave button next to the chat box!
-              GestureDetector(
-                onTap: _busy ? null : _toggleVoice,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF3F82F6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(width: 2, height: 12, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
-                      const SizedBox(width: 2),
-                      Container(width: 2, height: 18, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
-                      const SizedBox(width: 2),
-                      Container(width: 2, height: 14, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
-                      const SizedBox(width: 2),
-                      Container(width: 2, height: 10, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
-                    ],
+              if (!home) ...[
+                const SizedBox(width: 8),
+                // Always-visible Blue circular Voice Orb Wave button next to the chat box!
+                GestureDetector(
+                  onTap: _busy ? null : _toggleVoice,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF3F82F6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(width: 2, height: 12, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                        const SizedBox(width: 2),
+                        Container(width: 2, height: 18, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                        const SizedBox(width: 2),
+                        Container(width: 2, height: 14, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                        const SizedBox(width: 2),
+                        Container(width: 2, height: 10, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(1))),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _bottomTabBar({required bool emptyHome}) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+        child: Container(
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(
+            color: emptyHome ? const Color(0xFF2A2926) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: emptyHome ? Colors.white.withOpacity(0.08) : const Color(0xFFE5E7EB)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(emptyHome ? 0.22 : 0.05),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              _bottomTab(
+                icon: Icons.chat_bubble_outline,
+                label: 'Chat',
+                active: true,
+                dark: emptyHome,
+                onTap: emptyHome ? () {} : _newChat,
+              ),
+              _bottomTab(
+                icon: Icons.graphic_eq,
+                label: 'Voice',
+                active: _recording,
+                dark: emptyHome,
+                onTap: _busy && !_recording ? () {} : () => _toggleVoice(),
+              ),
+              _bottomTab(
+                icon: Icons.image_outlined,
+                label: 'Images',
+                active: false,
+                dark: emptyHome,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen())),
+              ),
+              _bottomTab(
+                icon: Icons.brush_outlined,
+                label: 'Design',
+                active: false,
+                dark: emptyHome,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignScreen())),
+              ),
+              _bottomTab(
+                icon: Icons.movie_creation_outlined,
+                label: 'Films',
+                active: false,
+                dark: emptyHome,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FilmsScreen())),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomTab({
+    required IconData icon,
+    required String label,
+    required bool active,
+    required bool dark,
+    required VoidCallback onTap,
+  }) {
+    final bg = active ? (dark ? Colors.white : Colors.black87) : Colors.transparent;
+    final fg = active ? (dark ? Colors.black87 : Colors.white) : (dark ? Colors.grey.shade500 : Colors.black45);
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 19, color: fg),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: fg, fontSize: 10, fontWeight: active ? FontWeight.w700 : FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1079,6 +1340,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         outline: lightLine,
       ),
     );
+    final emptyHome = _messages.isEmpty;
 
     // any touch counts as activity for the 5-minute idle auto-home timer
     return Listener(
@@ -1087,8 +1349,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       child: Theme(
         data: lightTheme,
         child: Scaffold(
+          backgroundColor: emptyHome ? const Color(0xFF1F201E) : lightBase,
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
+            backgroundColor: emptyHome ? const Color(0xFF242421) : Colors.transparent,
             elevation: 0,
             scrolledUnderElevation: 0,
             automaticallyImplyLeading: false,
@@ -1100,16 +1363,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   onTap: () => Scaffold.of(ctx).openDrawer(),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: emptyHome ? Colors.transparent : Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+                      border: Border.all(color: emptyHome ? Colors.transparent : const Color(0xFFE5E7EB)),
+                      boxShadow: emptyHome
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                     ),
                     child: Center(
                       child: Column(
@@ -1117,9 +1382,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Container(width: 14, height: 2, color: Colors.black87),
+                          Container(width: 14, height: 2, color: emptyHome ? Colors.white : Colors.black87),
                           const SizedBox(height: 3),
-                          Container(width: 9, height: 2, color: Colors.black87),
+                          Container(width: 9, height: 2, color: emptyHome ? Colors.white : Colors.black87),
                         ],
                       ),
                     ),
@@ -1128,7 +1393,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               ),
             ),
             centerTitle: true,
-            title: GestureDetector(
+            title: emptyHome ? _modeTabs() : GestureDetector(
               onTap: () {
                 _toast('Premium features & reasoning models unlocked! 🚀');
               },
@@ -1174,18 +1439,20 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: emptyHome ? Colors.transparent : Colors.white,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
+                      border: Border.all(color: emptyHome ? Colors.transparent : const Color(0xFFE5E7EB)),
+                      boxShadow: emptyHome
+                          ? []
+                          : [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                     ),
-                    child: const Icon(Icons.movie_creation_outlined, color: Colors.black87, size: 18),
+                    child: Icon(Icons.movie_creation_outlined, color: emptyHome ? Colors.white : Colors.black87, size: 18),
                   ),
                 ),
               ),
@@ -1386,7 +1653,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           ),
           body: Column(
             children: [
-              if (_agentMode)
+              if (!emptyHome && _agentMode)
                 Container(
                   width: double.infinity,
                   color: lightPanel,
@@ -1397,7 +1664,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                 ),
-              if (_workspace != null)
+              if (!emptyHome && _workspace != null)
                 Container(
                   width: double.infinity,
                   color: lightPanel,
@@ -1409,7 +1676,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   ),
                 ),
               Expanded(
-                child: _messages.isEmpty
+                child: emptyHome
                     ? _centeredHome()
                     : ListView.builder(
                         controller: _scroll,
@@ -1422,14 +1689,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                             ),
                       ),
               ),
-              if (_files.isNotEmpty) _filesRow(),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-                  child: _composerRow(),
+              if (!emptyHome && _files.isNotEmpty) _filesRow(),
+              if (!emptyHome)
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                    child: _composerRow(),
+                  ),
                 ),
-              ),
+              _bottomTabBar(emptyHome: emptyHome),
             ],
           ),
         ),
