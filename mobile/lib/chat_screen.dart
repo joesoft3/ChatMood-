@@ -902,7 +902,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// Empty chat home. The old mobile code still showed a formal light page and
   /// kept the composer pinned to the bottom, so it could never match the web
-  /// ChatGPT home. Here the greeting, composer, model/search row and starters
+  /// ChatGPT home. Here the greeting, composer, and three clean starters
   /// live in one centered column; the persistent bottom composer only returns
   /// after a conversation starts.
   Widget _centeredHome() {
@@ -950,7 +950,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 26),
                 const Text(
-                  'What can I help with?',
+                  'How can I help?',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
@@ -970,45 +970,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         const SizedBox(height: 6),
                       ],
                       _composerRow(home: true),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _modeToggleChip(
-                            icon: Icons.language,
-                            label: _search ? 'Search on' : 'Search off',
-                            active: _search,
-                            onTap: () => setState(() => _search = !_search),
-                          ),
-                          _modeToggleChip(
-                            icon: Icons.smart_toy_outlined,
-                            label: _agentMode ? 'Agent on' : 'Agent',
-                            active: _agentMode,
-                            onTap: () => setState(() {
-                              _agentMode = !_agentMode;
-                              if (_agentMode) _arenaMode = false;
-                            }),
-                          ),
-                          _modeToggleChip(
-                            icon: Icons.shield_outlined,
-                            label: _arenaMode ? 'Arena on' : 'Arena',
-                            active: _arenaMode,
-                            onTap: () => setState(() {
-                              _arenaMode = !_arenaMode;
-                              if (_arenaMode) _agentMode = false;
-                            }),
-                          ),
-                          _modeToggleChip(
-                            icon: Icons.tune,
-                            label: _modelLabel(),
-                            active: _thinkOn,
-                            onTap: _showModelPicker,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 22),
                       _homeActionPill(
                         Icons.auto_awesome,
                         'Write or brainstorm',
