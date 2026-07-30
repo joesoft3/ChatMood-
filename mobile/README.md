@@ -15,15 +15,18 @@ bubble labels, and joining a team by pasting an invite link/code.
 cd mobile
 flutter pub get
 
-# Run against your backend (Android emulator → host machine loopback is 10.0.2.2):
+# Production API (also the app's default):
+flutter run --dart-define=API_URL=https://moodai-api.fly.dev/api/v1
+
+# Local backend — Android emulator → host machine loopback is 10.0.2.2:
 flutter run --dart-define=API_URL=http://10.0.2.2:8000/api/v1
 
 # Physical phone on the same Wi-Fi as the backend machine:
 flutter run --dart-define=API_URL=http://192.168.x.x:8000/api/v1
 
 # Release builds
-flutter build apk --dart-define=API_URL=https://api.yourdomain.com/api/v1
-flutter build ipa --dart-define=API_URL=https://api.yourdomain.com/api/v1
+flutter build apk --release --dart-define=API_URL=https://moodai-api.fly.dev/api/v1
+flutter build ipa --release --dart-define=API_URL=https://moodai-api.fly.dev/api/v1
 ```
 
 The backend's `CORS_ORIGINS` does not apply to mobile (no browser CORS) — just make sure the
