@@ -6,12 +6,15 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Thin client for the ChatMood API (FastAPI, /api/v1).
-/// Pass the API root at build/run time:
+/// Pass the API root at build/run time for local development:
 ///   flutter run --dart-define=API_URL=http://192.168.1.10:8000/api/v1
-/// Default targets the Android emulator's host loopback.
+/// Production is the safe default so release builds do not point at an
+/// emulator-only host.
 class Api {
-  static const String baseUrl =
-      String.fromEnvironment('API_URL', defaultValue: 'http://10.0.2.2:8000/api/v1');
+  static const String baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://moodai-api.fly.dev/api/v1',
+  );
 
   static const _tokenKey = 'mood_token';
   static final http.Client _client = http.Client();
