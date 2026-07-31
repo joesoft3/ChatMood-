@@ -1,4 +1,4 @@
-# 🗄️ Where ChatMood's database can live
+# 🗄️ Where MoodAI's database can live
 
 > ### 🚦 LIVE STATUS (2026-07-21) — **PRODUCTION DB IS LIVE** ✅
 > | Piece | State (all agent-verified) |
@@ -7,7 +7,7 @@
 > | Schema | ✅ **20/20 alembic migrations** applied (0001 → 0019_design_orders) |
 > | Endpoint variant | ✅ **pooled** URI (`-pooler` host) chosen for Vercel serverless; direct also tested ✅ |
 > | `DATABASE_URL` | ✅ set on Vercel (encrypted, prod+preview) **and** sealed as GitHub secret; `NEON_API_KEY` sealed too |
-> | `/healthz` | ✅ `200 {"status":"ok","app":"ChatMood"}` on `moodai-api.vercel.app` |
+> | `/healthz` | ✅ `200 {"status":"ok","app":"MoodAI"}` on `moodai-api.vercel.app` |
 > | Auth live | ✅ register → 201 + JWT; `/me` reads back from Neon; 👑 owner bootstrapped: `admin@moodaiapp.com` (is_admin, boot email fixed — `.local` TLD breaks EmailStr) |
 > | Chat live | ✅ SSE: conversation persisted in Neon + model reply streamed (2.3 s) |
 >
@@ -15,7 +15,7 @@
 > API is restricted; the agent used the pre-created project + role-password
 > reset to obtain credentials, fully headless.
 
-ChatMood's backend is **FastAPI + SQLAlchemy on Postgres** (20+ relational
+MoodAI's backend is **FastAPI + SQLAlchemy on Postgres** (20+ relational
 tables, JOINs, transactions) with SQLite for local dev. Any hosted Postgres
 works — paste its URI as `DATABASE_URL` and the app normalizes it
 (scheme + `sslmode` translation included).
@@ -52,7 +52,7 @@ Bundled-in-Docker Postgres — covered in [BACKEND-HOSTING.md](BACKEND-HOSTING.m
 Appwrite is a great BaaS, but **it's not a hosted Postgres**. Its database is
 MariaDB-backed and reachable **only through Appwrite's own document APIs** —
 there is no SQL connection string to give SQLAlchemy (their own docs advise
-against direct DB connections). Adopting it would mean replacing ChatMood's
+against direct DB connections). Adopting it would mean replacing MoodAI's
 entire data layer with Appwrite's document SDK — a rewrite, not a host change.
 Appwrite *could* complement later (e.g. file storage), but it can't run this
 app's database.

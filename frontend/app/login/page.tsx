@@ -81,7 +81,7 @@ export default function LoginPage() {
         <section className="hidden lg:flex flex-col gap-6 pr-6">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-500">
-              <BrandMark brand={brand} /> {brand?.brand_name ?? "ChatMood"}
+              <BrandMark brand={brand} /> {brand?.brand_name ?? "MoodAI"}
             </div>
             {/* Deliberately not an <h1>: this whole section is `hidden lg:flex`,
                 so an h1 here would disappear below lg AND compete with the sign-in
@@ -119,8 +119,8 @@ export default function LoginPage() {
                 so making *it* the h1 would leave the page with no h1 at all
                 below lg. This card renders at every breakpoint, so the heading
                 belongs here. */}
-            <h1 className="text-2xl font-semibold text-white">{brand?.brand_name ?? "ChatMood"}</h1>
-            {brand && <p className="text-[10px] text-gray-500">powered by ChatMood</p>}
+            <h1 className="text-2xl font-semibold text-white">{brand?.brand_name ?? "MoodAI"}</h1>
+            {brand && <p className="text-[10px] text-gray-500">powered by MoodAI</p>}
             <p className="text-sm text-gray-500">
               {mode === "login" ? "Welcome back" : "Create your account"}
             </p>

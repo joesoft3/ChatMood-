@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         await stop_payment_sweep()
 
 
-app = FastAPI(title="ChatMood API", version="1.9.8", lifespan=lifespan)
+app = FastAPI(title="MoodAI API", version="1.9.8", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

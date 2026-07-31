@@ -121,8 +121,8 @@ const viewedThisSession = new Set<string>();
 
 const SOURCE_BADGE: Record<Reel["source"], string> = {
   upload: "🎥 Uploaded",
-  film: "🎬 ChatMood film",
-  chat: "✨ Made in ChatMood",
+  film: "🎬 MoodAI film",
+  chat: "✨ Made in MoodAI",
   duet: "🎭 Duet",
   repost: "🔁 Repost",
 };
@@ -176,7 +176,7 @@ function ShareSheet({
 }) {
   const [copied, setCopied] = useState(false);
   const link = reel.url;
-  const text = reel.caption ? `${reel.caption} — @${reel.author} on ChatMood Reel` : `@${reel.author} on ChatMood Reel`;
+  const text = reel.caption ? `${reel.caption} — @${reel.author} on MoodAI Reel` : `@${reel.author} on MoodAI Reel`;
 
   async function copy() {
     const ok = await copyText(link);
@@ -247,7 +247,7 @@ function ShareSheet({
           <button
             onClick={async () => {
               try {
-                await navigator.share({ title: `@${reel.author} on ChatMood Reel`, text, url: link });
+                await navigator.share({ title: `@${reel.author} on MoodAI Reel`, text, url: link });
                 onShared("native");
               } catch {
                 /* dismissed — not a share */
@@ -915,7 +915,7 @@ export default function ReelPage() {
   ];
 
   const empty = {
-    foryou: ["📺", "The reel is quiet", "Post a clip from your camera roll, or share a film you made in ChatMood — it lands here for every creator to watch."],
+    foryou: ["📺", "The reel is quiet", "Post a clip from your camera roll, or share a film you made in MoodAI — it lands here for every creator to watch."],
     saved: ["🔖", "Nothing saved yet", "Tap the bookmark on any reel and it'll wait for you here."],
     mine: ["🎬", "You haven't posted yet", "Your posts — live and unposted — collect here with their views, likes, shares and saves."],
     pro: ["⭐", "Creator Pro", "Unlock watermark-free reels, cinematic effects, HD export and Go Live."],

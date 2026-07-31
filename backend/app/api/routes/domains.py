@@ -181,7 +181,7 @@ async def connect_domain(
     except DomainError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     if await db.scalar(select(Domain).where(Domain.domain == domain)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already connected to ChatMood")
+        raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already connected to MoodAI")
     d = Domain(
         user_id=user.id,
         workspace_id=req.workspace_id,
@@ -382,7 +382,7 @@ async def renew_domain(
     await enforce_rate_limit(f"dombuy:{user.id}", 5)
     d = await _owned(db, user, did)
     if d.kind != "purchased" or d.registrar != "godaddy":
-        raise HTTPException(status.HTTP_409_CONFLICT, "Only registrar-purchased domains renew through ChatMood")
+        raise HTTPException(status.HTTP_409_CONFLICT, "Only registrar-purchased domains renew through MoodAI")
     if not registrar.configured:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Registrar not configured")
     if not settings.STRIPE_SECRET_KEY:
@@ -486,7 +486,7 @@ async def purchase_domain(
     except DomainError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e))
     if await db.scalar(select(Domain).where(Domain.domain == domain)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already taken in ChatMood")
+        raise HTTPException(status.HTTP_409_CONFLICT, "That domain is already taken in MoodAI")
     try:
         info = await registrar.availability(domain)
     except RegistrarNotConfigured as e:
@@ -526,7 +526,7 @@ async def purchase_domain(
                     "currency": info["currency"].lower(),
                     "product_data": {
                         "name": f"Domain registration: {domain}",
-                        "description": f"{years} year{'s' if years > 1 else ''} · privacy included · auto-connected to ChatMood",
+                        "description": f"{years} year{'s' if years > 1 else ''} · privacy included · auto-connected to MoodAI",
                     },
                     "unit_amount": price_cents,
                 },
@@ -585,7 +585,7 @@ async def brand_by_host(host: str = Query(..., max_length=253), db: AsyncSession
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no brand")
     return {
         "domain": d.domain,
-        "brand_name": d.brand_name or "ChatMood",
+        "brand_name": d.brand_name or "MoodAI",
         "workspace_id": d.workspace_id,
         "accent": d.accent,
         "logo_data": d.logo_data,

@@ -25,7 +25,7 @@ from pathlib import Path
 # name → why it's needed (kept next to the permission so a reviewer can see the
 # justification without digging; Play asks for exactly this reasoning).
 PERMISSIONS: dict[str, str] = {
-    "android.permission.INTERNET": "talk to the ChatMood API",
+    "android.permission.INTERNET": "talk to the MoodAI API",
     "android.permission.RECORD_AUDIO": "voice chat + reel recording",
     "android.permission.POST_NOTIFICATIONS": "push notifications (required on Android 13+)",
     "android.permission.CAMERA": "record clips for the Reel",

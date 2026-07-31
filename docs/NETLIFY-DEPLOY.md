@@ -1,4 +1,4 @@
-# 🚀 Deploy the ChatMood web app to Netlify
+# 🚀 Deploy the MoodAI web app to Netlify
 
 The repo ships a ready `netlify.toml` — the frontend deploys as-is. The FastAPI
 backend runs separately (any Docker host; see `docs/DEPLOY-WALKTHROUGH.md` for the
@@ -50,7 +50,7 @@ Every deploy also prints a **draft preview URL** (`--prod` promotes it).
 ## Custom domain on Netlify
 
 - **Site settings → Domain management → Add a domain** → point DNS at Netlify.
-- White-label business domains bought/connected **inside ChatMood** still terminate
+- White-label business domains bought/connected **inside MoodAI** still terminate
   at your Caddy edge (`docs/DEPLOY-WALKTHROUGH.md` §Custom domains) — Netlify hosts
   *your* platform app, Caddy serves *your customers'* domains.
 

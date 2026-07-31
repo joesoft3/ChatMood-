@@ -7,7 +7,7 @@ Professional features:
   minimal payload instead of failing the user's generation.
 
 Provider cascade (VIDEO_PROVIDER is a comma-chain, first success wins):
-- "reel"         🎬 ChatMood Reel — zero-key composer: FLUX scene stills (keyless
+- "reel"         🎬 MoodAI Reel — zero-key composer: FLUX scene stills (keyless
                  Pollinations) → ffmpeg Ken Burns mp4 with crossfades. Works
                  today; needs only ffmpeg (both deploy images ship it, and the
                  imageio-ffmpeg wheel covers serverless).
@@ -67,7 +67,7 @@ QUALITY_TAGS = {"720p": "high quality", "1080p": "high quality, sharp 1080p deta
 
 NEGATIVE_DEFAULT = "morphing, flicker, warped faces, distorted hands, readable text, text overlays, captions, subtitles, logo overlays, watermark, jitter"
 
-# 🎬 ChatMood Reel scene beats — deterministic camera-language variations wrapped
+# 🎬 MoodAI Reel scene beats — deterministic camera-language variations wrapped
 # around the user's idea (no LLM spent: daily-quota economy).
 REEL_BEATS = [
     "wide establishing shot, full scene in frame",
@@ -445,12 +445,12 @@ class VideoService:
     # ------------------------------------------------------------- reel
     async def _reel(self, prompt: str, opts: VideoOptions,
                     on_progress: Callable[[dict], None] | None = None) -> tuple[str, bool]:
-        """🎬 ChatMood Reel: N FLUX scene stills → ffmpeg Ken Burns mp4 (xfade chain).
+        """🎬 MoodAI Reel: N FLUX scene stills → ffmpeg Ken Burns mp4 (xfade chain).
 
         Returns a /media/files/{name} URL (the routine caller archives to R2 for
         keeps — the media dir itself is janitored after MEDIA_TTL_HOURS)."""
         if not settings.REEL_ENABLED:
-            raise VideoNotConfigured("ChatMood Reel is disabled (REEL_ENABLED=false).")
+            raise VideoNotConfigured("MoodAI Reel is disabled (REEL_ENABLED=false).")
         exe = _ffmpeg_exe()
         if not exe:
             raise VideoNotConfigured("No ffmpeg on this host — reel composer unavailable.")

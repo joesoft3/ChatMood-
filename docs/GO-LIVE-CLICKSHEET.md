@@ -1,4 +1,4 @@
-# 🚀 ChatMood — Go-Live Click-Sheet (Vercel or Railway → Netlify → Phone)
+# 🚀 MoodAI — Go-Live Click-Sheet (Vercel or Railway → Netlify → Phone)
 
 The whole app goes live in **~15 minutes of clicking**. Do the parts **in order** —
 each step has a 🖱 = a click in your browser, and a ✅ = how you know it worked.
@@ -88,7 +88,7 @@ Import an existing project** → **GitHub** → pick **`joesoft3/moodai`**.
 🖱 Optional: **Site configuration → Change site name** → e.g. `mood-ai-app` →
 `https://mood-ai-app.netlify.app`.
 
-✅ Open the site → you see the **ChatMood login screen** — frontend is **LIVE**.
+✅ Open the site → you see the **MoodAI login screen** — frontend is **LIVE**.
 
 **B5.** 🖱 Lock the backend to the site (so other origins can't call it):
 back in **Railway → moodai → Variables** — set:

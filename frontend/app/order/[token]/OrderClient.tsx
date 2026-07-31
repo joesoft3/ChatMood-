@@ -89,7 +89,7 @@ export default function OrderClient({ token }: { token: string }) {
           <h1 className="text-2xl font-bold">
             {info?.brand_name ? <span className="text-accent">{info.brand_name}</span> : "Your designer"}
           </h1>
-          <p className="text-xs text-gray-500">powered by ChatMood Design Studio ✨</p>
+          <p className="text-xs text-gray-500">powered by MoodAI Design Studio ✨</p>
         </header>
 
         {gone && (
@@ -186,7 +186,7 @@ export default function OrderClient({ token }: { token: string }) {
         )}
 
         <footer className="text-center text-[10px] text-gray-600 pt-2">
-          Made with ChatMood · Accra
+          Made with MoodAI · Accra
         </footer>
       </div>
     </main>

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes, fixes, and new features shipped to `main` for ChatMood.
+All notable changes, fixes, and new features shipped to `main` for MoodAI.
 Each entry links the pull request it landed in. Dates are UTC.
 
 ---
@@ -361,16 +361,16 @@ the panel, and the plan activates. Guide: [docs/PAYMENTS.md](docs/PAYMENTS.md).
   verified to fail the suite: removing the idempotency guard, making renewal reset
   instead of extend, and letting a user's own submission self-approve (10 tests).
 
-### 🏷 Rebrand: Mood AI → **ChatMood**
+### 🏷 Rebrand: Mood AI → **MoodAI**
 
-The product is now **ChatMood** ("Smart conversations. Real connections."), since the
+The product is now **MoodAI** ("Smart conversations. Real connections."), since the
 `moodai` domain wasn't available at the registrar.
 
 - **Renamed everywhere users can see it** — app name, page titles & metadata, PWA
   manifest, OG/Twitter cards, legal pages, the assistant's own persona ("You are
-  ChatMood…"), in-chat creation labels (ChatMood Canvas / ChatMood Reel), plugin
+  MoodAI…"), in-chat creation labels (MoodAI Canvas / MoodAI Reel), plugin
   runner, push copy, mobile strings, watermark text, and all 20 docs. `APP_NAME`
-  now defaults to `ChatMood`, so the free-tier badge reads "Made with ChatMood"
+  now defaults to `MoodAI`, so the free-tier badge reads "Made with MoodAI"
   automatically.
 - **Deliberately NOT renamed — these are wire identifiers, not branding.** Changing
   them would be a silent breaking change with zero brand benefit:
@@ -384,13 +384,13 @@ The product is now **ChatMood** ("Smart conversations. Real connections."), sinc
   | postgres `mood` db/user, `joesoft3/moodai` | infrastructure, not product identity |
 - If the public API aliases should become `chatmood-*`, the safe path is adding them
   **alongside** the existing ones rather than replacing them — happy to do that on request.
-- Verified live: `/healthz` reports ChatMood, `X-Mood-Host` still returns 200, and the
+- Verified live: `/healthz` reports MoodAI, `X-Mood-Host` still returns 200, and the
   API aliases still resolve. 512 tests pass (two correctly caught the user-visible
   label rename and were updated).
 
 ### 🏷 Free-tier watermarking (Pro & admins render clean)
 
-Generated output on the free plan now carries a subtle "Made with ChatMood" badge.
+Generated output on the free plan now carries a subtle "Made with MoodAI" badge.
 Paid plans and admins are unaffected. Guide: [docs/WATERMARKING.md](docs/WATERMARKING.md).
 
 - **One entitlement rule, one place** (`services/watermark.should_watermark()`), because
@@ -607,7 +607,7 @@ Audited every screen at 320–1600px in headless Chromium, asserting on computed
   contextual placeholder in the minimal composer. (#3)
 - **Calmer chat recovery** — disruptive connection alerts became inline dismissible notices;
   safe read requests auto-retry while the backend wakes from idle; “Chat” always opens a clean
-  new-chat surface while explicit history/library selection is preserved; the ChatMood mark sits
+  new-chat surface while explicit history/library selection is preserved; the MoodAI mark sits
   centered on the empty chat home. (#5)
 - **Clean conversation header** — removed the redundant Live/Chat/Auto/message-count status row,
   the auto-saved subtitle, and the extra Ask tab marker so conversation text flows. (#9)

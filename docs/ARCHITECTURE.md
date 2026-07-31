@@ -1,4 +1,4 @@
-# ChatMood — Architecture Blueprint
+# MoodAI — Architecture Blueprint
 
 A production-oriented design for a **Grok-class AI super-app** built by orchestrating
 existing frontier models (xAI/Grok primary), a FastAPI backend, and a Next.js web client.

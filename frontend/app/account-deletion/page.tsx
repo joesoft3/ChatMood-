@@ -2,9 +2,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Delete your account — ChatMood",
+  title: "Delete your account — MoodAI",
   description:
-    "How to permanently delete your ChatMood account and all associated data — in the app, on the web, or by request.",
+    "How to permanently delete your MoodAI account and all associated data — in the app, on the web, or by request.",
   alternates: { canonical: "/account-deletion" },
 };
 
@@ -60,7 +60,7 @@ export default function AccountDeletionPage() {
   return (
     <main className="mx-auto max-w-2xl px-5 py-12 space-y-8">
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-widest text-gray-500">ChatMood</p>
+        <p className="text-xs uppercase tracking-widest text-gray-500">MoodAI</p>
         <h1 className="text-3xl font-bold text-gray-100">Delete your account</h1>
         <p className="text-sm text-gray-400">
           Permanent self-service deletion — required by the Google Play and Apple App Store rules, in effect the moment you confirm.

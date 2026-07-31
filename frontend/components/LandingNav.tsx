@@ -65,7 +65,7 @@ export default function LandingNav() {
         <Link href="/" className="flex items-center gap-2 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.png" alt="" className="h-7 w-7 rounded-lg" />
-          <span className="text-sm font-semibold tracking-wide">ChatMood</span>
+          <span className="text-sm font-semibold tracking-wide">MoodAI</span>
         </Link>
 
         <div ref={rootRef} className="relative" onKeyDown={onMenuKeyDown}>

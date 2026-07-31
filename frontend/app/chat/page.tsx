@@ -539,9 +539,9 @@ export default function ChatPage() {
 
   function exportChat() {
     const title = convs.find((c) => c.id === activeId)?.title || "mood-conversation";
-    const md: string[] = [`# ${title}`, "", `_Exported from ChatMood · ${new Date().toLocaleString()}_`, ""];
+    const md: string[] = [`# ${title}`, "", `_Exported from MoodAI · ${new Date().toLocaleString()}_`, ""];
     for (const m of msgs) {
-      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ ChatMood", "", m.content, "");
+      md.push(m.role === "user" ? "## 🧑 You" : "## ✦ MoodAI", "", m.content, "");
     }
     const blob = new Blob([md.join("\n")], { type: "text/markdown" });
     const a = document.createElement("a");
@@ -684,7 +684,7 @@ export default function ChatPage() {
   );
 
   return (
-    <AppShell title={activeTitle || "ChatMood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
+    <AppShell title={activeTitle || "MoodAI Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
       {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
       {!emptyHome && (
         <>

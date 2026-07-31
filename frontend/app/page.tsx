@@ -5,20 +5,20 @@ import HeroVideo from "@/components/HeroVideo";
 import LandingNav from "@/components/LandingNav";
 
 export const metadata: Metadata = {
-  title: "ChatMood — Grok-class chat, arena, research and AI films",
+  title: "MoodAI — Grok-class chat, arena, research and AI films",
   description:
-    "ChatMood is a Grok-class assistant for streaming chat, live-cited research, blind model debates, and AI films with voice and sound.",
+    "MoodAI is a Grok-class assistant for streaming chat, live-cited research, blind model debates, and AI films with voice and sound.",
   alternates: { canonical: "/" },
 };
 
-const badges = ["S1 ChatMood-4", "⚔️ Arena v2", "🔭 Deep Research", "🎙 Cinema Sound"];
+const badges = ["S1 MoodAI-4", "⚔️ Arena v2", "🔭 Deep Research", "🎙 Cinema Sound"];
 
 const features: [string, string, string][] = [
   ["💬", "Streaming chat", "Frontier-grade models with a sharp, witty personality — Grok-class answers, your rules."],
   ["🎬", "Video with pure sound & voice", "Text-to-video with an AI voiceover and a cinematic ambient mix, polished by the built-in studio."],
-  ["⚔️", "Arena v2", "S1 ChatMood-4, GPT and Gemini debate blind. Ballots, judge verdicts and score cards with one-tap rematch."],
+  ["⚔️", "Arena v2", "S1 MoodAI-4, GPT and Gemini debate blind. Ballots, judge verdicts and score cards with one-tap rematch."],
   ["🔭", "Deep research", "Multi-source investigations with live citations and a saved research library."],
-  ["🧠", "Long-term memory", "ChatMood remembers what matters between conversations. You stay in control."],
+  ["🧠", "Long-term memory", "MoodAI remembers what matters between conversations. You stay in control."],
   ["🎤", "Voice mode", "Speak naturally and hear answers back — full duplex voice conversations."],
 ];
 
@@ -52,7 +52,7 @@ export default function Home() {
         />
 
         <div className="relative max-w-3xl text-center space-y-6">
-          <p className="text-xs uppercase tracking-[0.35em] text-accent">ChatMood</p>
+          <p className="text-xs uppercase tracking-[0.35em] text-accent">MoodAI</p>
           <h1 className="text-[clamp(2.3rem,7vw,4rem)] font-bold leading-[1.06] [text-shadow:0_2px_24px_rgb(0_0_0/0.45)]">
             A Grok-class AI that <span className="text-accent">talks back —</span>
             <br className="hidden sm:block" /> in voice, video and sound.
@@ -93,9 +93,9 @@ export default function Home() {
 
       <section className="border-t border-line px-4 sm:px-6 py-10">
         <div className="mx-auto max-w-2xl space-y-4">
-          <h3 className="text-center text-lg font-semibold">ChatMood Home Interface</h3>
+          <h3 className="text-center text-lg font-semibold">MoodAI Home Interface</h3>
           <div className="rounded-2xl border border-line bg-panel p-5 shadow-lg">
-            <div className="text-sm text-gray-400 mb-3">Ask ChatMood</div>
+            <div className="text-sm text-gray-400 mb-3">Ask MoodAI</div>
             <div className="flex flex-wrap gap-2">
               {/* This is a server-rendered marketing page, so these are real
                   destinations—not client-only alert handlers. Besides being
@@ -157,7 +157,7 @@ export default function Home() {
       {/* --------------------------------------------------- apps */}
       <section className="border-t border-line px-4 sm:px-6 py-14">
         <div className="mx-auto max-w-4xl 2xl:max-w-6xl space-y-5 rounded-3xl border border-line bg-panel p-8 text-center sm:p-10">
-          <h2 className="text-xl font-semibold sm:text-2xl">Take ChatMood everywhere</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">Take MoodAI everywhere</h2>
           <p className="mx-auto max-w-lg text-sm leading-relaxed text-gray-400">
             The Android app brings push notifications for Arena verdicts and approvals, voice mode on the go, and the full
             studio in your pocket.
@@ -192,7 +192,7 @@ export default function Home() {
       {/* --------------------------------------------------- footer */}
       <footer className="border-t border-line px-4 sm:px-6 py-8">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-6 gap-y-3 text-xs text-gray-500 2xl:max-w-6xl">
-          <span className="font-semibold text-gray-300">ChatMood</span>
+          <span className="font-semibold text-gray-300">MoodAI</span>
           <span>© 2026 · Built with ❤️ in Accra</span>
           {/* -my-2/py-2 keeps the visual rhythm while giving each link a
               44px-tall tap target (they were 16px — well under the 44px

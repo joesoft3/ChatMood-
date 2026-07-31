@@ -208,7 +208,7 @@ def build(source: Path, *, mark_band: int | None = None, dry_run: bool = False) 
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Generate ChatMood icons from one source lockup.")
+    ap = argparse.ArgumentParser(description="Generate MoodAI icons from one source lockup.")
     ap.add_argument("source", type=Path, help="brand lockup PNG/JPG (mark + wordmark)")
     ap.add_argument("--mark-band", type=int, default=None,
                     help="0-based band index to use as the mark (default: topmost)")

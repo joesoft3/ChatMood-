@@ -664,7 +664,7 @@ async def public_film(fid: str, request: Request, db: AsyncSession = Depends(get
     full = _film_out(film)
     return {
         "id": film.id,
-        "title": (film.prompt or "A ChatMood film").strip()[:90],
+        "title": (film.prompt or "A MoodAI film").strip()[:90],
         "url": full["url"],
         "poster": full["poster"],
         "scenes": film.scene_count,
@@ -717,7 +717,7 @@ async def draft_social_post(
     except Exception:
         caption = ""
     if not caption:
-        caption = f"🎬 Directed this with one prompt. Watch my {film.scene_count}-scene AI film: {share_url}\n\n#AIfilms #ChatMood #AIVideo"
+        caption = f"🎬 Directed this with one prompt. Watch my {film.scene_count}-scene AI film: {share_url}\n\n#AIfilms #MoodAI #AIVideo"
     elif share_url not in caption:
         caption = f"{caption.rstrip()}\n\n🔗 {share_url}"
 

@@ -69,14 +69,14 @@ export function useBrand(): Brand | null {
   return brand;
 }
 
-/** Logo img when the brand has one, else the official ChatMood mark (public/icon.png). */
+/** Logo img when the brand has one, else the official MoodAI mark (public/icon.png). */
 export function BrandMark({ brand, size = "h-7 w-7" }: { brand: Brand | null; size?: string }) {
   if (brand?.logo_data) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={brand.logo_data} alt={brand.brand_name} className={`${size} rounded-md object-contain shrink-0`} />;
   }
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src="/icon.png" alt="ChatMood" className={`${size} rounded-md object-contain shrink-0`} />;
+  return <img src="/icon.png" alt="MoodAI" className={`${size} rounded-md object-contain shrink-0`} />;
 }
 
-export const DEFAULT_BRAND_NAME = "ChatMood";
+export const DEFAULT_BRAND_NAME = "MoodAI";

@@ -51,7 +51,7 @@ async function guardedFetch(input: string, init: RequestInit): Promise<Response>
   }
 
   if (lastError instanceof TypeError) {
-    throw new Error("Can't reach the ChatMood server — it may be starting up or your connection dropped. Try again in a few seconds.");
+    throw new Error("Can't reach the MoodAI server — it may be starting up or your connection dropped. Try again in a few seconds.");
   }
   throw lastError;
 }

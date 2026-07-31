@@ -157,7 +157,7 @@ def test_blank_source_fails_loudly_instead_of_writing_empty_icons(tmp_path, monk
 def test_canvas_fill_matches_the_source_background():
     """Regression: a near-but-not-identical fill leaves a visible rectangle.
 
-    Caught on the real ChatMood logo — its canvas is #01020D while the brand
+    Caught on the real MoodAI logo — its canvas is #01020D while the brand
     constant is #0B0F14, so filling with BRAND_BG drew a clearly visible seam
     around the cropped mark.
     """

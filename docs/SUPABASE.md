@@ -1,11 +1,11 @@
-# 🔌 Supabase as ChatMood's managed database
+# 🔌 Supabase as MoodAI's managed database
 
 Your entire platform (users, chats, films, designs, brand kits, plugins, teams…)
 runs on one Postgres. Supabase gives you a managed one — free tier is plenty
 to start (500 MB), with daily backups on paid. The schema (16 migrations,
 everything ships) pushes in ~30 seconds.
 
-> This is **database-only**: ChatMood keeps its own auth (JWT) and file storage.
+> This is **database-only**: MoodAI keeps its own auth (JWT) and file storage.
 > Swapping auth/storage onto Supabase is a bigger re-architecture — listed as a
 > separate upgrade track.
 

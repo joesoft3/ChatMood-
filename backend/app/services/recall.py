@@ -1,6 +1,6 @@
 """Cross-conversation recall ("chat memory").
 
-ChatMood remembers *what previous conversations were about* — not just extracted
+MoodAI remembers *what previous conversations were about* — not just extracted
 facts. Two complementary parts:
 
 1.  Rolling summaries in Postgres — ``conversations.summary`` is refreshed as a
@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 SUMMARY_SYSTEM = (
     "You maintain a running third-person digest of a conversation between the user "
-    "and an AI assistant called ChatMood. Rules: max 90 words; keep decisions made, "
+    "and an AI assistant called MoodAI. Rules: max 90 words; keep decisions made, "
     "concrete names/dates/numbers, stated preferences and the conversation's goal; "
     "drop small talk; update the existing digest rather than restarting it; reply "
     "with ONLY the digest text, no preamble."

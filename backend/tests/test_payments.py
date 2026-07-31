@@ -227,7 +227,7 @@ async def _publish_momo(c, admin_tok, label="MTN MoMo — main", number="0244123
     r = await c.post(
         "/admin/payments/methods",
         json={"kind": "momo", "label": label, "network": "mtn",
-              "account_name": "ChatMood Ltd", "account_number": number,
+              "account_name": "MoodAI Ltd", "account_number": number,
               "instructions": "Dial *170#, send to the number above, then paste the transaction ID."},
         headers=_h(admin_tok),
     )

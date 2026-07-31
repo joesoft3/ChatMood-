@@ -1,4 +1,4 @@
-# ☁️ ChatMood — production deploy walkthrough
+# ☁️ MoodAI — production deploy walkthrough
 
 From zero to a live, custom-domain, Pro-gated deployment. ~30–45 minutes.
 Your repo ships a working `docker-compose.yml`, a Caddy **edge** profile with

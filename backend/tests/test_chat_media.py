@@ -108,7 +108,7 @@ def test_image_flow_sse_contract(env, monkeypatch):
             media = next(e for e in evs if e["type"] == "media")
             assert media["url"] == "https://cdn.example/archived.png" and media["stored"] == "r2"
             meta = evs[0]
-            assert meta["model"] == "ChatMood Canvas"  # friendly label only — no vendor names
+            assert meta["model"] == "MoodAI Canvas"  # friendly label only — no vendor names
             # assistant persisted with meta.media (reload contract)
             async with env() as s:
                 from sqlalchemy import select
@@ -229,7 +229,7 @@ def test_video_flow_sse_contract(env, monkeypatch):
             assert len(prog) == 3 and prog[0]["stage"] == "scenes" and prog[-1]["done"] == 1
             media = next(e for e in evs if e["type"] == "media")
             assert media["kind"] == "video" and media["url"].endswith("reel.mp4")
-            assert evs[0]["model"] == "ChatMood Reel"
+            assert evs[0]["model"] == "MoodAI Reel"
             async with env() as s:
                 from sqlalchemy import select
                 rows = (await s.execute(select(Message).where(Message.role == "assistant"))).scalars().all()

@@ -1,6 +1,6 @@
-# ChatMood — a Grok-class assistant built on xAI + FastAPI + Next.js
+# MoodAI — a Grok-class assistant built on xAI + FastAPI + Next.js
 
-ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
+MoodAI is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
 **orchestrating existing frontier models and tools** instead of training anything from scratch.
 
 - 💬 Streaming AI chat (Grok models via the xAI API)
@@ -19,7 +19,7 @@ ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabili
 - 🔑 **Developer API** — **OpenAI-compatible** programmatic access (`mk_live_…` keys): point any existing SDK at `/api/v1/public`, streaming supported, plus `/search` (grounded + citations), `/images` and `/usage`. Scoped, per-key rate-limited, revocable; only a SHA-256 hash is ever stored
 - ⭐🔴 **Creator Pro + Go Live on the Reel** — free creators post watermarked 720p/60s clips; **Pro unlocks watermark-free 1080p, 3-minute uploads, cinematic Noir/Dream/Vintage grades, analytics — and Go Live.** A broadcast *is* a reel: it floats to the top of the feed while streaming, then becomes a replay. Real RTMP/HLS via Mux · Cloudflare Stream · LiveKit (provider-agnostic adapter; reports itself unavailable rather than faking a stream when no keys are set) — see [docs/REEL-PREMIUM.md](docs/REEL-PREMIUM.md)
 - 💳 **Payments — mobile money first** — admin publishes an MTN/Telecel/Vodafone MoMo number, the user pays and submits the transaction ID, the owner verifies in the panel and the plan activates instantly. **Zero API keys required.** Paystack/Flutterwave/Stripe slot into the same flow once their keys land; the UI honestly shows "needs key" until then. Idempotent approval, one-claim-per-reference, periods that extend rather than reset, and a sweep that expires lapsed manual plans — see [docs/PAYMENTS.md](docs/PAYMENTS.md)
-- 🏷 **Free-tier watermarking** — generated designs, films, edits and in-chat media carry a subtle "Made with ChatMood" badge on the free plan; **Pro and admins render clean**. Pillow-drawn (no `drawtext` dependency), baked in at render time so every export path inherits it, and fail-open so a badge failure never costs a render — see [docs/WATERMARKING.md](docs/WATERMARKING.md)
+- 🏷 **Free-tier watermarking** — generated designs, films, edits and in-chat media carry a subtle "Made with MoodAI" badge on the free plan; **Pro and admins render clean**. Pillow-drawn (no `drawtext` dependency), baked in at render time so every export path inherits it, and fail-open so a badge failure never costs a render — see [docs/WATERMARKING.md](docs/WATERMARKING.md)
 - 🧩 Plugins — Gmail, Google Calendar & GitHub via OAuth (encrypted tokens, function calling)
 - 🔀 Multi-provider router — Gemini/OpenAI(/Claude via gateway) per task, env-driven, xAI default
 - 👥 Team workspaces — shared conversations with authors + per-seat usage (owners)

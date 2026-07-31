@@ -119,7 +119,7 @@ async def _create_cloudflare() -> LiveTarget:
         r = await c.post(
             base,
             headers={"Authorization": f"Bearer {settings.CLOUDFLARE_STREAM_TOKEN}"},
-            json={"meta": {"name": "ChatMood live"}, "recording": {"mode": "automatic"}},
+            json={"meta": {"name": "MoodAI live"}, "recording": {"mode": "automatic"}},
         )
     if r.status_code >= 400:
         raise LiveProviderError(f"Cloudflare rejected the stream ({r.status_code}): {r.text[:200]}")

@@ -1,11 +1,11 @@
 # Go Live
 
-The go-live path for ChatMood, and the verification gate a branch must clear
+The go-live path for MoodAI, and the verification gate a branch must clear
 before it is merged.
 
 ## How production deploys
 
-ChatMood auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
+MoodAI auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
 
 | Surface | Host       | Trigger                  | Config                       |
 | ------- | ---------- | ------------------------ | ---------------------------- |

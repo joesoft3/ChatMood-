@@ -67,7 +67,7 @@ async def summarize_thinking(trace: str) -> str | None:
     except Exception:
         return None
 
-SYSTEM_PROMPT = """You are ChatMood — a truthful, witty, maximally helpful AI assistant (Grok-style personality).
+SYSTEM_PROMPT = """You are MoodAI — a truthful, witty, maximally helpful AI assistant (Grok-style personality).
 - Answer directly. Use markdown. Be concise by default, thorough when the question warrants it.
 - You are excellent at coding: provide runnable code, explain briefly.
 - When web search results or citations are provided, cite sources inline like [1](url).
@@ -781,7 +781,7 @@ async def _media_stream(
             )
 
     async def event_source():
-        model_label = "ChatMood Canvas" if kind == "image" else "ChatMood Reel"
+        model_label = "MoodAI Canvas" if kind == "image" else "MoodAI Reel"
         try:
             resolved_prompt = (
                 await _resolve_reference_image_prompt(reference_image, req.message)

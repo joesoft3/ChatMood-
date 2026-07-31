@@ -180,7 +180,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [devices, setDevices] = useState<DevicesInfo | null>(null);
   const [engagement, setEngagement] = useState<Engagement | null>(null);
-  const [pushTitle, setPushTitle] = useState("🔔 ChatMood push test");
+  const [pushTitle, setPushTitle] = useState("🔔 MoodAI push test");
   const [pushBody, setPushBody] = useState("If you can read this, push is wired end-to-end. 🎉");
   const [pushMsg, setPushMsg] = useState("");
   const [pushBusy, setPushBusy] = useState(false);

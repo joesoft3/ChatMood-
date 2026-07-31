@@ -1,4 +1,4 @@
-# 🏪 Play Console — listing pack for ChatMood
+# 🏪 Play Console — listing pack for MoodAI
 
 Everything below is copy-paste ready. The **build artifacts** already exist:
 `app-release.aab` on the [v0.2.0 release](https://github.com/joesoft3/moodai/releases/tag/v0.2.0)
@@ -9,12 +9,12 @@ production uploads; then Play App Signing covers the app key).
 
 | Field | Text |
 |---|---|
-| **App name** | ChatMood |
+| **App name** | MoodAI |
 | **Short description** (80) | AI super-app: chat, ⚔ Arena debates, 🎬 video with AI voice & sound. |
 | **Full description** | below |
 
 ```
-ChatMood is a Grok-class AI super-app — and now it directs films. Every major model competes
+MoodAI is a Grok-class AI super-app — and now it directs films. Every major model competes
 for your attention, and it always shows its work.
 
 🎬 VIDEO STUDIO WITH CINEMA SOUND — type an idea, get a finished video: AI-written voiceover

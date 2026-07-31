@@ -668,7 +668,7 @@ export default function DesignPage() {
                         rather than letting the user wonder what the mark is. */}
                     {d.watermarked && (
                       <span
-                        title="Free plan renders carry a small ChatMood badge. Upgrade to Pro for clean exports."
+                        title="Free plan renders carry a small MoodAI badge. Upgrade to Pro for clean exports."
                         className="absolute bottom-2 right-2 rounded-full bg-black/70 px-1.5 py-0.5 text-[9px] text-gray-200 backdrop-blur"
                       >
                         🏷 badged

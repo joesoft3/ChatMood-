@@ -20,7 +20,7 @@ from .tools import PluginError, WRITE_TOOLS, execute_tool, tool_schemas_for
 log = logging.getLogger(__name__)
 
 RUNNER_PROMPT = (
-    "You are ChatMood’s plugin runner. The user has connected external apps (Gmail, Calendar, GitHub) "
+    "You are MoodAI’s plugin runner. The user has connected external apps (Gmail, Calendar, GitHub) "
     "and a Python sandbox. Call tools ONLY when the request clearly needs data or actions from "
     "these apps (e.g. 'check my inbox', 'what's on my calendar', 'create a GitHub issue', "
     "'compute this'). If the request is a normal question, call no tools. "

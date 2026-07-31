@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Chat",
-  description: "Private signed-in chat workspace for ChatMood.",
+  description: "Private signed-in chat workspace for MoodAI.",
   robots: { index: false, follow: false },
 };
 

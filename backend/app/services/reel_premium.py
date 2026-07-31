@@ -48,7 +48,7 @@ class Perk:
 
 
 PERKS: tuple[Perk, ...] = (
-    Perk("no_watermark", "Watermark-free reels", "Post without the ChatMood badge burned into your video.", False, "🏷"),
+    Perk("no_watermark", "Watermark-free reels", "Post without the MoodAI badge burned into your video.", False, "🏷"),
     Perk("premium_effects", "Cinematic effects", "Noir, Dream and Vintage grades — the looks that read as film.", False, "🎨"),
     Perk("hd_export", "1080p HD export", "Publish at full 1080×1920 instead of 720p.", False, "📺"),
     Perk("long_clips", f"{PRO_MAX_SECONDS // 60}-minute clips", f"Post up to {PRO_MAX_SECONDS // 60} minutes ({PRO_MAX_MB} MB) instead of {FREE_MAX_SECONDS}s.", False, "⏱"),

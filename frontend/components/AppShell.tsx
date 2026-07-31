@@ -180,9 +180,9 @@ export default function AppShell({
           <BrandMark brand={brand} />
         </div>
         <div className="min-w-0">
-          <span className="font-semibold tracking-tight block truncate text-gray-100">{brand?.brand_name ?? "ChatMood"}</span>
+          <span className="font-semibold tracking-tight block truncate text-gray-100">{brand?.brand_name ?? "MoodAI"}</span>
           <span className="text-[10px] text-gray-600 block mt-0.5">AI workspace</span>
-          {brand && <span className="text-[10px] text-gray-500 block -mt-0.5">powered by ChatMood</span>}
+          {brand && <span className="text-[10px] text-gray-500 block -mt-0.5">powered by MoodAI</span>}
         </div>
       </div>
       <ConversationList onNavigate={() => setDrawerOpen(false)} />
@@ -287,7 +287,7 @@ export default function AppShell({
             ) : (
               <div className="min-w-0 flex-1">
                 <h1 className="text-sm font-semibold truncate text-gray-100">{title}</h1>
-                <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "ChatMood"} workspace</p>
+                <p className="text-[10px] text-gray-600 truncate">{brand?.brand_name ?? "MoodAI"} workspace</p>
               </div>
             )}
             <ThemeToggle compact />

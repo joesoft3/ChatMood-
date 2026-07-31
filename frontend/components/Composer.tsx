@@ -300,7 +300,7 @@ export default function Composer({
               bare
                 ? deepMode
                   ? "Ask a research question…"
-                  : "Ask ChatMood anything…"
+                  : "Ask MoodAI anything…"
                 : agentMode
                   ? "Give the agent team a goal…"
                   : deepMode
@@ -311,7 +311,7 @@ export default function Composer({
                         ? "Describe code to write / a bug to fix (🧠 toggle for reasoning)…"
                         : thinkOn
                           ? "Ask something worth deep reasoning (grok-4 🧠)…"
-                          : "Ask ChatMood anything…"
+                          : "Ask MoodAI anything…"
             }
             className="composer-input min-h-[3.25rem] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-6 outline-none placeholder-gray-600"
           />

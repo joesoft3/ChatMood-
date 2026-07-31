@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import OrderClient from "./OrderClient";
 
 export const metadata: Metadata = {
-  title: "Design order · ChatMood",
+  title: "Design order · MoodAI",
   description: "Order a flyer, logo or banner — delivered right back to this page.",
   robots: { index: false },
 };

@@ -207,7 +207,7 @@ function ToolPills({ tools }: { tools: { name: string; ok: boolean }[] }) {
 function PendingAssistantState({ msg }: { msg: ChatMsg }) {
   let icon = <Brain size={14} className="text-accent" />;
   let title = "Thinking through the answer…";
-  let detail = "ChatMood is working on your response.";
+  let detail = "MoodAI is working on your response.";
   let activity = ["understanding", "reasoning", "drafting"];
 
   const pendingMedia = msg.media?.find((m) => m.pending);
@@ -423,7 +423,7 @@ export default function MessageBubble({
           ? (msg.media?.[0]?.kind === "image" ? "Image studio" : "Video studio")
           : isStreaming
             ? "Working"
-            : "ChatMood";
+            : "MoodAI";
   const assistantIcon = msg.research
     ? <Search size={13} />
     : msg.arena && !msg.arena.winner
@@ -444,7 +444,7 @@ export default function MessageBubble({
           <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
             {assistantIcon}
           </span>
-          <span className="font-medium text-gray-300">ChatMood</span>
+          <span className="font-medium text-gray-300">MoodAI</span>
           <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
           {isStreaming && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent/80" />}
         </div>

@@ -2,7 +2,7 @@
 
 Two ways in:
   • **Upload** — a creator posts their own clip (`POST /reels/upload`, multipart).
-  • **Share**  — a creator posts something ChatMood already generated: a storyboard
+  • **Share**  — a creator posts something MoodAI already generated: a storyboard
     film or an in-chat video (`POST /reels/share`, JSON). Nothing is copied;
     the row points at the media that already exists.
 
@@ -385,7 +385,7 @@ async def share_to_reel(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """♻️ Post a video ChatMood already made — a film, or an in-chat generation.
+    """♻️ Post a video MoodAI already made — a film, or an in-chat generation.
 
     Body: `{film_id}` **or** `{url}`, plus an optional `caption`.
     Nothing is copied: the reel points at media that already exists.
@@ -450,7 +450,7 @@ async def share_to_reel(
     if not (url.startswith(f"{base}/api/v1/media/files/") or url.startswith(f"{base}/api/v1/reels/files/")):
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Only videos generated in ChatMood can be shared to the reel",
+            "Only videos generated in MoodAI can be shared to the reel",
         )
 
     row = Reel(
