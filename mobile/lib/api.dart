@@ -11,10 +11,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Production is the safe default so release builds do not point at an
 /// emulator-only host.
 class Api {
-  static const String baseUrl = String.fromEnvironment(
+  static const String _productionBaseUrl = 'https://moodai-api.fly.dev/api/v1';
+  static const String _configuredBaseUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'https://moodai-api.fly.dev/api/v1',
+    defaultValue: _productionBaseUrl,
   );
+
+  /// A workflow input such as `Main` must never turn into an invalid URI.
+  /// Release builds fall back to Fly.io unless an explicit absolute HTTP(S)
+  /// API URL was supplied.
+  static String get baseUrl {
+    final raw = _configuredBaseUrl.trim();
+    final uri = Uri.tryParse(raw);
+    if (uri == null || uri.host.isEmpty || (uri.scheme != 'https' && uri.scheme != 'http')) {
+      return _productionBaseUrl;
+    }
+    return raw.replaceFirst(RegExp(r'/+$'), '');
+  }
 
   static const _tokenKey = 'mood_token';
   static final http.Client _client = http.Client();
