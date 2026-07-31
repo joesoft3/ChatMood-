@@ -10,10 +10,10 @@ import ErrorBoundary from "./ErrorBoundary";
 import { API, apiFetch, token } from "@/lib/api";
 import { applyAccent, applyFavicon, BrandMark } from "@/lib/brand";
 
-// 👑 The owner panel entry points (floating button + drawer link) are shown ONLY
-// to the deployment owner's own login — not merely to any is_admin account.
-// Override per white-label deployment with NEXT_PUBLIC_OWNER_EMAIL.
-const OWNER_EMAIL = (process.env.NEXT_PUBLIC_OWNER_EMAIL ?? "joesoft2024@gmail.com").toLowerCase();
+// 👑 The owner panel entry points (floating button + drawer link) are shown
+// to any user with the is_admin flag set on their account.
+// The server still double-checks is_admin on every /admin API call — this
+// gate is purely about who SEES the button.
 
 // ⚠️ Order matters: the phone bottom tab bar renders NAV.slice(0, 5).
 // Reel must stay within the first five or it is drawer-only on mobile —
@@ -76,13 +76,13 @@ export default function AppShell({
     if (!token.get()) router.push("/login");
   }, [router]);
 
-  // Owner panel entry: visible ONLY to the owner email (server still
-  // double-checks is_admin on every /admin API call — this gate is purely
-  // about who SEES the button)
+  // Owner panel entry: visible to any user with the is_admin flag.
+  // The server still double-checks is_admin on every /admin API call — this
+  // gate is purely about who SEES the button.
   useEffect(() => {
     if (!token.get()) return;
-    apiFetch<{ is_admin?: boolean; email?: string }>("/auth/me")
-      .then((m) => setIsAdmin(Boolean(m.is_admin) && (m.email ?? "").toLowerCase() === OWNER_EMAIL))
+    apiFetch<{ is_admin?: boolean }>("/auth/me")
+      .then((m) => setIsAdmin(Boolean(m.is_admin)))
       .catch(() => {});
   }, []);
 
@@ -301,16 +301,29 @@ export default function AppShell({
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
 
-        {/* 👑 Owner panel floating button — owner email only, hidden while inside /admin.
-            Mobile: compact circle, lifted clear above the quick-chips/model-picker/composer
-            stack (tab bar 3.5rem + composer ~6.5rem + chips ~2.6rem ≈ 12.6rem) so it can
-            never block the send button; desktop: labelled pill in the bottom-right corner. */}
+        {/* 🎬 Reel floating button — visible to all users, hidden while inside /reel.
+            Desktop: labelled pill in the bottom-right corner. On mobile the bottom
+            tab bar already includes Reel so the FAB is desktop/tablet only. */}
+        {pathname !== "/reel" && (
+          <Link
+            href="/reel"
+            aria-label="Open Reel"
+            title="Reel"
+            className="touch-manipulation absolute z-30 right-6 bottom-6 hidden md:flex items-center gap-2 rounded-full bg-white text-black font-semibold pl-3.5 pr-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.5)] ring-1 ring-white/20 hover:brightness-110 hover:scale-[1.04] active:scale-95 transition"
+          >
+            <Tv size={18} />
+            <span className="text-xs tracking-wide">Reel</span>
+          </Link>
+        )}
+
+        {/* 👑 Admin panel floating button — admin users only, hidden while inside /admin.
+            Positioned above the Reel FAB so the two never overlap. */}
         {isAdmin && pathname !== "/admin" && (
           <Link
             href="/admin"
             aria-label="Open owner panel"
             title="Owner panel"
-            className="touch-manipulation absolute z-30 right-6 bottom-6 hidden md:flex items-center gap-2 rounded-full bg-accent text-black font-semibold pl-3.5 pr-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.5)] ring-1 ring-white/20 hover:brightness-110 hover:scale-[1.04] active:scale-95 transition"
+            className="touch-manipulation absolute z-30 right-6 bottom-[4.5rem] hidden md:flex items-center gap-2 rounded-full bg-accent text-black font-semibold pl-3.5 pr-4 py-3 shadow-[0_10px_28px_rgba(0,0,0,0.5)] ring-1 ring-white/20 hover:brightness-110 hover:scale-[1.04] active:scale-95 transition"
           >
             <ShieldCheck size={18} />
             <span className="text-xs tracking-wide">Admin</span>
