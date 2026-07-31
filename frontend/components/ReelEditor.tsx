@@ -28,7 +28,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveMediaUrl } from "@/lib/api";
 
 export interface Asset {
   id: string;
@@ -354,7 +354,7 @@ export default function ReelEditor({
             <video
               ref={previewRef}
               key={current.key}
-              src={current.asset.url}
+              src={resolveMediaUrl(current.asset.url)}
               controls
               playsInline
               className="h-full w-full object-contain"
@@ -373,7 +373,7 @@ export default function ReelEditor({
               style={{ width: `${overlayScale * 100}%` }}
             >
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video src={overlay.url} muted className="h-full w-full object-cover" />
+              <video src={resolveMediaUrl(overlay.url)} muted className="h-full w-full object-cover" />
             </div>
           )}
         </div>
@@ -419,7 +419,7 @@ export default function ReelEditor({
                 >
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video
-                    src={c.asset.url}
+                    src={resolveMediaUrl(c.asset.url)}
                     muted
                     preload="metadata"
                     className="h-20 w-12 bg-black object-cover"

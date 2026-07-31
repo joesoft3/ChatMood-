@@ -20,7 +20,7 @@
 |---|---|---|---|
 | Staged action waiting | ✋ Approval needed | “Send email: Q3 launch…” | 🧩 Action inbox (/plugins) |
 | ⚔️ Arena finished | verdict in | “Grok-4 verdict: Draft C wins 7-5” | the conversation |
-| Team mention (later) | @you in Team Mood | first 80 chars | workspace chat |
+| Team mention (later) | @you in Team ChatMood | first 80 chars | workspace chat |
 
 ## Architecture
 

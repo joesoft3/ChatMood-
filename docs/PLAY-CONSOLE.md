@@ -22,7 +22,7 @@ in 10 studio voices, a cinematic ambient mix, and loudness-polished audio. Story
 splits your idea into 2–4 directed scenes, stitches them into one continuous film, and burns
 subtitles in on request.
 
-⚔️ ARENA — send one question, watch S1 Mood-4, GPT and Gemini draft answers in parallel, vote
+⚔️ ARENA — send one question, watch S1 ChatMood-4, GPT and Gemini draft answers in parallel, vote
 on each other's work blind, then get a judge verdict with accuracy & clarity score cards.
 Losers' drafts are re-challengeable with one tap.
 

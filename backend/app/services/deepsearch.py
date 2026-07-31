@@ -36,7 +36,7 @@ What is still missing to write a comprehensive report? Return STRICT JSON only:
 {{"assessment": "one sentence", "followups": ["specific search query"]}}
 Rules: max {n} followups; return [] when coverage is already sufficient."""
 
-SYNTH_PROMPT = """You are DeepMood, an expert research writer.
+SYNTH_PROMPT = """You are ChatMood Deep Research, an expert research writer.
 Using ONLY the findings and the numbered source list below, write a comprehensive,
 well-structured markdown report that fully answers the user's goal.
 - Cite claims INLINE as [n](url) using the source-list numbering.

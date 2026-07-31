@@ -20,7 +20,7 @@ usage `GET /{id}/usage`.
 
 ## The 2-minute tour
 
-1. **Create** — Settings → Teams → *New workspace* → name it (e.g. `Team Mood`). You are owner.
+1. **Create** — Settings → Teams → *New workspace* → name it (e.g. `Team ChatMood`). You are owner.
 2. **Invite** — open the workspace → *Create invite* → copy the link `https://<app>/join/<token>`. Optionally restrict to one **email domain** (e.g. `@mood.ai`) or send an **email invite** from the same panel.
 3. **Join** — on the teammate's device: open link → create account / sign in → auto-bounced back onto `/join/<token>` → *in the team* (domain-gated invites reject mismatched emails politely).
 4. **Work together** — teammates switch to the workspace in the chat header; messages sent there appear in **workspace conversations** for everyone; memory stays personal, arenas/quota still per-user.

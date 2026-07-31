@@ -3,7 +3,7 @@ import "./globals.css";
 import { ConversationsProvider } from "@/lib/conversations";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://moodai-app.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://chatmood-app.vercel.app"),
   title: {
     default: "ChatMood — chat, arena, deep research & AI films with sound",
     template: "%s · ChatMood",

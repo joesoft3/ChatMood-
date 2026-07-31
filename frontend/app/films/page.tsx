@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Clapperboard, Clapperboard as FilmIcon, Copy, Loader2, Megaphone, PencilLine, RefreshCw, RotateCcw, Trash2, X } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionLink, StudioEmptyState, StudioHero, StudioNotice } from "@/components/StudioChrome";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveMediaUrl } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 
 interface Film {
@@ -207,8 +207,8 @@ export default function FilmsPage() {
                   ) : (
                     // eslint-disable-next-line jsx-a11y/media-has-caption
                     <video
-                      src={f.url}
-                      poster={f.poster || undefined}
+                      src={resolveMediaUrl(f.url)}
+                      poster={resolveMediaUrl(f.poster) || undefined}
                       preload="none"
                       controls
                       playsInline

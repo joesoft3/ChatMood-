@@ -1,6 +1,6 @@
 # 🎙 Cinema Sound — text-to-video with pure sound & voice
 
-**Shipped in v0.3.0.** Mood's Video Studio can now finish every generated clip
+**Shipped in v0.3.0.** ChatMood's Video Studio can now finish every generated clip
 with a studio-grade soundtrack: an AI-written, AI-performed voiceover mixed over
 a soft procedural ambience — loudness-normalized ("pure sound") and muxed into a
 single MP4 by a server-side ffmpeg pipeline.

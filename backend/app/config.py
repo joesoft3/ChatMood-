@@ -127,7 +127,7 @@ class Settings(BaseSettings):
     R2_ACCOUNT_ID: str = ""
     R2_ACCESS_KEY_ID: str = ""
     R2_SECRET_ACCESS_KEY: str = ""
-    R2_BUCKET: str = "moodai"
+    R2_BUCKET: str = "chatmood"
     R2_PRESIGN_SECONDS: int = 3600      # download link TTL for private objects
     R2_PUBLIC_BASE_URL: str = ""        # optional public bucket/CDN base for permanent links
     R2_ENDPOINT_URL: str = ""           # override for ANY S3-compatible service (MinIO/B2/moto)
@@ -174,7 +174,7 @@ class Settings(BaseSettings):
     STRIPE_PRICE_ID: str = ""
 
     # Custom domains (connect own + real-time purchase for business white-label)
-    PLATFORM_CNAME_TARGET: str = ""   # e.g. cname.mood-ai.app — users CNAME their domain here
+    PLATFORM_CNAME_TARGET: str = ""   # e.g. cname.chatmood.app — users CNAME their domain here
     PLATFORM_A_RECORD_IP: str = ""    # apex IP for purchased domains (optional; www gets CNAME)
     DOMAIN_MARKUP_PCT: int = 20       # your margin on registrar cost price
     GODADDY_API_KEY: str = ""         # registrar integration (developer.godaddy.com/keys)

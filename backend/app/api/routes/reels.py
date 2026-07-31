@@ -74,7 +74,51 @@ def _author_label(u: User) -> str:
 
 
 def _media_url(name: str) -> str:
-    return f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/reels/files/{name}"
+    # Return a *relative* API path so the frontend can build the absolute URL from
+    # its own NEXT_PUBLIC_API_URL (which is always correctly configured for the
+    # deployment). The old absolute BACKEND_PUBLIC_URL defaults to localhost:8000
+    # and causes mixed-content / unreachable videos in production when that env is
+    # not set — the number one reason for "video can't play".
+    # The frontend's normalizeMediaUrl() will turn this into
+    # `${API}/reels/files/${name}` (absolute, correct host, https).
+    return f"/api/v1/reels/files/{name}"
+
+def _absolute_media_url(name: str) -> str:
+    # For places that still need an absolute URL (e.g. Open Graph, email), fall
+    # back to BACKEND_PUBLIC_URL when it looks like a real deployment URL,
+    # otherwise use the relative path.
+    base = (settings.BACKEND_PUBLIC_URL or "").rstrip("/")
+    if base and "localhost" not in base and "127.0.0.1" not in base:
+        return f"{base}/api/v1/reels/files/{name}"
+    return f"/api/v1/reels/files/{name}"
+
+def _film_media_url(name: str) -> str:
+    # Films live under /media/files — same relative logic
+    return f"/api/v1/media/files/{name}"
+
+
+def _normalize_source_url(u: str) -> str:
+    """If the stored source_url is an old absolute BACKEND_PUBLIC_URL (e.g.
+    http://localhost:8000/api/v1/...), turn it into a relative API path so the
+    frontend can rebuild it from its own NEXT_PUBLIC_API_URL. This prevents
+    mixed-content / localhost 404s that caused 'video can't play'."""
+    if not u:
+        return ""
+    try:
+        # Keep relative paths as-is
+        if u.startswith("/api/"):
+            return u
+        from urllib.parse import urlparse
+
+        parsed = urlparse(u)
+        path = parsed.path or ""
+        # Extract /api/v1/media/files/... or /api/v1/reels/files/...
+        if "/api/v1/" in path:
+            idx = path.index("/api/v1/")
+            return path[idx:]  # relative API path
+        return u
+    except Exception:
+        return u
 
 
 def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool = False) -> dict:
@@ -87,7 +131,7 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
     if r.filename and REEL_NAME_RE.match(r.filename):
         url = _media_url(r.filename)
     elif r.source_url:
-        url = r.source_url
+        url = _normalize_source_url(r.source_url)
 
     poster = ""
     if r.poster and REEL_POSTER_RE.match(r.poster):
@@ -100,6 +144,10 @@ def _reel_out(r: Reel, *, liked: bool = False, saved: bool = False, mine: bool =
         "source": r.source,
         "url": url,
         "poster": poster,
+        # raw filenames so frontend can rebuild URL from its own API base
+        # (prevents localhost / mixed-content 404s when BACKEND_PUBLIC_URL is unset)
+        "filename": r.filename or "",
+        "poster_filename": r.poster or "",
         "views": r.views or 0,
         "likes": r.likes or 0,
         "shares": r.shares or 0,
@@ -339,8 +387,51 @@ async def upload_reel(
     name = f"{uid}_r.mp4"
     os.makedirs(settings.MEDIA_DIR, exist_ok=True)
     path = os.path.join(settings.MEDIA_DIR, name)
+    # Write raw first
     with open(path, "wb") as fh:
         fh.write(raw)
+
+    # 🔧 FIX: browsers reject MOV/WebM served as video/mp4 when the container
+    # doesn't match. If ffmpeg is present, transcode any non-MP4 upload to a
+    # baseline H264/AAC MP4 that every browser can play. Fail-open: if transcode
+    # fails, keep the original file — a playable raw upload is better than no upload.
+    try:
+        if mime != "video/mp4":
+            ffbin = soundtrack.ffmpeg_path()
+            if ffbin:
+                tmp = os.path.join(settings.MEDIA_DIR, f"{uid}_conv.mp4")
+                try:
+                    # Fast baseline transcode — 720p-ish, yuv420p for max compat
+                    studio.run(
+                        [
+                            ffbin,
+                            "-y",
+                            "-i",
+                            path,
+                            "-c:v",
+                            "libx264",
+                            "-preset",
+                            "fast",
+                            "-crf",
+                            "23",
+                            "-pix_fmt",
+                            "yuv420p",
+                            "-c:a",
+                            "aac",
+                            "-b:a",
+                            "128k",
+                            "-movflags",
+                            "+faststart",
+                            tmp,
+                        ],
+                        timeout=120,
+                    )
+                    os.replace(tmp, path)
+                except Exception:
+                    _unlink(tmp)
+                    log.info("reel transcode to mp4 skipped, keeping raw", exc_info=True)
+    except Exception:
+        log.info("reel transcode wrapper failed", exc_info=True)
 
     # 🎬 Studio pass — effect/speed burn-in, then captions. Both fail OPEN: a
     # look that won't render must never cost the creator their upload.
@@ -413,15 +504,15 @@ async def share_to_reel(
 
         src = ""
         if film.filename:
-            src = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{film.filename}"
+            src = _film_media_url(film.filename)
         elif film.fallback_url:
-            src = film.fallback_url
+            src = _normalize_source_url(film.fallback_url) or film.fallback_url
         if not src:
             raise HTTPException(status.HTTP_409_CONFLICT, "That film has no playable file")
 
         poster_url = ""
         if film.poster:
-            poster_url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{film.poster}"
+            poster_url = _film_media_url(film.poster)
 
         row = Reel(
             id=uuid.uuid4().hex,
@@ -446,12 +537,24 @@ async def share_to_reel(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "Pass a film_id or a url to share"
         )
     # Only accept media this deployment actually serves — no arbitrary hotlinks.
-    base = settings.BACKEND_PUBLIC_URL.rstrip("/")
-    if not (url.startswith(f"{base}/api/v1/media/files/") or url.startswith(f"{base}/api/v1/reels/files/")):
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            "Only videos generated in ChatMood can be shared to the reel",
-        )
+    # Accept both absolute BACKEND_PUBLIC_URL and relative /api/v1/... forms so
+    # the frontend's relative URLs (which fix localhost/mixed-content bugs) pass.
+    normalized = _normalize_source_url(url)
+    if not (
+        "/api/v1/media/files/" in normalized or "/api/v1/reels/files/" in normalized
+    ):
+        # Also check absolute form for backward compat
+        base = settings.BACKEND_PUBLIC_URL.rstrip("/")
+        if not (
+            url.startswith(f"{base}/api/v1/media/files/")
+            or url.startswith(f"{base}/api/v1/reels/files/")
+            or url.startswith("/api/v1/media/files/")
+            or url.startswith("/api/v1/reels/files/")
+        ):
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                "Only videos generated in ChatMood can be shared to the reel",
+            )
 
     row = Reel(
         id=uuid.uuid4().hex,
@@ -1021,7 +1124,17 @@ async def serve_reel_file(name: str):
         }.get(ext, "application/octet-stream")
     else:
         media_type = "video/mp4"
-    return FileResponse(path, media_type=media_type)
+    # CORS + Range are critical for <video> tags: without Access-Control-Allow-Origin
+    # a cross-origin video may be blocked, and without Accept-Ranges seeking fails.
+    # The file route is public (unguessable names) so * is safe.
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=31536000, immutable",
+    }
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 # ═══════════════════════════════════════════════════ ⭐ premium · 🔴 Go Live

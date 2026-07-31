@@ -154,7 +154,7 @@
   <div class="main">
     <header class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu">☰</button>
-      <h1 id="title">Mood Chat</h1>
+      <h1 id="title">ChatMood Chat</h1>
       <span class="badge">offline demo</span>
     </header>
 
@@ -164,7 +164,7 @@
       <div class="composer">
         <div class="composer-row">
           <button class="cbtn" title="Attach (demo)">📎</button>
-          <textarea id="chat-input" rows="1" placeholder="Ask Mood anything…"></textarea>
+          <textarea id="chat-input" rows="1" placeholder="Ask ChatMood anything…"></textarea>
           <button class="cbtn on" id="search-toggle" title="Live search">🌐</button>
           <button class="cbtn" id="mic-btn" title="Voice (demo)">🎤</button>
           <button class="cbtn send" id="send-btn" disabled>↑</button>
@@ -212,8 +212,8 @@
           <button class="btn" id="upgrade-btn">Upgrade to Pro</button>
         </div>
         <div class="card mem-card">
-          <h3><span class="ic">🧠</span> What Mood remembers about you (<span id="mem-count">3</span>)</h3>
-          <p>Long-term memories personalize every chat. Delete anything you don't want Mood to know.</p>
+          <h3><span class="ic">🧠</span> What ChatMood remembers about you (<span id="mem-count">3</span>)</h3>
+          <p>Long-term memories personalize every chat. Delete anything you don't want ChatMood to know.</p>
           <button class="btn danger" id="mem-clear">Clear all</button>
           <div id="mem-list" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
@@ -233,7 +233,7 @@
 (function () {
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
-  const PAGE_TITLES = { chat: "Mood Chat", voice: "Voice", images: "Image Lab", settings: "Settings" };
+  const PAGE_TITLES = { chat: "ChatMood Chat", voice: "Voice", images: "Image Lab", settings: "Settings" };
   const NAV = [
     { id: "chat", label: "Chat", icon: "💬" },
     { id: "voice", label: "Voice", icon: "🎙" },
@@ -314,7 +314,7 @@
 
   /* ---------- chat demo ---------- */
   const REPLIES = [
-    "Great question! Here's the short version: Mood combines Grok-class chat, live search with citations, long-term memory, file & image analysis and voice — all from one app.\n\n(⚠️ Offline demo — the live app streams real answers from the xAI API.)",
+    "Great question! Here's the short version: ChatMood combines Grok-class chat, live search with citations, long-term memory, file & image analysis and voice — all from one app.\n\n(⚠️ Offline demo — the live app streams real answers from the xAI API.)",
     "On it. Here's a quick take:\n\n• Point one, delivered with confidence\n• Point two, with a dash of wit\n• Point three, because good things come in threes\n\n(live replies stream token-by-token in the real app) ",
     "I searched the web (demo mode), and the consensus is: this preview has **no backend** — but the real thing calls xAI Live Search and cites sources like this.",
   ];
@@ -381,7 +381,7 @@
     phase = p;
     orb.className = "orb" + (p === "listening" ? " listening" : p === "thinking" ? " thinking" : "");
     orb.textContent = p === "idle" ? "🎤" : p === "listening" ? "⏹" : p === "thinking" ? "⏳" : "🔊";
-    vlabel.textContent = { idle: "Tap the orb to talk", listening: "Listening… tap to send", thinking: "Mood is thinking…", speaking: "Speaking… tap to stop" }[p];
+    vlabel.textContent = { idle: "Tap the orb to talk", listening: "Listening… tap to send", thinking: "ChatMood is thinking…", speaking: "Speaking… tap to stop" }[p];
     $("#r1").className = "ring" + (p !== "idle" ? " anim" : "");
     $("#r2").className = "ring r2" + (p === "listening" ? " anim fast" : p === "speaking" ? " anim" : "");
     $("#r3").className = "ring r3" + (p === "thinking" ? " anim fast" : "");

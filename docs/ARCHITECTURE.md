@@ -137,7 +137,7 @@ upgrade), `mem_days` 30→365 (fact/digest pruning in `extract_and_store` via `p
 
 ### 5.1 Cross-conversation recall (remembering previous chats)
 
-Facts tell Mood *who you are*; recall tells it *what you've discussed*. Two pieces in `services/recall.py`:
+Facts tell ChatMood *who you are*; recall tells it *what you've discussed*. Two pieces in `services/recall.py`:
 
 - **Rolling summaries.** After replies (debounced — 1st exchange, then every other one),
   `grok-3-mini` maintains a ≤100-word summary per conversation, stored on `conversations.summary`
@@ -302,7 +302,7 @@ accumulated across all agents and metered as one "agent" usage event.
 - **Human-in-the-loop (implemented):** write tools (`gmail_send_message`,
   `calendar_create_event`, `github_create_issue`) never execute in the loop — they become
   `pending_actions` rows, the stream emits a `confirm` event, and the UI renders an approval
-  card (Approve/Reject → `POST /plugins/actions/{id}/approve|reject`). Mood’s reply is told
+  card (Approve/Reject → `POST /plugins/actions/{id}/approve|reject`). ChatMood’s reply is told
   explicitly not to claim completion.
 - **Built-in tools (implemented):** `run_python_code` — subprocess sandbox (`services/sandbox.py`,
   isolated mode, CPU/memory rlimits, hard timeout, clipped output; documented as NOT a hardened

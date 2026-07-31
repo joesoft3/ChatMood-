@@ -1,4 +1,4 @@
-"""v1.9.7 — 🎬 Mood Reel composer (scene fetch → ffmpeg Ken Burns) + provider cascade."""
+"""v1.9.7 — 🎬 ChatMood Reel composer (scene fetch → ffmpeg Ken Burns) + provider cascade."""
 
 import asyncio
 
