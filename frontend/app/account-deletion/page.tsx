@@ -50,7 +50,7 @@ const SEC = [
   {
     t: "No password access?",
     b: [
-      "Email support@moodaiapp.com from the account email with the subject “Delete my account”.",
+      "Email support@chatmood.app from the account email with the subject “Delete my account”.",
       "We verify ownership and complete the deletion within 72 hours.",
     ],
   },

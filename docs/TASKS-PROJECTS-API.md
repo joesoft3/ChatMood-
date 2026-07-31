@@ -1,11 +1,11 @@
 # ⏰🗂🔑 Tasks · Projects · Developer API
 
-Three Grok-parity surfaces that turn Mood from *something you ask* into
+Three Grok-parity surfaces that turn ChatMood from *something you ask* into
 *something that works for you*:
 
 | Surface | What it adds | Where it lives |
 | --- | --- | --- |
-| ⏰ **Scheduled tasks** | Saved prompts Mood runs unattended, on a schedule | `/tasks` |
+| ⏰ **Scheduled tasks** | Saved prompts ChatMood runs unattended, on a schedule | `/tasks` |
 | 🗂 **Projects** | Durable containers: standing brief + pinned docs + filed chats | `/projects` |
 | 🔑 **Developer API** | OpenAI-compatible programmatic access with `mk_live_…` keys | Settings → API |
 
@@ -16,7 +16,7 @@ Three Grok-parity surfaces that turn Mood from *something you ask* into
 ### What it is
 
 A task is a prompt plus a cadence. *"Every weekday at 07:00, brief me on AI
-news."* Mood runs it while you sleep, appends the answer to a dedicated chat
+news."* ChatMood runs it while you sleep, appends the answer to a dedicated chat
 thread, and pushes a notification when it's done.
 
 ### Scheduling model
@@ -203,7 +203,7 @@ POST /api/v1/public/images              image generation
 GET  /api/v1/public/usage               the calling account's meters
 ```
 
-`/search` and `/usage` are Mood extensions; the rest is stock-shaped.
+`/search` and `/usage` are ChatMood extensions; the rest is stock-shaped.
 
 ### Key security
 

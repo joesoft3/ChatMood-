@@ -132,7 +132,7 @@ async def list_models(caller: tuple[User, ApiKey] = Depends(get_api_caller)):
     return {
         "object": "list",
         "data": [
-            {"id": alias, "object": "model", "owned_by": "mood-ai", "backing": backing}
+            {"id": alias, "object": "model", "owned_by": "chatmood", "backing": backing}
             for alias, backing in PUBLIC_MODELS.items()
         ],
         "scopes": [s for s in (key.scopes or "").split(",") if s],

@@ -6,7 +6,7 @@ import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
 import { ChevronDown, Clapperboard, Download, Image as ImageIcon, Loader2, Pencil, Sparkles, Trash2, Wand2, X } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice } from "@/components/StudioChrome";
-import { API, apiFetch, token } from "@/lib/api";
+import { API, apiFetch, token, resolveMediaUrl } from "@/lib/api";
 
 interface ImgItem {
   id: string;
@@ -287,7 +287,7 @@ export default function ImagesPage() {
       const response = await fetch(item.url, { headers: token.get() ? { Authorization: `Bearer ${token.get()}` } : undefined });
       if (!response.ok) throw new Error("Could not load video");
       const blob = await response.blob();
-      setEditFile(new File([blob], `mood-ai-video-${item.id}.mp4`, { type: blob.type || "video/mp4" }));
+      setEditFile(new File([blob], `chatmood-video-${item.id}.mp4`, { type: blob.type || "video/mp4" }));
       setEditOpen(true);
       setPrompt("");
       setInfo("✂️ Video loaded into the editor. Describe the changes in the prompt box, then choose Edit my video.");
@@ -987,7 +987,7 @@ export default function ImagesPage() {
                     <div key={v.id} className="rounded-xl overflow-hidden border border-line bg-panel">
                       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                       <video
-                        src={v.url}
+                        src={resolveMediaUrl(v.url)}
                         controls
                         playsInline
                         className={`w-full bg-black ${v.meta?.aspect_ratio === "9:16" ? "aspect-[9/16] max-h-[480px] mx-auto" : v.meta?.aspect_ratio === "1:1" ? "aspect-square" : "aspect-video"}`}
@@ -1090,7 +1090,7 @@ export default function ImagesPage() {
                       className="block h-full w-full"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <img src={resolveMediaUrl(img.url)} alt={img.prompt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     </button>
                     <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-left text-[11px] text-gray-300 line-clamp-2 opacity-0 group-hover:opacity-100 transition">
                       {img.prompt}
@@ -1141,7 +1141,7 @@ export default function ImagesPage() {
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur flex items-center justify-center p-4" onClick={() => setZoom(null)}>
           <div className="max-w-3xl w-full space-y-3" onClick={(e) => e.stopPropagation()}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={zoom.url} alt={zoom.prompt} className="w-full max-h-[75vh] object-contain rounded-xl" />
+            <img src={resolveMediaUrl(zoom.url)} alt={zoom.prompt} className="w-full max-h-[75vh] object-contain rounded-xl" />
             <div className="flex items-center gap-3">
               <p className="flex-1 text-xs text-gray-400 line-clamp-2">{zoom.prompt}</p>
               <button

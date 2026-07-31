@@ -218,7 +218,7 @@ async def generate_video(
             note = f"Soundtrack mix failed ({type(e).__name__}) — delivered the original video."
         else:
             if result:
-                url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{result.filename}"
+                url = f"/api/v1/media/files/{result.filename}"
                 audio_out = result.mode
                 script = result.script
             elif not note:
@@ -316,7 +316,14 @@ async def serve_muxed_video(name: str):
     if not os.path.exists(path):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Expired or unknown media (muxed files live 24h)")
     media_type = "image/jpeg" if name.endswith("_p.jpg") else "video/mp4"
-    return FileResponse(path, media_type=media_type)
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "public, max-age=86400",
+    }
+    return FileResponse(path, media_type=media_type, headers=headers)
 
 
 @router.post("/videos/enhance")
@@ -349,14 +356,20 @@ def _film_out(f: Film) -> dict:
     if f.filename:
         # Only serve filenames that match the unguessable 128-bit hex pattern
         if soundtrack.MEDIA_NAME_RE.match(f.filename) or f.filename.endswith(".mp4"):
-            url = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.filename}"
+            url = f"/api/v1/media/files/{f.filename}"
     elif f.fallback_url:
+        # Normalize old absolute URLs to relative
         url = f.fallback_url
+        if "/api/v1/" in url:
+            try:
+                url = url[url.index("/api/v1/") :]
+            except ValueError:
+                pass
 
     poster = ""
     if f.poster:
         if soundtrack.MEDIA_POSTER_RE.match(f.poster) or f.poster.endswith("_p.jpg"):
-            poster = f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{f.poster}"
+            poster = f"/api/v1/media/files/{f.poster}"
 
     scenes_raw = f.scenes_json or "[]"
     try:

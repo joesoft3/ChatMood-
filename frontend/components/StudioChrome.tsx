@@ -117,11 +117,17 @@ export function StudioEmptyState({
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="text-center text-gray-600 pt-20 space-y-3">
-      <div className="text-4xl">{emoji}</div>
-      <p className="text-sm text-gray-300 font-medium">{title}</p>
-      <p className="text-sm text-gray-500 max-w-xl mx-auto">{description}</p>
-      {actions && <div className="flex justify-center gap-2 flex-wrap">{actions}</div>}
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 py-10 sm:py-14">
+      <div className="flex flex-col items-center gap-3 text-center select-none">
+        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#141415] border border-white/8 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] text-xl">
+          {emoji}
+        </span>
+        <h2 className="text-center text-[clamp(1.5rem,3.5vw,2rem)] font-semibold tracking-tight text-white">
+          {title}
+        </h2>
+        <p className="max-w-xl text-center text-sm leading-relaxed text-gray-400">{description}</p>
+      </div>
+      {actions && <div className="flex flex-wrap items-center justify-center gap-2">{actions}</div>}
     </div>
   );
 }

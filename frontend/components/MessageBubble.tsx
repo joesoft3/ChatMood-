@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
 import { Brain, Check, Clapperboard, Copy, Download, RotateCcw, Search, Sparkles, Square, Swords, Trash2, Volume2, Wand2 } from "lucide-react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, resolveMediaUrl } from "@/lib/api";
 import ArenaPanel from "./ArenaPanel";
 import ThinkingPanel from "./ThinkingPanel";
 
@@ -135,10 +135,10 @@ function MediaBlock({
       {m.kind === "image" ? (
         <a href={m.url} target="_blank" rel="noreferrer" title="Open full-size">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={m.url} alt={m.prompt ?? "Generated image"} className="block w-full max-w-lg" />
+          <img src={resolveMediaUrl(m.url)} alt={m.prompt ?? "Generated image"} className="block w-full max-w-lg" />
         </a>
       ) : (
-        <video src={m.url} controls playsInline preload="metadata" className="block w-full max-w-lg bg-black" />
+        <video src={resolveMediaUrl(m.url)} controls playsInline preload="metadata" className="block w-full max-w-lg bg-black" />
       )}
       <div className="flex items-center gap-2 px-4 py-2.5 text-[11px] text-gray-500">
         <span className="truncate flex-1">

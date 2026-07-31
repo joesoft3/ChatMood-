@@ -4,6 +4,30 @@ import Link from "next/link";
 // 🎬 Public film share page — beautiful OG previews (video + hero poster),
 // no login wall. Server-rendered from the API's public film endpoint.
 
+
+function resolvePublicMediaUrl(u: string): string {
+  if (!u) return "";
+  if (u.startsWith("/api/")) {
+    try {
+      const apiOrigin = new URL(API).origin;
+      return `${apiOrigin}${u}`;
+    } catch {
+      return u;
+    }
+  }
+  if (u.includes("/api/v1/")) {
+    try {
+      const idx = u.indexOf("/api/v1/");
+      const path = u.slice(idx);
+      const apiOrigin = new URL(API).origin;
+      return `${apiOrigin}${path}`;
+    } catch {
+      return u;
+    }
+  }
+  return u;
+}
+
 const API = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
 
 interface ShareFilm {
@@ -46,10 +70,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       type: "video.other",
       title: film.title,
       description,
-      videos: film.url ? [{ url: film.url, type: "video/mp4" }] : undefined,
-      images: film.poster ? [{ url: film.poster, alt: film.title }] : undefined,
+      videos: film.url ? [{ url: resolvePublicMediaUrl(film.url), type: "video/mp4" }] : undefined,
+      images: film.poster ? [{ url: resolvePublicMediaUrl(film.poster), alt: film.title }] : undefined,
     },
-    twitter: { card: "summary_large_image", title: film.title, description, images: film.poster ? [film.poster] : undefined },
+    twitter: { card: "summary_large_image", title: film.title, description, images: film.poster ? [resolvePublicMediaUrl(film.poster)] : undefined },
   };
 }
 
@@ -81,8 +105,8 @@ export default async function FilmSharePage({ params }: { params: Promise<{ id: 
             <div className="rounded-3xl overflow-hidden border border-line bg-panel shadow-2xl shadow-black/40">
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
-                src={film.url}
-                poster={film.poster || undefined}
+                src={resolvePublicMediaUrl(film.url)}
+                poster={film.poster ? resolvePublicMediaUrl(film.poster) : undefined}
                 preload="metadata"
                 controls
                 playsInline

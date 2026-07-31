@@ -1,4 +1,4 @@
-name: mood-ai
+name: chatmood
 
 services:
   db:

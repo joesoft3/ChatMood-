@@ -199,7 +199,7 @@ def test_share_rejects_unfinished_or_foreign_films(env):
 
 
 def test_share_url_must_be_media_this_deployment_serves(env):
-    """No arbitrary hotlinks — the feed only carries media Mood made."""
+    """No arbitrary hotlinks — the feed only carries media ChatMood made."""
     async def _t():
         async with await _client() as c:
             tk = await _token(c, "hotlink@moodaiapp.com")

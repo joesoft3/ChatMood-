@@ -42,7 +42,7 @@ const SUPERPOWERS: Record<string, string[]> = {
   ],
   github: [
     "\"List my open repos and their issues\"",
-    "\"File a bug report on moodai for the login bug\" (asks first ✋)",
+    "\"File a bug report on ChatMood for the login bug\" (asks first ✋)",
     "\"Summarize recent commits across my projects\"",
   ],
 };

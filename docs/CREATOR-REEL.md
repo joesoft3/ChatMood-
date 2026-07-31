@@ -3,7 +3,7 @@
 A single public feed every signed-in creator can watch and post to. Two ways in:
 
 - **Upload** — a creator posts their own clip from the camera roll.
-- **Share** — a creator posts something Mood already generated (a storyboard
+- **Share** — a creator posts something ChatMood already generated (a storyboard
   film, or a video made in chat). Nothing is copied: the reel row points at the
   media that already exists.
 
@@ -208,7 +208,7 @@ evaporate overnight is not a feed. There is a regression test for exactly this.
 **Shares can't hotlink.** `POST /reels/share` accepts a `url` only if it points
 at media this deployment serves (`/api/v1/media/files/…` or
 `/api/v1/reels/files/…`). Arbitrary external URLs are rejected with `422`, so
-the feed can only ever carry media Mood produced or a creator uploaded.
+the feed can only ever carry media ChatMood produced or a creator uploaded.
 
 Serving is public like `/media/files` so `<video>` tags and mobile players work
 without auth headers; names are 128-bit random hex and the route hard-matches

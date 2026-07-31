@@ -10,7 +10,7 @@ steps. Ship list:
 | Android/iOS app | Drawer → **Delete account** (red) | password re-confirm → `DELETE /api/v1/auth/me` |
 | Web app | **Settings → Danger zone** | same endpoint, same password gate |
 | Public web link (Play data-safety) | **/account-deletion** | static page: steps, scope, backups, email fallback |
-| Support fallback | support@moodaiapp.com | verified owner, ≤ 72 h |
+| Support fallback | support@chatmood.app | verified owner, ≤ 72 h |
 
 ## What one call erases (service: `app/services/account.py`)
 
