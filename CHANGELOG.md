@@ -7,7 +7,7 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
-### 📱 Finish the chat on Flutter — edit, pin, follow-ups, media file_id
+### 📱 Finish the chat on Flutter — edit, pin, follow-ups, media file_id (PR #43)
 
 The last pass finished the *web* chat. The phone still treated a just-generated
 image as a dead preview, had no way to rewind a mistyped turn, and listed
