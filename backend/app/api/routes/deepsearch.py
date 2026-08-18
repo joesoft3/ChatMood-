@@ -79,7 +79,9 @@ async def deepsearch_stream(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty question")
     await enforce_rate_limit(f"deep:{user.id}", 8 * plan_rate_mult(user.plan))
 
-    conv, created = await get_or_create_conversation(db, user, req.conversation_id, "🔭 " + req.message)
+    conv, created = await get_or_create_conversation(
+        db, user, req.conversation_id, "🔭 " + req.message, temporary=bool(req.temporary)
+    )
     db.add(Message(conversation_id=conv.id, role="user", content=req.message, meta={"mode": "deepsearch", "depth": req.depth}))
     await db.commit()
 
@@ -168,10 +170,11 @@ async def deepsearch_stream(
                     c.updated_at = datetime.now(timezone.utc)
                 await s.commit()
             await record_usage(user.id, "deepsearch", settings.MODEL_CHAT, **estimate_tokens(req.message, answer))
-            bg.add_task(extract_and_store, user.id, req.message, answer, user.plan)
-            bg.add_task(update_conversation_summary, user.id, conv.id)
-            if created:
-                bg.add_task(generate_title, conv.id, req.message)
+            if not getattr(conv, "temporary", False):
+                bg.add_task(extract_and_store, user.id, req.message, answer, user.plan)
+                bg.add_task(update_conversation_summary, user.id, conv.id)
+                if created:
+                    bg.add_task(generate_title, conv.id, req.message)
             yield sse({"type": "done"})
         except Exception as e:
             log.exception("deepsearch failed")

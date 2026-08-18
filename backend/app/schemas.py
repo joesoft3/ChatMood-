@@ -15,6 +15,7 @@ class LoginRequest(BaseModel):
 
 class PreferencesUpdate(BaseModel):
     custom_instructions: str | None = Field(default=None, max_length=2000)
+    fun_mode: bool | None = None  # 😄 persist Grok-style Fun personality
 
 
 class AccountDeleteRequest(BaseModel):
@@ -69,6 +70,8 @@ class ChatRequest(BaseModel):
     rematch: bool = False             # ⚔️ rematch: drafters try to beat the previous arena winner
     mode: str | None = None           # 🎨🎬 v1.9.7: force "image" | "video" in-chat creation (None = auto-detect)
     edit_from: str | None = None      # ✏️ rewind: delete this user message + everything after, then resend
+    fun: bool = False                 # 😄 Fun mode for this turn (else user.fun_mode)
+    temporary: bool = False           # 👻 incognito: no history, no memory write
 
 
 class WorkspaceCreate(BaseModel):
@@ -156,6 +159,11 @@ class AdminFlagUpdate(BaseModel):
 class AdminPushTest(BaseModel):
     title: str = Field(default="🔔 ChatMood push test", max_length=80)
     body: str = Field(default="If you can read this, push is wired end-to-end. 🎉", max_length=240)
+
+
+class MemoryUpdate(BaseModel):
+    fact: str = Field(min_length=1, max_length=500)
+    category: str | None = Field(default=None, max_length=24)
 
 
 class ImageRequest(BaseModel):

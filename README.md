@@ -3,7 +3,7 @@
 ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
 **orchestrating existing frontier models and tools** instead of training anything from scratch.
 
-- 💬 Streaming AI chat (Grok models via the xAI API)
+- 💬 Streaming AI chat (Grok models via the xAI API) — **😄 Fun mode**, **👻 temporary chats**, **🖊 Canvas**, **∑ KaTeX math**
 - 🌐 Real-time web/X/news search grounding (xAI Live Search)
 - 🧠 Long-term memory (semantic, per-user, stored in Qdrant) **+ cross-chat recall — ChatMood remembers what your previous conversations were about**
 - 📄 PDF / Word / Excel / CSV / text analysis

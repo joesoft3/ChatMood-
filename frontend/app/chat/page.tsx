@@ -13,6 +13,7 @@ import Composer, { FileChip } from "@/components/Composer";
 import ArenaPanel, { ArenaEvt } from "@/components/ArenaPanel";
 import ThinkingPanel, { ThinkEvt } from "@/components/ThinkingPanel";
 import ModelPicker from "@/components/ModelPicker";
+import CanvasPanel from "@/components/CanvasPanel";
 
 /** 🧠 Only these models support extended reasoning (grok-4-fast has no thinking trace). */
 const THINKABLE = ["grok-4", "auto", "grok-code-fast-1"];
@@ -53,6 +54,10 @@ export default function ChatPage() {
   const pendingOpenRef = useRef(false);
   const [transportError, setTransportError] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [funMode, setFunMode] = useState(false);
+  const [temporary, setTemporary] = useState(false);
+  const [researchDepth, setResearchDepth] = useState<"deep" | "deeper">("deep");
+  const [canvas, setCanvas] = useState<{ title: string; content: string } | null>(null);
 
   // Agent mode, Deep search and Arena are mutually exclusive
   function setAgentMode(v: boolean) {
@@ -123,6 +128,11 @@ export default function ChatPage() {
       pendingOpenRef.current = true;
       setActiveId(openConv);
     }
+    apiFetch<{ fun_mode?: boolean }>("/auth/me")
+      .then((me) => {
+        if (me.fun_mode) setFunMode(true);
+      })
+      .catch(() => {});
     if (!id) return;
     setWsId(id);
     Promise.all([
@@ -314,13 +324,15 @@ export default function ChatPage() {
           search,
           plugins: pluginMode,
           regenerate,
-          depth: deepMode ? "deep" : undefined,
+          depth: deepMode ? researchDepth : undefined,
           model,
           think: thinkOn,
           arena: useArena,
           arena_extra: arenaExtra,
           rematch: forceRematch || undefined,
           edit_from: editFrom,
+          fun: funMode,
+          temporary,
         },
         (ev) => {
           if (ev.type === "meta") {
@@ -635,6 +647,17 @@ export default function ChatPage() {
         }}
         arenaExtra={arenaExtra}
         setArenaExtra={setArenaExtra}
+        funMode={funMode}
+        toggleFun={() => {
+          const next = !funMode;
+          setFunMode(next);
+          void apiFetch("/auth/preferences", {
+            method: "PATCH",
+            body: JSON.stringify({ fun_mode: next }),
+          }).catch(() => {});
+        }}
+        temporary={temporary}
+        toggleTemporary={() => setTemporary((v) => !v)}
         bare={bare}
       />
     );
@@ -661,6 +684,8 @@ export default function ChatPage() {
       onVoice={handleVoice}
       draft={draft}
       bare={bare}
+      researchDepth={researchDepth}
+      setResearchDepth={setResearchDepth}
     />
   );
 
@@ -968,6 +993,22 @@ export default function ChatPage() {
           {pickerEl(false)}
           {composerEl(false)}
         </>
+      )}
+      {canvas && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-30 flex max-w-full">
+          <div className="pointer-events-auto h-full w-[min(28rem,100vw)] shadow-[-24px_0_48px_rgb(0_0_0/0.35)]">
+            <CanvasPanel
+              open
+              title={canvas.title}
+              content={canvas.content}
+              onClose={() => setCanvas(null)}
+              onUse={(text) => {
+                setDraft({ text, nonce: Date.now() });
+                setCanvas(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </AppShell>
   );

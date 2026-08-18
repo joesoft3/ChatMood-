@@ -12,6 +12,7 @@ The chat screen (`mobile/lib/chat_screen.dart`) now matches the web finish pass:
 | 📌 Pin / delete | Drawer pin keeps a personal chat above recency; unpin restores order. Delete confirms, then `DELETE`s the conversation. | `PATCH /conversations/{id}` `{pinned}` · `DELETE /conversations/{id}` |
 | 💬 Follow-ups | After a text answer, up to three tap-to-send chips land above the composer. | SSE `suggestions` |
 | ⬇✏️🗑 Media | Live and restored generations carry `file_id`. Download shares via the stable `/files/{id}/download` route; Edit prefills the composer; Delete removes the library row and the card. | `GET/DELETE /files/{id}` |
+| 😄 Fun / 👻 Temporary | Drawer toggles. Fun sends `fun: true`; Temporary hides the chat from history and skips memory writes. | `POST /chat/stream` |
 
 ## Navigation
 

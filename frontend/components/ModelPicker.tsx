@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Swords } from "lucide-react";
+import { Brain, Ghost, Smile, Swords } from "lucide-react";
 
 export interface ModelOption {
   id: string;
@@ -30,6 +30,10 @@ interface Props {
   toggleArena: () => void;
   arenaExtra: string;
   setArenaExtra: (v: string) => void;
+  funMode?: boolean;
+  toggleFun?: () => void;
+  temporary?: boolean;
+  toggleTemporary?: () => void;
   /** 🏠 bare = transparent + centered, for the Grok-style empty home. */
   bare?: boolean;
 }
@@ -45,6 +49,10 @@ export default function ModelPicker({
   toggleArena,
   arenaExtra,
   setArenaExtra,
+  funMode = false,
+  toggleFun,
+  temporary = false,
+  toggleTemporary,
   bare = false,
 }: Props) {
   return (

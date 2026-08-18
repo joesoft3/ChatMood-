@@ -20,6 +20,8 @@ export interface ChatPayload {
   rematch?: boolean;    // ⚔️ rematch — drafters try to beat the previous winner
   mode?: string;        // 🎨🎬 force in-chat creation: "image" | "video" (undefined = auto-detect)
   edit_from?: string;   // ✏️ rewind from this user message id, then resend
+  fun?: boolean;        // 😄 Grok Fun personality for this turn
+  temporary?: boolean;  // 👻 incognito: hidden from history, no memory write
 }
 
 export interface ChatEvent {

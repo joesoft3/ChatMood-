@@ -105,7 +105,14 @@ SYSTEM_PROMPT = """You are ChatMood — a truthful, witty, maximally helpful AI 
 - You are excellent at coding: provide runnable code, explain briefly.
 - When web search results or citations are provided, cite sources inline like [1](url).
 - You have long-term memory: known user facts are provided; use them naturally, never recite the list.
+- For math, use KaTeX: inline $...$ and display $$...$$.
 Today's date: {date}"""
+
+FUN_MODE_PROMPT = """Fun mode is ON (Grok Fun). Be the wittiest, most irreverent version of ChatMood:
+- Crack jokes, use slang, roast ideas — never the user personally.
+- Stay truthful. Fun is extra flavor, not a license to invent facts or skip the answer.
+- Keep the answer useful first; the punchline is the garnish.
+- Lean into the Grok voice: curious, a little unhinged, never cruel."""
 
 
 def sse(obj: dict) -> str:
@@ -119,6 +126,7 @@ async def get_or_create_conversation(
     seed_text: str,
     workspace_id: str | None = None,
     project_id: str | None = None,
+    temporary: bool = False,
 ) -> tuple[Conversation, bool]:
     if conversation_id:
         conv = await db.get(Conversation, conversation_id)
@@ -146,6 +154,7 @@ async def get_or_create_conversation(
         title=(seed_text[:60] or "New chat"),
         workspace_id=workspace_id,
         project_id=project_id,
+        temporary=bool(temporary),
     )
     db.add(conv)
     await db.flush()
@@ -201,9 +210,12 @@ async def build_messages(
     use_search: bool,
     created: bool = False,
     project_id: str | None = None,
+    fun: bool = False,
 ) -> tuple[list[dict], str, bool]:
     """Returns (messages, model, enable_live_search). Reused by the voice pipeline."""
     persona = SYSTEM_PROMPT.format(date=date.today())
+    if fun or getattr(user, "fun_mode", False):
+        persona += "\n\n" + FUN_MODE_PROMPT
     if user.custom_instructions:
         persona += (
             "\n\nCustom instructions from the user (follow them unless they conflict "
@@ -421,7 +433,13 @@ async def chat_stream(
         req.files = []
 
     conv, created = await get_or_create_conversation(
-        db, user, req.conversation_id, req.message, req.workspace_id, req.project_id
+        db,
+        user,
+        req.conversation_id,
+        req.message,
+        req.workspace_id,
+        req.project_id,
+        temporary=bool(req.temporary),
     )
     user_row = Message(
         conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files}
@@ -485,6 +503,7 @@ async def chat_stream(
         db, user, conv.id, req.message, req.files, req.search, created,
         project_id=conv.project_id,  # the CONVERSATION's project wins — a filed chat
         # keeps its brief on every turn, not only the one that created it
+        fun=bool(req.fun) or bool(getattr(user, "fun_mode", False)),
     )
     # 🚀 Premium picker: honor the requested model (vision threads stay on the vision model).
     if model != settings.MODEL_VISION and req.model in MODEL_CHOICES:
@@ -572,9 +591,11 @@ async def chat_stream(
                 else estimate_tokens(req.message + json.dumps(messages[0])[:3000], reply)
             )
             await record_usage(user.id, "chat", model, **tok)
-            bg.add_task(extract_and_store, user.id, req.message, reply, user.plan)
-            bg.add_task(update_conversation_summary, user.id, conv.id)
-            if created:
+            # 👻 Temporary chats never write memory or past-chat recall.
+            if not getattr(conv, "temporary", False):
+                bg.add_task(extract_and_store, user.id, req.message, reply, user.plan)
+                bg.add_task(update_conversation_summary, user.id, conv.id)
+            if created and not getattr(conv, "temporary", False):
                 bg.add_task(generate_title, conv.id, req.message)
             # Follow-ups AFTER the answer is persisted so a slow rewrite never
             # delays the last token. Fail-open: missing chips beat a hung turn.

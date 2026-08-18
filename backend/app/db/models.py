@@ -19,6 +19,7 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(255))
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fun_mode: Mapped[bool] = mapped_column(default=False)  # 😄 Grok-style Fun personality
     plan: Mapped[str] = mapped_column(String(20), default="free")
     is_admin: Mapped[bool] = mapped_column(default=False)  # app-owner panel access (ADMIN_EMAILS env also grants)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -73,6 +74,7 @@ class Conversation(Base):
     # is created by a later migration, and a plain column keeps create_all order-free.
     title: Mapped[str] = mapped_column(String(200), default="New chat")
     pinned: Mapped[bool] = mapped_column(default=False)  # 📌 stays at the top of the sidebar
+    temporary: Mapped[bool] = mapped_column(default=False)  # 👻 Grok-style: hidden from history, no memory write
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)  # rolling cross-chat recall summary
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

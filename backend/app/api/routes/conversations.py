@@ -19,6 +19,7 @@ def conv_out(c: Conversation) -> dict:
         "title": c.title,
         "project_id": c.project_id,
         "pinned": bool(getattr(c, "pinned", False)),
+        "temporary": bool(getattr(c, "temporary", False)),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -40,8 +41,9 @@ async def list_conversations(db: AsyncSession = Depends(get_db), user: User = De
     rows = (
         await db.execute(
             select(Conversation)
-            .where(Conversation.user_id == user.id)
+            .where(Conversation.user_id == user.id, Conversation.temporary.is_(False))
             # Pinned chats stay on top; recency still wins inside each group.
+            # 👻 Temporary (incognito) chats stay off the history list.
             .order_by(Conversation.pinned.desc(), Conversation.updated_at.desc())
         )
     ).scalars().all()

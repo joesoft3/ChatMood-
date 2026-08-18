@@ -297,7 +297,7 @@ export default function AppShell({
 
         {/* Page content — wrapped in an error boundary so one broken page
             never takes down the entire shell (sidebar, tab bar, header survive). */}
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col relative">
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
 

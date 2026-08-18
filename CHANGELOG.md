@@ -7,6 +7,29 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 😄 Grok-parity pack — Fun, temporary chats, editable memory, DeeperSearch, Canvas, math
+
+ChatMood already had the Grok core. This pack closes the remaining *user-facing*
+holes so a grok.com user can land here and not miss the daily controls.
+
+- **😄 Fun mode.** One tap on the model row (also Settings + Flutter drawer).
+  Persists as `users.fun_mode`; a turn can also send `fun: true`. The system
+  prompt gets the Grok Fun voice — jokes and slang, facts stay true.
+- **👻 Temporary chat.** Hidden from the sidebar, never written to memory or
+  past-chat recall. `conversations.temporary`. You can still read the thread
+  this session via its id.
+- **✏️ Edit a memory.** Settings → a fact → Edit. `PATCH /memory/{id}`
+  re-embeds and swaps the deterministic point id. Past-chat digests stay
+  read-only.
+- **🔭 DeeperSearch.** Research mode now has Deep (2×4) and Deeper (3×5)
+  pills — the backend `depth` switch was already there; the UI never exposed it.
+- **🖊 Canvas.** Long answers get an Open in Canvas control: a side workspace
+  to edit, copy, download, or send back into the composer.
+- **∑ KaTeX.** `$inline$` and `$$display$$` render in chat (remark-math +
+  rehype-katex).
+
+Migration `0029_grok_parity` is existence-guarded. Tests: `test_grok_parity.py`.
+
 ### 📱 Finish the chat on Flutter — edit, pin, follow-ups, media file_id (PR #43)
 
 The last pass finished the *web* chat. The phone still treated a just-generated

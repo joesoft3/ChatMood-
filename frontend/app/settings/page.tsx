@@ -15,6 +15,7 @@ interface Me {
   display_name: string | null;
   plan: string;
   custom_instructions?: string | null;
+  fun_mode?: boolean;
 }
 
 interface Mem {
@@ -295,6 +296,9 @@ export default function SettingsPage() {
   const [billingMsg, setBillingMsg] = useState("");
   const [instructions, setInstructions] = useState("");
   const [instrSaved, setInstrSaved] = useState(false);
+  const [funMode, setFunMode] = useState(false);
+  const [editingMem, setEditingMem] = useState<string | null>(null);
+  const [editFact, setEditFact] = useState("");
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [plugins, setPlugins] = useState<PluginStatus[] | null>(null);
   const [pluginMsg, setPluginMsg] = useState("");
@@ -406,7 +410,10 @@ export default function SettingsPage() {
 
     if (meRes.status === "fulfilled") {
       setMe(meRes.value);
-      if (options?.hydrateInstructions) setInstructions(meRes.value.custom_instructions ?? "");
+      if (options?.hydrateInstructions) {
+        setInstructions(meRes.value.custom_instructions ?? "");
+        setFunMode(Boolean(meRes.value.fun_mode));
+      }
     }
     if (billingRes.status === "fulfilled") setBilling({ status: billingRes.value.subscription ?? "none", period: billingRes.value.current_period_end });
     else setBilling(null);
@@ -876,6 +883,21 @@ export default function SettingsPage() {
   async function deleteMem(id: string) {
     setMems((m) => (m ? m.filter((x) => x.id !== id) : m));
     await apiFetch(`/memory/${id}`, { method: "DELETE" }).catch(loadMemories);
+  }
+
+  async function saveMem(id: string) {
+    const fact = editFact.trim();
+    if (!fact) return;
+    try {
+      const row = await apiFetch<Mem>(`/memory/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ fact }),
+      });
+      setMems((m) => (m ? m.map((x) => (x.id === id ? { ...x, ...row } : x)) : m));
+      setEditingMem(null);
+    } catch {
+      await loadMemories();
+    }
   }
 
   async function clearAll() {
@@ -1940,6 +1962,22 @@ export default function SettingsPage() {
                 Tell ChatMood how to behave in <b>every</b> conversation — tone, format, language, expertise level
                 (e.g. “Answer like a senior engineer; keep answers concise; always show code in Python”).
               </p>
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={funMode}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setFunMode(next);
+                    void apiFetch("/auth/preferences", {
+                      method: "PATCH",
+                      body: JSON.stringify({ fun_mode: next }),
+                    }).catch(() => {});
+                  }}
+                  className="accent-[#7c9bff]"
+                />
+                😄 Fun mode — wittier, more Grok. Facts stay true.
+              </label>
               <textarea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
@@ -2089,7 +2127,7 @@ client.chat.completions.create(
             >
               <p className="text-xs text-gray-500">
                 ChatMood remembers durable facts about you and what your past conversations were about — that&apos;s how
-                it picks up where you left off in new chats. Delete anything you don&apos;t want ChatMood to know.
+                it picks up where you left off in new chats. Edit a fact to correct it, or delete anything you don&apos;t want ChatMood to know.
               </p>
               <div className="flex gap-2">
                 <button
@@ -2120,7 +2158,34 @@ client.chat.completions.create(
                             <span className="text-[10px] uppercase tracking-wide text-gray-500 border border-line rounded-full px-2 py-0.5 shrink-0 mt-0.5">
                               {m.category ?? "fact"}
                             </span>
-                            <span className="flex-1 text-sm text-gray-300">{m.fact}</span>
+                            {editingMem === m.id ? (
+                              <div className="flex-1 flex items-center gap-2 min-w-0">
+                                <input
+                                  value={editFact}
+                                  onChange={(e) => setEditFact(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") void saveMem(m.id);
+                                    if (e.key === "Escape") setEditingMem(null);
+                                  }}
+                                  className="flex-1 rounded-lg border border-accent/40 bg-base px-2 py-1 text-sm outline-none"
+                                />
+                                <button type="button" onClick={() => void saveMem(m.id)} className="text-[11px] text-accent shrink-0">Save</button>
+                              </div>
+                            ) : (
+                              <span className="flex-1 text-sm text-gray-300">{m.fact}</span>
+                            )}
+                            {editingMem !== m.id && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMem(m.id);
+                                  setEditFact(m.fact);
+                                }}
+                                className="text-gray-600 hover:text-white transition shrink-0 text-[11px]"
+                              >
+                                Edit
+                              </button>
+                            )}
                             <button onClick={() => deleteMem(m.id)} className="text-gray-600 hover:text-red-400 transition shrink-0" aria-label="Delete memory">
                               <X size={14} />
                             </button>

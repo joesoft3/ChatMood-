@@ -96,6 +96,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _agentMode = false;
   bool _arenaMode = false;
   bool _thinkOn = false;
+  bool _funMode = false;
+  bool _temporary = false;
   String _model = 'auto';
   bool _recording = false;
   // 🏠 idle auto-home (web parity): 5 min without activity → back to the clean
@@ -512,6 +514,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       'workspace_id': _workspace?.id, // personal chats send null — server ignores it
       'model': _model,
       'think': _thinkOn,
+      'fun': _funMode,
+      'temporary': _temporary,
       'arena': useArena,
       if (rematch) 'rematch': true,
       if (editing) 'edit_from': editFrom,
@@ -899,8 +903,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           }
                           setSt(() { busy = true; err = null; });
                           try {
-                            await Api.deleteMyAccount(pw.text);
-                            if (ctx.mounted) Navigator.pop(ctx, true);
+                                      if (ctx.mounted) Navigator.pop(ctx, true);
                           } catch (e) {
                             setSt(() { busy = false; err = '$e'; });
                           }
@@ -1619,6 +1622,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         style: TextStyle(fontSize: 10, color: Colors.grey)),
                     value: _search,
                     onChanged: (v) => setState(() => _search = v),
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.sentiment_satisfied_alt, size: 18),
+                    title: const Text('😄 Fun mode', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('wittier Grok voice — facts stay true',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _funMode,
+                    onChanged: (v) => setState(() => _funMode = v),
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.visibility_off_outlined, size: 18),
+                    title: const Text('👻 Temporary chat', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('hidden from history, never written to memory',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _temporary,
+                    onChanged: (v) => setState(() => _temporary = v),
                   ),
                   ListTile(
                     dense: true,

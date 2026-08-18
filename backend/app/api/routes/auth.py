@@ -22,6 +22,7 @@ def user_out(u: User) -> dict:
         "display_name": u.display_name,
         "plan": u.plan,
         "custom_instructions": u.custom_instructions,
+        "fun_mode": bool(getattr(u, "fun_mode", False)),
         "is_admin": is_effective_admin(u),
     }
 
@@ -162,7 +163,11 @@ async def update_preferences(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Personalization: persistent custom instructions injected into every chat."""
-    user.custom_instructions = (req.custom_instructions or "").strip() or None
+    """Personalization: persistent custom instructions + Fun-mode preference."""
+    if req.custom_instructions is not None:
+        user.custom_instructions = req.custom_instructions.strip() or None
+    if req.fun_mode is not None:
+        user.fun_mode = bool(req.fun_mode)
     await db.commit()
+    await db.refresh(user)
     return user_out(user)

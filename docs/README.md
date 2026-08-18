@@ -56,6 +56,7 @@ deploy path that matches your host.
 | [PAYMENTS.md](PAYMENTS.md) | 💳 Manual mobile money, admin review, and adding Paystack/Flutterwave later. |
 | [BRAND-ICONS.md](BRAND-ICONS.md) | 🎨 One lockup → every app/PWA/Android icon, with the maskable safe zone. |
 | [WATERMARKING.md](WATERMARKING.md) | 🏷 Free-tier render badging — entitlement rules, where it applies, how to brand it. |
+| [GROK-PARITY.md](GROK-PARITY.md) | 😄 Fun mode, 👻 temporary chats, editable memory, DeeperSearch, Canvas, KaTeX. |
 | [PLUGIN-OAUTH.md](PLUGIN-OAUTH.md) | 🔑 Gmail, Google Calendar and GitHub OAuth for real. |
 | [ADMIN-ANALYTICS.md](ADMIN-ANALYTICS.md) | 📊 Admin analytics & engagement surfaces. |
 
