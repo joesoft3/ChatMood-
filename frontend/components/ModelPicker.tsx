@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Swords } from "lucide-react";
+import { BookOpen, Brain, Ghost, Smile, Swords, X } from "lucide-react";
 
 export interface ModelOption {
   id: string;
@@ -30,6 +30,14 @@ interface Props {
   toggleArena: () => void;
   arenaExtra: string;
   setArenaExtra: (v: string) => void;
+  funMode?: boolean;
+  toggleFun?: () => void;
+  temporary?: boolean;
+  toggleTemporary?: () => void;
+  studyMode?: boolean;
+  toggleStudy?: () => void;
+  gptLabel?: string | null;
+  onClearGpt?: () => void;
   /** 🏠 bare = transparent + centered, for the Grok-style empty home. */
   bare?: boolean;
 }
@@ -45,6 +53,14 @@ export default function ModelPicker({
   toggleArena,
   arenaExtra,
   setArenaExtra,
+  funMode = false,
+  toggleFun,
+  temporary = false,
+  toggleTemporary,
+  studyMode = false,
+  toggleStudy,
+  gptLabel = null,
+  onClearGpt,
   bare = false,
 }: Props) {
   return (
@@ -93,6 +109,55 @@ export default function ModelPicker({
         >
           <Swords size={12} /> Arena
         </button>
+        {toggleFun && (
+          <button
+            onClick={toggleFun}
+            title="😄 Fun mode — wittier Grok voice. Facts stay true."
+            className={`rounded-full border px-3 py-1.5 text-[10px] sm:text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${
+              funMode
+                ? "bg-amber-400/15 border-amber-400/35 text-amber-200"
+                : "border-white/8 bg-[#141415] text-gray-500 hover:text-white"
+            }`}
+          >
+            <Smile size={12} /> Fun
+          </button>
+        )}
+        {toggleStudy && (
+          <button
+            onClick={toggleStudy}
+            title="📚 Study mode — Socratic tutor. Hints first, then a quiz."
+            className={`rounded-full border px-3 py-1.5 text-[10px] sm:text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${
+              studyMode
+                ? "bg-sky-400/15 border-sky-400/35 text-sky-200"
+                : "border-white/8 bg-[#141415] text-gray-500 hover:text-white"
+            }`}
+          >
+            <BookOpen size={12} /> Study
+          </button>
+        )}
+        {toggleTemporary && (
+          <button
+            onClick={toggleTemporary}
+            title="👻 Temporary chat — hidden from history, never written to memory"
+            className={`rounded-full border px-3 py-1.5 text-[10px] sm:text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${
+              temporary
+                ? "bg-white/10 border-white/25 text-white"
+                : "border-white/8 bg-[#141415] text-gray-500 hover:text-white"
+            }`}
+          >
+            <Ghost size={12} /> Temporary
+          </button>
+        )}
+        {gptLabel && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-3 py-1.5 text-[10px] sm:text-[11px] font-medium text-accent shrink-0">
+            {gptLabel}
+            {onClearGpt && (
+              <button type="button" onClick={onClearGpt} aria-label="Stop using this GPT" className="hover:text-white">
+                <X size={11} />
+              </button>
+            )}
+          </span>
+        )}
         {arenaMode && (
           <select
             value={arenaExtra}

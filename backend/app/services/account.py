@@ -112,6 +112,8 @@ async def delete_user_data(db: AsyncSession, user: M.User) -> dict[str, Any]:
     await db.execute(delete(M.UsageEvent).where(M.UsageEvent.user_id == uid))
     await db.execute(delete(M.Subscription).where(M.Subscription.user_id == uid))
     await db.execute(delete(M.Domain).where(M.Domain.user_id == uid))
+    if hasattr(M, "CustomGpt"):
+        await db.execute(delete(M.CustomGpt).where(M.CustomGpt.user_id == uid))
 
     # teams: dissolve owned workspaces entirely, simply leave the others
     for ws in owned_ws:

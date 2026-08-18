@@ -8,6 +8,8 @@ export interface ConvItem {
   id: string;
   title: string;
   pinned?: boolean;
+  archived?: boolean;
+  gpt_id?: string | null;
   updated_at?: string | null;
 }
 
@@ -23,6 +25,7 @@ interface CtxType {
   refresh: () => Promise<void>;
   remove: (id: string) => Promise<void>;
   pin: (id: string, pinned: boolean) => Promise<void>;
+  archive: (id: string, archived: boolean) => Promise<void>;
 }
 
 const Ctx = createContext<CtxType | null>(null);
@@ -106,6 +109,24 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     }
   }, [refresh]);
 
+  const archive = useCallback(async (id: string, archived: boolean) => {
+    setConvs((c) => c.filter((x) => x.id !== id));
+    setActiveIdState((curr) => {
+      if (curr !== id) return curr;
+      try {
+        localStorage.removeItem(LAST_CONV_KEY);
+      } catch {
+        /* storage unavailable */
+      }
+      return null;
+    });
+    try {
+      await apiFetch(`/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ archived }) });
+    } catch {
+      void refresh();
+    }
+  }, [refresh]);
+
   const remove = useCallback(async (id: string) => {
     setConvs((c) => c.filter((x) => x.id !== id));
     setActiveIdState((curr) => {
@@ -126,6 +147,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   }, []);
 
   return (
-    <Ctx.Provider value={{ convs, activeId, setActiveId, refresh, remove, pin }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ convs, activeId, setActiveId, refresh, remove, pin, archive }}>{children}</Ctx.Provider>
   );
 }

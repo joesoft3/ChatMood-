@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Image as ImageIcon, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
+import { Bot, CopyPlus, Download, FileText, Image as ImageIcon, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -13,6 +13,7 @@ import Composer, { FileChip } from "@/components/Composer";
 import ArenaPanel, { ArenaEvt } from "@/components/ArenaPanel";
 import ThinkingPanel, { ThinkEvt } from "@/components/ThinkingPanel";
 import ModelPicker from "@/components/ModelPicker";
+import CanvasPanel from "@/components/CanvasPanel";
 
 /** 🧠 Only these models support extended reasoning (grok-4-fast has no thinking trace). */
 const THINKABLE = ["grok-4", "auto", "grok-code-fast-1"];
@@ -53,6 +54,14 @@ export default function ChatPage() {
   const pendingOpenRef = useRef(false);
   const [transportError, setTransportError] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [funMode, setFunMode] = useState(false);
+  const [studyMode, setStudyMode] = useState(false);
+  const [temporary, setTemporary] = useState(false);
+  const [researchDepth, setResearchDepth] = useState<"deep" | "deeper">("deep");
+  const [canvas, setCanvas] = useState<{ title: string; content: string } | null>(null);
+  const [gptId, setGptId] = useState<string | null>(null);
+  const [gptLabel, setGptLabel] = useState("");
+  const [gptStarters, setGptStarters] = useState<string[]>([]);
 
   // Agent mode, Deep search and Arena are mutually exclusive
   function setAgentMode(v: boolean) {
@@ -122,6 +131,25 @@ export default function ChatPage() {
     if (openConv) {
       pendingOpenRef.current = true;
       setActiveId(openConv);
+    }
+    apiFetch<{ fun_mode?: boolean; study_mode?: boolean }>("/auth/me")
+      .then((me) => {
+        if (me.fun_mode) setFunMode(true);
+        if (me.study_mode) setStudyMode(true);
+      })
+      .catch(() => {});
+    const gpt = q.get("gpt");
+    if (gpt) {
+      setGptId(gpt);
+      apiFetch<{ name?: string; emoji?: string; starters?: string[] }>(`/gpts/${gpt}`)
+        .then((g) => {
+          setGptLabel(`${g.emoji ?? "🤖"} ${g.name ?? "GPT"}`);
+          setGptStarters((g.starters ?? []).filter(Boolean).slice(0, 4));
+        })
+        .catch(() => {
+          setGptId(null);
+          setGptLabel("");
+        });
     }
     if (!id) return;
     setWsId(id);
@@ -233,6 +261,7 @@ export default function ChatPage() {
                     }
                   : undefined,
               media: Array.isArray(meta.media) && meta.media.length > 0 ? meta.media : undefined,
+              feedback: meta.feedback?.rating === "up" || meta.feedback?.rating === "down" ? meta.feedback.rating : null,
             };
           })
         );
@@ -266,26 +295,28 @@ export default function ChatPage() {
     });
   }
 
-  async function send(text: string, search: boolean, regenerate = false, forceRematch = false, editFrom?: string) {
+  async function send(text: string, search: boolean, regenerate = false, forceRematch = false, editFrom?: string, continueGen = false) {
     // Keep every prompt on the streaming path. The API detects image/video
     // requests (including flyers, logos, banners and stickers) and emits its
     // real media lifecycle, then persists the answer and the asset. A former
     // client-only shortcut faked a successful generation and immediately
     // cleared the thread; it also stopped this page from compiling, which
     // blocked the production chat-home deployment entirely.
-    if ((!text.trim() && files.length === 0 && !regenerate) || busy) return;
+    if ((!text.trim() && files.length === 0 && !regenerate && !continueGen) || busy) return;
     setSuggestions([]);
     setBusy(true);
     busyRef.current = true;
-    const useArena = (arenaMode || forceRematch) && !regenerate;
+    const useArena = (arenaMode || forceRematch) && !regenerate && !continueGen;
     const useThink = thinkOn && !arenaMode && !agentMode && THINKABLE.includes(model);
     const specialMode = agentMode || deepMode || useArena;
-    const fileIds = specialMode || regenerate ? [] : files.map((f) => f.id);
-    setMsgs((m) => [
-      ...m,
-      { role: "user", content: text, author: wsId ? "you" : undefined },
-      { role: "assistant", content: "" },
-    ]);
+    const fileIds = specialMode || regenerate || continueGen ? [] : files.map((f) => f.id);
+    if (!continueGen) {
+      setMsgs((m) => [
+        ...m,
+        { role: "user", content: text, author: wsId ? "you" : undefined },
+        { role: "assistant", content: "" },
+      ]);
+    }
     setFiles([]);
     const endpoint = agentMode
       ? "/agents/stream"
@@ -314,13 +345,18 @@ export default function ChatPage() {
           search,
           plugins: pluginMode,
           regenerate,
-          depth: deepMode ? "deep" : undefined,
+          depth: deepMode ? researchDepth : undefined,
           model,
           think: thinkOn,
           arena: useArena,
           arena_extra: arenaExtra,
           rematch: forceRematch || undefined,
           edit_from: editFrom,
+          fun: funMode,
+          temporary,
+          study: studyMode,
+          gpt_id: gptId || undefined,
+          continue_gen: continueGen || undefined,
         },
         (ev) => {
           if (ev.type === "meta") {
@@ -344,6 +380,18 @@ export default function ChatPage() {
           }
           if (ev.type === "suggestions" && ev.suggestions?.length) {
             setSuggestions(ev.suggestions.filter(Boolean).slice(0, 3));
+          }
+          if (ev.type === "done" && ev.assistant_message_id) {
+            setMsgs((m) => {
+              const a = [...m];
+              for (let i = a.length - 1; i >= 0; i--) {
+                if (a[i].role === "assistant") {
+                  a[i] = { ...a[i], id: ev.assistant_message_id };
+                  break;
+                }
+              }
+              return a;
+            });
           }
           // multi-agent progress
           if (ev.type === "plan" && ev.steps)
@@ -515,6 +563,38 @@ export default function ChatPage() {
     }
   }
 
+  async function continueLast() {
+    if (busy || !activeId) return;
+    const last = msgs[msgs.length - 1];
+    if (!last || last.role !== "assistant" || !last.content.trim()) return;
+    await send("", true, false, false, undefined, true);
+  }
+
+  async function rateMessage(index: number, rating: "up" | "down" | null) {
+    const target = msgs[index];
+    if (!target?.id || !activeId) return;
+    setMsgs((m) => m.map((row, i) => (i === index ? { ...row, feedback: rating } : row)));
+    try {
+      await apiFetch(`/conversations/${activeId}/messages/${target.id}/feedback`, {
+        method: "POST",
+        body: JSON.stringify({ rating }),
+      });
+    } catch {
+      /* fail-open */
+    }
+  }
+
+  async function duplicateChat() {
+    if (!activeId) return;
+    try {
+      const copy = await apiFetch<{ id: string }>(`/conversations/${activeId}/duplicate`, { method: "POST" });
+      await refresh();
+      setActiveId(copy.id);
+    } catch (e: any) {
+      setTransportError(e?.message ?? "Couldn't duplicate this chat");
+    }
+  }
+
   /** ⚔️ Rematch: rerun the arena — drafters are shown this winner and asked to beat it. */
   async function rematch() {
     if (busy) return;
@@ -635,6 +715,32 @@ export default function ChatPage() {
         }}
         arenaExtra={arenaExtra}
         setArenaExtra={setArenaExtra}
+        funMode={funMode}
+        toggleFun={() => {
+          const next = !funMode;
+          setFunMode(next);
+          void apiFetch("/auth/preferences", {
+            method: "PATCH",
+            body: JSON.stringify({ fun_mode: next }),
+          }).catch(() => {});
+        }}
+        temporary={temporary}
+        toggleTemporary={() => setTemporary((v) => !v)}
+        studyMode={studyMode}
+        toggleStudy={() => {
+          const next = !studyMode;
+          setStudyMode(next);
+          void apiFetch("/auth/preferences", {
+            method: "PATCH",
+            body: JSON.stringify({ study_mode: next }),
+          }).catch(() => {});
+        }}
+        gptLabel={gptLabel || null}
+        onClearGpt={() => {
+          setGptId(null);
+          setGptLabel("");
+          setGptStarters([]);
+        }}
         bare={bare}
       />
     );
@@ -661,6 +767,8 @@ export default function ChatPage() {
       onVoice={handleVoice}
       draft={draft}
       bare={bare}
+      researchDepth={researchDepth}
+      setResearchDepth={setResearchDepth}
     />
   );
 
@@ -708,6 +816,12 @@ export default function ChatPage() {
       prompt: "Summarize the following: ",
       onClick: () => setDraft({ text: "Summarize the following: ", nonce: Date.now() }),
     },
+    {
+      icon: Bot,
+      label: "Explore GPTs",
+      prompt: "Open the GPT store",
+      onClick: () => router.push("/gpts"),
+    },
   ] as const;
 
   const chatTabs = (
@@ -754,6 +868,11 @@ export default function ChatPage() {
               <button onClick={exportChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition">
                 <Download size={13} /> <span className="hidden sm:inline">Export</span>
               </button>
+              {activeId && (
+                <button onClick={() => void duplicateChat()} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition" title="Duplicate this chat">
+                  <CopyPlus size={13} /> <span className="hidden sm:inline">Duplicate</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -781,6 +900,25 @@ export default function ChatPage() {
       )}
       {/* 🗂 Project mode — the standing brief is applied server-side; say so plainly
           so the user knows why answers differ from a loose chat. */}
+      {gptId && (
+        <div className="shrink-0 border-b border-line bg-accent/5 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-[11px]">
+          <span className="truncate text-gray-300">{gptLabel || "Custom GPT"} is answering this chat</span>
+          <button type="button" onClick={() => router.push("/gpts")} className="text-accent hover:underline">
+            browse GPTs
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setGptId(null);
+              setGptLabel("");
+              setGptStarters([]);
+            }}
+            className="ml-auto shrink-0 text-gray-500 hover:text-white"
+          >
+            dismiss
+          </button>
+        </div>
+      )}
       {projectId && (
         <div className="shrink-0 border-b border-line bg-accent/5 px-3 sm:px-4 py-1.5 flex items-center gap-2 text-[11px]">
           <span className="truncate text-gray-300">
@@ -897,6 +1035,16 @@ export default function ChatPage() {
                 {/* nav, not a bare div: this is a set of controls, and the label
                     was previously on a plain <div> where it announced nothing. */}
                 <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="Conversation starters">
+                  {gptStarters.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setDraft({ text: s, nonce: Date.now() })}
+                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-4 py-2.5 text-xs text-accent transition hover:border-accent/45 hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      {s}
+                    </button>
+                  ))}
                   {homeActions.map(({ icon: Icon, label, onClick, prompt }) => (
                     <button
                       key={label}
@@ -939,6 +1087,17 @@ export default function ChatPage() {
                     ? (text) => void editMessage(i, text)
                     : undefined
                 }
+                onOpenCanvas={(title, content) => setCanvas({ title, content })}
+                onFeedback={
+                  !busy && m.role === "assistant" && m.id && activeId
+                    ? (rating) => void rateMessage(i, rating)
+                    : undefined
+                }
+                onContinue={
+                  !busy && i === msgs.length - 1 && m.role === "assistant" && activeId
+                    ? () => void continueLast()
+                    : undefined
+                }
               />
             </div>
           ))}
@@ -968,6 +1127,22 @@ export default function ChatPage() {
           {pickerEl(false)}
           {composerEl(false)}
         </>
+      )}
+      {canvas && (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-30 flex max-w-full">
+          <div className="pointer-events-auto h-full w-[min(28rem,100vw)] shadow-[-24px_0_48px_rgb(0_0_0/0.35)]">
+            <CanvasPanel
+              open
+              title={canvas.title}
+              content={canvas.content}
+              onClose={() => setCanvas(null)}
+              onUse={(text) => {
+                setDraft({ text, nonce: Date.now() });
+                setCanvas(null);
+              }}
+            />
+          </div>
+        </div>
       )}
     </AppShell>
   );

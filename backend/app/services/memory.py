@@ -341,5 +341,40 @@ async def delete_memory(user_id: str, point_id: str) -> bool:
     return True
 
 
+async def update_memory(user_id: str, point_id: str, fact: str, category: str | None = None) -> dict | None:
+    """Correct a stored fact (Grok: select text in the memory summary and edit).
+
+    Point ids are uuid5(user + fact), so a rewrite mints a new id and drops the
+    old row — the Settings UI swaps the id it holds.
+    """
+    fact = (fact or "").strip()
+    if not fact:
+        return None
+    found = await qdrant().retrieve(settings.MEMORY_COLLECTION, [point_id], with_payload=True)
+    if not found or (found[0].payload or {}).get("user_id") != user_id:
+        return None
+    old = found[0].payload or {}
+    if old.get("kind") == "chat":
+        return None  # past-chat digests are not user-editable prose
+    cat = (category or old.get("category") or "other")[:24]
+    vec = (await embed([fact]))[0]
+    new_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{user_id}:{fact.lower()}"))
+    payload = {
+        "user_id": user_id,
+        "kind": "fact",
+        "fact": fact,
+        "category": cat,
+        "created_at": old.get("created_at") or datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await qdrant().upsert(
+        settings.MEMORY_COLLECTION,
+        [PointStruct(id=new_id, vector=vec, payload=payload)],
+    )
+    if new_id != point_id:
+        await qdrant().delete(settings.MEMORY_COLLECTION, points_selector=PointIdsList(points=[point_id]))
+    return {"id": new_id, **payload}
+
+
 async def clear_memories(user_id: str) -> None:
     await qdrant().delete(settings.MEMORY_COLLECTION, points_selector=FilterSelector(filter=_user_filter(user_id)))

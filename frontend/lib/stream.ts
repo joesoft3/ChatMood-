@@ -20,6 +20,11 @@ export interface ChatPayload {
   rematch?: boolean;    // ⚔️ rematch — drafters try to beat the previous winner
   mode?: string;        // 🎨🎬 force in-chat creation: "image" | "video" (undefined = auto-detect)
   edit_from?: string;   // ✏️ rewind from this user message id, then resend
+  fun?: boolean;        // 😄 Grok Fun personality for this turn
+  temporary?: boolean;  // 👻 incognito: hidden from history, no memory write
+  study?: boolean;      // 📚 ChatGPT Study tutor for this turn
+  gpt_id?: string;      // 🤖 custom / catalog GPT
+  continue_gen?: boolean; // ▶️ continue the last assistant message
 }
 
 export interface ChatEvent {
@@ -79,6 +84,7 @@ export interface ChatEvent {
   stage?: string;            // media_progress: scenes | compositing
   done?: number;             // media_progress progress counter
   user_message_id?: string;  // meta: persisted id of the user turn we just wrote
+  assistant_message_id?: string; // done: persisted id of the assistant turn
   suggestions?: string[];    // tap-to-send follow-ups after the answer
 }
 

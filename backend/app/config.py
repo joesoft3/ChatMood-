@@ -318,6 +318,7 @@ class Settings(BaseSettings):
     PROJECTS_ENABLED: bool = True
     PROJECT_MAX_FILES: int = 40        # pinned documents per project
     PROJECT_MAX_PER_USER: int = 100
+    GPT_MAX_PER_USER: int = 40         # user-built Custom GPTs (catalog is unlimited)
 
     # ⏰ Scheduled tasks — saved prompts ChatMood runs unattended
     TASKS_ENABLED: bool = True

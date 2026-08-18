@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from .api.deps import get_redis
-from .api.routes import admin, admin_payments, agents, apikeys, auth, billing, chat, conversations, deepsearch, designer, devices, domains, files, media, memory, payments, plugins, projects, public_api, reels, share, tasks, usage, voice, voice_ws, workspaces
+from .api.routes import admin, admin_payments, agents, apikeys, auth, billing, chat, conversations, deepsearch, designer, devices, domains, files, gpts, media, memory, payments, plugins, projects, public_api, reels, share, tasks, usage, voice, voice_ws, workspaces
 from .config import settings
 from .core.metrics import REQ_COUNT, REQ_LAT, metrics_response
 from .db.session import engine, init_db
@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         await stop_payment_sweep()
 
 
-app = FastAPI(title="ChatMood API", version="1.9.8", lifespan=lifespan)
+app = FastAPI(title="ChatMood API", version="1.9.9", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -134,6 +134,7 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(payments.router, prefix="/api/v1/payments", tags=["payments"])
 app.include_router(admin_payments.router, prefix="/api/v1/admin/payments", tags=["admin-payments"])
 app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
+app.include_router(gpts.router, prefix="/api/v1/gpts", tags=["gpts"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(apikeys.router, prefix="/api/v1/keys", tags=["api-keys"])
 app.include_router(public_api.router, prefix="/api/v1/public", tags=["public-api"])

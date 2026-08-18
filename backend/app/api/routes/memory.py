@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.models import Conversation, User
 from ...db.session import get_db
-from ...services.memory import clear_memories, delete_memory, list_memories
+from ...schemas import MemoryUpdate
+from ...services.memory import clear_memories, delete_memory, list_memories, update_memory
 from ..deps import get_current_user
 
 router = APIRouter()
@@ -16,6 +17,18 @@ async def get_memories(user: User = Depends(get_current_user)):
         return {"memories": await list_memories(user.id)}
     except Exception:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Memory store unavailable")
+
+
+@router.patch("/{memory_id}")
+async def edit_memory(memory_id: str, req: MemoryUpdate, user: User = Depends(get_current_user)):
+    """Correct a remembered fact — Grok lets you edit the memory summary in place."""
+    try:
+        row = await update_memory(user.id, memory_id, req.fact, req.category)
+    except Exception:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Memory store unavailable")
+    if not row:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Memory not found")
+    return row
 
 
 @router.delete("/{memory_id}")

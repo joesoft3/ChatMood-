@@ -105,7 +105,27 @@ SYSTEM_PROMPT = """You are ChatMood — a truthful, witty, maximally helpful AI 
 - You are excellent at coding: provide runnable code, explain briefly.
 - When web search results or citations are provided, cite sources inline like [1](url).
 - You have long-term memory: known user facts are provided; use them naturally, never recite the list.
+- For math, use KaTeX: inline $...$ and display $$...$$.
 Today's date: {date}"""
+
+FUN_MODE_PROMPT = """Fun mode is ON (Grok Fun). Be the wittiest, most irreverent version of ChatMood:
+- Crack jokes, use slang, roast ideas — never the user personally.
+- Stay truthful. Fun is extra flavor, not a license to invent facts or skip the answer.
+- Keep the answer useful first; the punchline is the garnish.
+- Lean into the Grok voice: curious, a little unhinged, never cruel."""
+
+STUDY_MODE_PROMPT = """Study mode is ON (ChatGPT Study). You are a patient tutor, not an answer key:
+- Do not dump the full answer first. Ask what the student already knows.
+- Guide with one Socratic question or a small hint at a time.
+- Check understanding before moving on. Celebrate a correct step briefly.
+- If they insist on the answer, give it, then ask them to explain it back in their own words.
+- Offer a short 3-question quiz when a topic wraps.
+- Be encouraging, never condescending. Truth still wins over pedagogy if they are stuck and frustrated."""
+
+CONTINUE_PROMPT = (
+    "Continue exactly from where you left off. Do not repeat any text already written. "
+    "Do not add a preamble like 'sure' or 'continuing:' — just keep writing."
+)
 
 
 def sse(obj: dict) -> str:
@@ -119,6 +139,8 @@ async def get_or_create_conversation(
     seed_text: str,
     workspace_id: str | None = None,
     project_id: str | None = None,
+    temporary: bool = False,
+    gpt_id: str | None = None,
 ) -> tuple[Conversation, bool]:
     if conversation_id:
         conv = await db.get(Conversation, conversation_id)
@@ -146,6 +168,8 @@ async def get_or_create_conversation(
         title=(seed_text[:60] or "New chat"),
         workspace_id=workspace_id,
         project_id=project_id,
+        temporary=bool(temporary),
+        gpt_id=gpt_id,
     )
     db.add(conv)
     await db.flush()
@@ -201,9 +225,16 @@ async def build_messages(
     use_search: bool,
     created: bool = False,
     project_id: str | None = None,
+    fun: bool = False,
+    study: bool = False,
+    gpt_id: str | None = None,
 ) -> tuple[list[dict], str, bool]:
     """Returns (messages, model, enable_live_search). Reused by the voice pipeline."""
     persona = SYSTEM_PROMPT.format(date=date.today())
+    if fun or getattr(user, "fun_mode", False):
+        persona += "\n\n" + FUN_MODE_PROMPT
+    if study or getattr(user, "study_mode", False):
+        persona += "\n\n" + STUDY_MODE_PROMPT
     if user.custom_instructions:
         persona += (
             "\n\nCustom instructions from the user (follow them unless they conflict "
@@ -217,6 +248,31 @@ async def build_messages(
         from ...services.projects import context_messages
 
         msgs += await context_messages(db, user, project_id)
+
+    # 0b) Custom GPT / catalog assistant — standing instructions + knowledge files
+    if gpt_id:
+        from ...services.gpts import knowledge_blocks, resolve_gpt
+
+        gpt = await resolve_gpt(db, user, gpt_id)
+        if gpt:
+            brief = (gpt.get("instructions") or "").strip()
+            label = f"{gpt.get('emoji') or 'GPT'} {gpt.get('name') or 'Custom GPT'}"
+            block = f"You are running as the custom GPT \"{label}\"."
+            if brief:
+                block += (
+                    " Follow these instructions closely unless they conflict with being truthful and safe:\n"
+                    + brief[:8000]
+                )
+            msgs.append({"role": "system", "content": block})
+            knowledge = await knowledge_blocks(db, user, list(gpt.get("file_ids") or []))
+            if knowledge:
+                msgs.append(
+                    {
+                        "role": "system",
+                        "content": "Knowledge files attached to this GPT. Prefer them over general knowledge when they apply:\n"
+                        + "\n\n".join(knowledge),
+                    }
+                )
 
     # 1) Long-term memory + 1b) past-chat recall — CONCURRENT, each under a hard
     #    budget (they share the vector store; serialized dead-endpoint attempts
@@ -361,7 +417,7 @@ async def chat_stream(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if not req.message.strip() and not req.files and not req.regenerate:
+    if not req.message.strip() and not req.files and not req.regenerate and not req.continue_gen:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty message")
     await enforce_rate_limit(f"chat:{user.id}", settings.CHAT_RATE_LIMIT_PER_MIN * plan_rate_mult(user.plan))
 
@@ -420,26 +476,63 @@ async def chat_stream(
         req.message = user_text
         req.files = []
 
+    continue_target: Message | None = None
+    if req.continue_gen:
+        if not req.conversation_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to continue")
+        conv = await db.get(Conversation, req.conversation_id)
+        if not conv or conv.user_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+        last = (
+            await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conv.id)
+                # sqlite timestamps are 1s; assistant is created after the user
+                # turn so `role asc` puts "assistant" before "user" on a tie.
+                .order_by(Message.created_at.desc(), Message.role.asc())
+                .limit(1)
+            )
+        ).scalars().first()
+        if not last or last.role != "assistant" or not (last.content or "").strip():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to continue")
+        continue_target = last
+        req.message = CONTINUE_PROMPT
+        req.files = []
+        req.regenerate = False
+
     conv, created = await get_or_create_conversation(
-        db, user, req.conversation_id, req.message, req.workspace_id, req.project_id
+        db,
+        user,
+        req.conversation_id,
+        req.message,
+        req.workspace_id,
+        req.project_id,
+        temporary=bool(req.temporary),
+        gpt_id=req.gpt_id,
     )
-    user_row = Message(
-        conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files}
-    )
-    db.add(user_row)
-    for fid in req.files[:6]:  # link assets to the conversation
-        a = await db.get(FileAsset, fid)
-        if a and a.user_id == user.id:
-            a.conversation_id = conv.id
-    await db.commit()
-    user_message_id = user_row.id
+    if req.gpt_id and not getattr(conv, "gpt_id", None):
+        conv.gpt_id = req.gpt_id
+    user_message_id = None
+    if continue_target is None:
+        user_row = Message(
+            conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files}
+        )
+        db.add(user_row)
+        for fid in req.files[:6]:  # link assets to the conversation
+            a = await db.get(FileAsset, fid)
+            if a and a.user_id == user.id:
+                a.conversation_id = conv.id
+        await db.commit()
+        user_message_id = user_row.id
+    else:
+        await db.commit()
 
     # 🎨🎬 In-chat creation (v1.9.7) — "create an image of…" / "make a video of…"
     # Routed BEFORE context assembly: zero LLM classification cost, no memory/RAG
     # retrieval spent on gen prompts, generation streams inline like ChatGPT.
     # NOTE: the web/mobile composers ship search=true by default — the media
     # intent must win over that (a creation turn never needs web context).
-    if settings.CHAT_MEDIA and not req.plugins:
+    if settings.CHAT_MEDIA and not req.plugins and continue_target is None:
         last_media: dict | None = None
         if not created:
             prev = (
@@ -485,6 +578,9 @@ async def chat_stream(
         db, user, conv.id, req.message, req.files, req.search, created,
         project_id=conv.project_id,  # the CONVERSATION's project wins — a filed chat
         # keeps its brief on every turn, not only the one that created it
+        fun=bool(req.fun) or bool(getattr(user, "fun_mode", False)),
+        study=bool(req.study) or bool(getattr(user, "study_mode", False)),
+        gpt_id=req.gpt_id or getattr(conv, "gpt_id", None),
     )
     # 🚀 Premium picker: honor the requested model (vision threads stay on the vision model).
     if model != settings.MODEL_VISION and req.model in MODEL_CHOICES:
@@ -556,8 +652,27 @@ async def chat_stream(
                 }
                 yield sse({"type": "thinking", "thinking": {"summary": summary}, "think_time_ms": elapsed})
 
+            assistant_id = continue_target.id if continue_target is not None else None
             async with SessionLocal() as s:
-                s.add(Message(conversation_id=conv.id, role="assistant", content=reply, meta=think_meta or {}))
+                if continue_target is not None:
+                    existing = await s.get(Message, continue_target.id)
+                    if existing:
+                        existing.content = (existing.content or "") + reply
+                        if think_meta:
+                            meta = dict(existing.meta or {})
+                            meta.update(think_meta)
+                            existing.meta = meta
+                        assistant_id = existing.id
+                    else:
+                        row = Message(conversation_id=conv.id, role="assistant", content=reply, meta=think_meta or {})
+                        s.add(row)
+                        await s.flush()
+                        assistant_id = row.id
+                else:
+                    row = Message(conversation_id=conv.id, role="assistant", content=reply, meta=think_meta or {})
+                    s.add(row)
+                    await s.flush()
+                    assistant_id = row.id
                 c = await s.get(Conversation, conv.id)
                 if c:
                     c.updated_at = datetime.now(timezone.utc)
@@ -572,16 +687,18 @@ async def chat_stream(
                 else estimate_tokens(req.message + json.dumps(messages[0])[:3000], reply)
             )
             await record_usage(user.id, "chat", model, **tok)
-            bg.add_task(extract_and_store, user.id, req.message, reply, user.plan)
-            bg.add_task(update_conversation_summary, user.id, conv.id)
-            if created:
+            # 👻 Temporary chats never write memory or past-chat recall.
+            if not getattr(conv, "temporary", False):
+                bg.add_task(extract_and_store, user.id, req.message, reply, user.plan)
+                bg.add_task(update_conversation_summary, user.id, conv.id)
+            if created and not getattr(conv, "temporary", False):
                 bg.add_task(generate_title, conv.id, req.message)
             # Follow-ups AFTER the answer is persisted so a slow rewrite never
             # delays the last token. Fail-open: missing chips beat a hung turn.
             followups = await suggest_followups(req.message, reply)
             if followups:
                 yield sse({"type": "suggestions", "suggestions": followups})
-            yield sse({"type": "done"})
+            yield sse({"type": "done", "assistant_message_id": assistant_id})
         except Exception as e:
             log.exception("chat stream failed")
             yield sse({"type": "error", "message": friendly_ai_error(e)})

@@ -3,7 +3,7 @@
 ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
 **orchestrating existing frontier models and tools** instead of training anything from scratch.
 
-- 💬 Streaming AI chat (Grok models via the xAI API)
+- 💬 Streaming AI chat (Grok models via the xAI API) — **😄 Fun mode**, **📚 Study mode**, **👻 temporary chats**, **🖊 Canvas**, **∑ KaTeX math**, **🤖 Custom GPTs**
 - 🌐 Real-time web/X/news search grounding (xAI Live Search)
 - 🧠 Long-term memory (semantic, per-user, stored in Qdrant) **+ cross-chat recall — ChatMood remembers what your previous conversations were about**
 - 📄 PDF / Word / Excel / CSV / text analysis
@@ -131,8 +131,10 @@ chatmood/
 |---|---|---|
 | POST | `/api/v1/auth/register`, `/login` | JWT auth |
 | GET  | `/api/v1/auth/me` | current user |
-| CRUD | `/api/v1/conversations` | chat threads + messages |
-| POST | `/api/v1/chat/stream` | **SSE streaming chat** (memory + search + files + doc-RAG) |
+| CRUD | `/api/v1/conversations` | chat threads + messages · archive · duplicate · export · ratings |
+| GET | `/api/v1/conversations/search` | full-text search across titles and message bodies |
+| CRUD | `/api/v1/gpts` | 🤖 Custom GPTs — catalog + private assistants + knowledge files |
+| POST | `/api/v1/chat/stream` | **SSE streaming chat** (memory + search + files + doc-RAG + Study + GPTs) |
 | POST | `/api/v1/agents/stream` | **multi-agent run** (plan → steps → answer, SSE progress) |
 | POST | `/api/v1/agents/arena/stream` | ⚔️ **Pro arena**: provider drafts → blind ballots → Grok-4 verdict (plan-capped `arena_day`) |
 | POST | `/api/v1/deepsearch/stream` | **DeepSearch** (subtopics → research rounds → gap analysis → cited report) |
@@ -214,7 +216,8 @@ chatmood/
 | **Doc-RAG** (docs auto-embedded; cross-chat semantic retrieval) | ✅ |
 | **Multi-agent mode** (planner → researcher/coder/writer) | ✅ — toggle 🤖 in the composer |
 | **DeepSearch** (multi-round agentic research, gap analysis, cited report) | ✅ — toggle 🔭 in the composer |
-| **Pro chat UX** — stop generation, regenerate, **edit & resend**, copy + code-copy, read-aloud, export .md, rename + **pin** chats, suggested follow-ups, ⌘K / `/` / Esc shortcuts, per-answer model badge, persistent custom instructions | ✅ |
+| **Pro chat UX** — stop generation, regenerate, **edit & resend**, copy + code-copy, read-aloud, export .md, rename + **pin** + **archive** chats, suggested follow-ups, 👍👎 ratings, Continue, ⌘K / `/` / Esc shortcuts, per-answer model badge, persistent custom instructions | ✅ |
+| **Custom GPTs + Study mode** | ✅ `/gpts` store + 📚 Socratic tutor |
 | **Alembic migrations** (baseline + guarded upgrades) | ✅ new |
 | **Observability** — Prometheus metrics, LLM instrumentation, request-id logs, health/ready probes, optional OpenTelemetry tracing | ✅ new |
 | **Owner-panel floating button** — 👑 floating Admin pill on every app page (admins only, server-verified) | ✅ v1.8.0 |

@@ -7,6 +7,84 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 🤖 ChatGPT-parity pack — Custom GPTs, Study, archive, search, ratings, Continue
+
+Nothing was removed. This pack adds the ChatGPT surfaces ChatMood was still
+missing so the product can merge and deploy as a serious assistant, not a
+thin Grok wrapper.
+
+- **🤖 Custom GPTs.** `/gpts` is a real store: eight catalog assistants
+  (Writing Coach, Code Reviewer, Interview Prep, Data Analyst, Study Tutor,
+  Meeting Notes, Email Pro, Daily Pulse) plus private user-built GPTs with
+  instructions, starters and knowledge files. `/chat?gpt=` starts a thread
+  that keeps that brief on every turn.
+- **📚 Study mode.** Socratic tutor on the model row, Settings, and Flutter
+  drawer. Persists as `users.study_mode`; a turn can also send `study: true`.
+- **📦 Archive.** Hide a chat from the live sidebar without deleting it.
+  Restore from Archived. `conversations.archived`.
+- **🔎 Full-text search.** The sidebar search now hits titles *and* message
+  bodies (`GET /conversations/search?q=`).
+- **👍👎 Ratings.** Thumbs on an assistant turn store `meta.feedback`.
+- **▶️ Continue.** Grow the last answer in place — no extra user turn.
+- **⎘ Duplicate + JSON export.** Fork a thread; download JSON or Markdown
+  from the API. The existing client Markdown export stays.
+- **🌅 Pulse, honestly.** Daily Pulse is a catalog GPT; **Schedule daily
+  Pulse** creates a real 08:00 UTC task with live search. Not a fake
+  always-on agent.
+
+Migration `0030_chatgpt_parity` is existence-guarded. Tests:
+`test_chatgpt_parity.py`. Mobile `1.9.9+25`.
+
+### 😄 Grok-parity pack — Fun, temporary chats, editable memory, DeeperSearch, Canvas, math
+
+ChatMood already had the Grok core. This pack closes the remaining *user-facing*
+holes so a grok.com user can land here and not miss the daily controls.
+
+- **😄 Fun mode.** One tap on the model row (also Settings + Flutter drawer).
+  Persists as `users.fun_mode`; a turn can also send `fun: true`. The system
+  prompt gets the Grok Fun voice — jokes and slang, facts stay true.
+- **👻 Temporary chat.** Hidden from the sidebar, never written to memory or
+  past-chat recall. `conversations.temporary`. You can still read the thread
+  this session via its id.
+- **✏️ Edit a memory.** Settings → a fact → Edit. `PATCH /memory/{id}`
+  re-embeds and swaps the deterministic point id. Past-chat digests stay
+  read-only.
+- **🔭 DeeperSearch.** Research mode now has Deep (2×4) and Deeper (3×5)
+  pills — the backend `depth` switch was already there; the UI never exposed it.
+- **🖊 Canvas.** Long answers get an Open in Canvas control: a side workspace
+  to edit, copy, download, or send back into the composer.
+- **∑ KaTeX.** `$inline$` and `$$display$$` render in chat (remark-math +
+  rehype-katex).
+
+Migration `0029_grok_parity` is existence-guarded. Tests: `test_grok_parity.py`.
+
+### 📱 Finish the chat on Flutter — edit, pin, follow-ups, media file_id (PR #43)
+
+The last pass finished the *web* chat. The phone still treated a just-generated
+image as a dead preview, had no way to rewind a mistyped turn, and listed
+every chat in recency order with no pin. Same four holes, same contracts.
+
+- **✏️ Edit & resend.** Tap Edit on your bubble, change the text, Save &
+  resend. The client drops that turn and everything after it, then posts
+  `edit_from` on `/chat/stream` (the only endpoint that honors a rewind —
+  arena/agent paths are forced off so the old answer cannot linger). The
+  `meta.user_message_id` is stored on the just-sent bubble so you can edit
+  it without reloading the thread. Hidden in team workspaces: the API is
+  owner-only.
+- **📌 Pin / 🗑 delete in the drawer.** Personal chats get a pin (stays
+  above recency, same `PATCH {pinned}` as the web sidebar) and a delete
+  with a confirm. Team lists stay read-only.
+- **💬 Suggested follow-ups.** After a text answer, up to three
+  tap-to-send chips land above the composer from the `suggestions` SSE
+  event. Cleared on send, new chat, and idle home-reset.
+- **⬇✏️🗑 Media `file_id`.** The live `media` event and restored
+  `meta.media` now carry the FileAsset id. Download goes through the
+  stable `/files/{id}/download` route into the share sheet (hotlinks fall
+  back to a plain GET). Edit prefills “Edit this image/video:”. Delete
+  confirms, then `DELETE /files/{id}` and drops the card locally.
+
+`mobile` version `1.9.8+24`.
+
 ### ✏️📌💬 Finish the chat — edit, pin, follow-ups, and a live media-id bug
 
 The chat surface was one layer short of feeling finished. Four holes, one pass.

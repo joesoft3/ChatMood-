@@ -48,6 +48,9 @@ interface Props {
   draft?: { text: string; nonce: number };
   /** 🏠 bare = rendered inside the centered empty home. */
   bare?: boolean;
+  /** DeepSearch: "deep" (2 rounds) or "deeper" (3 rounds). */
+  researchDepth?: "deep" | "deeper";
+  setResearchDepth?: (d: "deep" | "deeper") => void;
 }
 
 export default function Composer({
@@ -71,6 +74,8 @@ export default function Composer({
   onVoice,
   draft,
   bare = false,
+  researchDepth = "deep",
+  setResearchDepth,
 }: Props) {
   const [input, setInput] = useState("");
   const [searchOn, setSearchOn] = useState(true);
@@ -239,16 +244,44 @@ export default function Composer({
             <button type="button" onClick={() => setComposerError("")} className="text-red-200/70 hover:text-red-100" aria-label="Dismiss composer error">✕</button>
           </div>
         )}
-        {bare && deepMode && (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={() => setDeepMode(false)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] text-accent transition hover:border-accent/45 hover:bg-accent/15"
-              aria-label="Turn off research mode"
-            >
-              <Telescope size={12} /> Research mode <X size={11} />
-            </button>
+        {deepMode && (
+          <div className="flex justify-center gap-1.5">
+            {setResearchDepth && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setResearchDepth("deep")}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] transition ${
+                    researchDepth === "deep"
+                      ? "border-accent/25 bg-accent/10 text-accent"
+                      : "border-white/8 bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Deep
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setResearchDepth("deeper")}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] transition ${
+                    researchDepth === "deeper"
+                      ? "border-accent/25 bg-accent/10 text-accent"
+                      : "border-white/8 bg-white/5 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Deeper
+                </button>
+              </>
+            )}
+            {bare && (
+              <button
+                type="button"
+                onClick={() => setDeepMode(false)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] text-accent transition hover:border-accent/45 hover:bg-accent/15"
+                aria-label="Turn off research mode"
+              >
+                <Telescope size={12} /> Research mode <X size={11} />
+              </button>
+            )}
           </div>
         )}
         <div

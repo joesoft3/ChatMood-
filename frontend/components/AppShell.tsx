@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { AlarmClock, AudioLines, Brush, Clapperboard, FolderKanban, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
+import { AlarmClock, AudioLines, Bot, Brush, Clapperboard, FolderKanban, FolderOpen, Image as ImageIcon, LogOut, Menu, MessageSquare, Puzzle, Settings, ShieldCheck, Telescope, Tv } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
 import ErrorBoundary from "./ErrorBoundary";
@@ -28,6 +28,7 @@ const NAV = [
   { href: "/design", label: "Design", icon: Brush },
   { href: "/tasks", label: "Tasks", icon: AlarmClock },
   { href: "/projects", label: "Projects", icon: FolderKanban },
+  { href: "/gpts", label: "GPTs", icon: Bot },
   { href: "/files", label: "Files", icon: FolderOpen },
   { href: "/plugins", label: "Plugins", icon: Puzzle },
   { href: "/deepsearch", label: "Research", icon: Telescope },
@@ -297,7 +298,7 @@ export default function AppShell({
 
         {/* Page content — wrapped in an error boundary so one broken page
             never takes down the entire shell (sidebar, tab bar, header survive). */}
-        <div className="flex-1 min-h-0 flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col relative">
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
 
