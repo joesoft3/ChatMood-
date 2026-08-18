@@ -1,34 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { API_IS_RELATIVE, apiOrigin, serverApiBase } from "@/lib/apiBase";
 
 // 🎬 Public film share page — beautiful OG previews (video + hero poster),
 // no login wall. Server-rendered from the API's public film endpoint.
 
 
+// This page is server-rendered, but the URLs it emits are followed by the
+// *browser*: resolve them against the public API base (a same-origin "/api/v1"
+// path when the app proxies), never against the server's internal origin.
 function resolvePublicMediaUrl(u: string): string {
   if (!u) return "";
-  if (u.startsWith("/api/")) {
-    try {
-      const apiOrigin = new URL(API).origin;
-      return `${apiOrigin}${u}`;
-    } catch {
-      return u;
-    }
-  }
-  if (u.includes("/api/v1/")) {
-    try {
-      const idx = u.indexOf("/api/v1/");
-      const path = u.slice(idx);
-      const apiOrigin = new URL(API).origin;
-      return `${apiOrigin}${path}`;
-    } catch {
-      return u;
-    }
-  }
-  return u;
+  const idx = u.indexOf("/api/v1/");
+  const path = idx >= 0 ? u.slice(idx) : u.startsWith("/api/") ? u : null;
+  if (path === null) return u;
+  return API_IS_RELATIVE ? path : `${apiOrigin()}${path}`;
 }
-
-const API = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1").replace(/\/+$/, "");
 
 interface ShareFilm {
   id: string;
@@ -46,7 +33,10 @@ interface ShareFilm {
 
 async function loadFilm(id: string): Promise<ShareFilm | null> {
   try {
-    const res = await fetch(`${API}/media/public/films/${id}`, { next: { revalidate: 300 } });
+    // SSR fetch: must be absolute, so use the internal/server-side base.
+    const res = await fetch(`${serverApiBase()}/media/public/films/${id}`, {
+      next: { revalidate: 300 },
+    });
     if (!res.ok) return null;
     return (await res.json()) as ShareFilm;
   } catch {

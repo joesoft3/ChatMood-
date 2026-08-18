@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FileAudio, Loader2, Mic, RotateCcw, Square, Volume2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioHero, StudioNotice } from "@/components/StudioChrome";
-import { API, apiFetch, token } from "@/lib/api";
+import { apiFetch, token } from "@/lib/api";
+import { apiWsBase } from "@/lib/apiBase";
 import { useConversations } from "@/lib/conversations";
 import { useRecorder } from "@/lib/use-recorder";
 
@@ -25,7 +26,9 @@ interface Turn {
 }
 
 function wsUrl(): string {
-  return `${API.replace(/^http/, "ws")}/voice/ws?token=${encodeURIComponent(token.get() ?? "")}`;
+  // apiWsBase() yields wss:// on https pages and resolves a same-origin API
+  // base against the current host — a bare "/api/v1" is not a valid WS URL.
+  return `${apiWsBase()}/voice/ws?token=${encodeURIComponent(token.get() ?? "")}`;
 }
 
 export default function VoicePage() {
