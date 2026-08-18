@@ -1,4 +1,6 @@
-export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+import { API, apiOrigin } from "./apiBase";
+
+export { API };
 
 /**
  * Resolve a media URL that may be:
@@ -19,19 +21,11 @@ export function resolveMediaUrl(raw: string): string {
       path = raw.slice(idx); // e.g. /api/v1/reels/files/xxx
     }
 
-    // If path is now a relative API path, build absolute from API
+    // If path is now a relative API path, hang it off the API origin. With a
+    // same-origin (proxied) API that origin IS the page origin, so the result
+    // stays same-origin and never points at the visitor's own machine.
     if (path.startsWith("/api/v1/")) {
-      // API is like https://host/api/v1  -> origin = https://host
-      try {
-        const apiUrl = new URL(API);
-        return `${apiUrl.origin}${path}`;
-      } catch {
-        // API may be relative? Fallback to current origin + path
-        if (typeof window !== "undefined") {
-          return `${window.location.origin}${path}`;
-        }
-        return path;
-      }
+      return `${apiOrigin()}${path}`;
     }
 
     // Otherwise try to parse as absolute URL
@@ -42,13 +36,8 @@ export function resolveMediaUrl(raw: string): string {
       const m = raw.match(/\/reels\/files\/([^/?]+)/) || raw.match(/\/media\/files\/([^/?]+)/);
       const fname = m ? m[1] : null;
       if (fname) {
-        try {
-          const apiUrl = new URL(API);
-          const isReel = raw.includes("/reels/files/");
-          return `${apiUrl.origin}/api/v1/${isReel ? "reels" : "media"}/files/${fname}`;
-        } catch {
-          return raw;
-        }
+        const isReel = raw.includes("/reels/files/");
+        return `${apiOrigin()}/api/v1/${isReel ? "reels" : "media"}/files/${fname}`;
       }
     }
 

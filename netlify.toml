@@ -20,9 +20,8 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# SPA-ish safety net: unknown paths render the shell (client router handles them).
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
+# NOTE: no SPA catch-all here on purpose. This is a Next.js **App Router** site,
+# not a static SPA — there is no `/index.html` in the build output, so a
+# `/*  →  /index.html  200` rule makes Netlify answer real routes with a file
+# that does not exist (blank page / 404 shell) instead of letting the Next.js
+# runtime render them. Routing, 404s and SSR are the runtime's job.

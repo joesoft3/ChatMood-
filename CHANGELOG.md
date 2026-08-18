@@ -7,6 +7,38 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 🩹 Fix — opening the deployed link showed a blank page
+
+Two independent bugs, both of which produced an empty screen in a real browser
+while everything looked fine locally.
+
+- **The browser was told to call `localhost:8000`.** `NEXT_PUBLIC_API_URL`
+  defaulted to `http://localhost:8000/api/v1`, and that default is *inlined into
+  the client bundle at build time*. For any visitor, `localhost` is their own
+  machine — so every call failed (and was blocked outright as mixed content on
+  an https host), leaving the shell with no data. The base now falls back to the
+  same-origin path `/api/v1`, which `next.config.mjs` rewrites onto
+  `BACKEND_ORIGIN` (default `http://localhost:8000`). Deployments that already
+  set `NEXT_PUBLIC_API_URL` are unaffected — the absolute URL still wins and the
+  rewrite stays inert.
+- **Netlify's SPA catch-all swallowed every route.** `/* → /index.html 200` was
+  serving a file the App Router build never emits, so real routes resolved to
+  nothing. Removed; the Next.js runtime owns routing, SSR and 404s.
+
+Also fixed along the same seam: the voice WebSocket now derives `wss://` from
+the page origin (a bare `/api/v1` is not a valid WS URL), the public film share
+page separates its **server-side** fetch base from the **browser-facing** media
+URLs it emits, and `next dev` accepts hosted preview origins
+(`allowedDevOrigins`) so tunneled dev servers load their `/_next/*` assets.
+
+Verified: production build contains no `localhost:8000` in any client chunk;
+`/`, `/login`, `/chat`, `/voice` all render and `POST /api/v1/auth/login`
+succeeds through the web origin.
+
+---
+
+## 2026-08-18
+
 ### 🤖 ChatGPT-parity pack — Custom GPTs, Study, archive, search, ratings, Continue
 
 Nothing was removed. This pack adds the ChatGPT surfaces ChatMood was still

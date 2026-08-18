@@ -16,6 +16,7 @@ node_modules/
 # runtime data
 storage/
 uploads/
+*.db
 
 # os / editor
 .DS_Store

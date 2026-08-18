@@ -270,10 +270,28 @@ scroll instead of breaking layouts, images scale to their container, fluid clamp
 Preview the tiers without running anything: open `docs/ui-design-preview.html`
 (static mock — buttons are illustrative).
 
+### Where the browser looks for the API
+
+`NEXT_PUBLIC_API_URL` is **inlined into the browser bundle at build time**.
+
+- **Set** → the browser calls that absolute URL. This is the production wiring
+  (Netlify/Vercel/Fly): `https://api.your-domain.com/api/v1`.
+- **Not set** → the app calls the same-origin path **`/api/v1`**, and Next.js
+  proxies it to `BACKEND_ORIGIN` (default `http://localhost:8000`). So the page
+  only ever talks to the host it was served from — correct on localhost, on a
+  phone over LAN, and behind any tunnel/preview URL, with no rebuild.
+
+> ⚠️ Never ship a build whose `NEXT_PUBLIC_API_URL` points at `localhost` — for
+> a visitor, `localhost` is *their own machine*, so every request fails (and on
+> an https site it's blocked as mixed content) and the app renders a blank page.
+> Leave the variable unset and let the proxy handle it, or set a public URL.
+
 ### Testing on a real phone (same Wi-Fi)
 
 1. Find your computer's LAN IP (`ipconfig getifaddr en0` / `ip addr`): e.g. `192.168.1.50`.
-2. **The API must be reachable from the phone** — `localhost` inside the phone means the phone itself! Rebuild the frontend with:
+2. Open `http://192.168.1.50:3000` on the phone — with `NEXT_PUBLIC_API_URL`
+   unset, the app calls `/api/v1` on that same host and the proxy forwards it.
+   To point the browser straight at the API instead, rebuild with:
    ```bash
    NEXT_PUBLIC_API_URL=http://192.168.1.50:8000/api/v1 docker compose up --build
    ```
