@@ -52,6 +52,7 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const pendingOpenRef = useRef(false);
   const [transportError, setTransportError] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   // Agent mode, Deep search and Arena are mutually exclusive
   function setAgentMode(v: boolean) {
@@ -184,6 +185,7 @@ export default function ChatPage() {
     if (!activeId) {
       lastLoaded.current = null;
       setMsgs([]);
+      setSuggestions([]);
       return;
     }
     if (skipNextLoad.current) {
@@ -203,6 +205,7 @@ export default function ChatPage() {
           d.messages.map((m: any) => {
             const meta = m.meta ?? {};
             return {
+              id: m.id,
               role: m.role,
               content: m.content,
               author: m.user_id ? (authors[m.user_id] ?? "member") : undefined,
@@ -263,7 +266,7 @@ export default function ChatPage() {
     });
   }
 
-  async function send(text: string, search: boolean, regenerate = false, forceRematch = false) {
+  async function send(text: string, search: boolean, regenerate = false, forceRematch = false, editFrom?: string) {
     // Keep every prompt on the streaming path. The API detects image/video
     // requests (including flyers, logos, banners and stickers) and emits its
     // real media lifecycle, then persists the answer and the asset. A former
@@ -271,6 +274,7 @@ export default function ChatPage() {
     // cleared the thread; it also stopped this page from compiling, which
     // blocked the production chat-home deployment entirely.
     if ((!text.trim() && files.length === 0 && !regenerate) || busy) return;
+    setSuggestions([]);
     setBusy(true);
     busyRef.current = true;
     const useArena = (arenaMode || forceRematch) && !regenerate;
@@ -316,14 +320,30 @@ export default function ChatPage() {
           arena: useArena,
           arena_extra: arenaExtra,
           rematch: forceRematch || undefined,
+          edit_from: editFrom,
         },
         (ev) => {
           if (ev.type === "meta") {
             if (ev.model) patchLast((m) => ({ ...m, model: ev.model }));
+            if (ev.user_message_id) {
+              setMsgs((m) => {
+                const a = [...m];
+                for (let i = a.length - 1; i >= 0; i--) {
+                  if (a[i].role === "user") {
+                    a[i] = { ...a[i], id: ev.user_message_id };
+                    break;
+                  }
+                }
+                return a;
+              });
+            }
             if (ev.conversation_id && !activeId) {
               newId = ev.conversation_id;
               skipNextLoad.current = true; // keep the streamed messages; don't refetch
             }
+          }
+          if (ev.type === "suggestions" && ev.suggestions?.length) {
+            setSuggestions(ev.suggestions.filter(Boolean).slice(0, 3));
           }
           // multi-agent progress
           if (ev.type === "plan" && ev.steps)
@@ -388,7 +408,14 @@ export default function ChatPage() {
           if (ev.type === "media")
             patchLast((m) => ({
               ...m,
-              media: [{ kind: ev.kind ?? "image", url: ev.url, prompt: ev.prompt, stored: ev.stored, pending: false }],
+              media: [{
+                kind: ev.kind ?? "image",
+                url: ev.url,
+                prompt: ev.prompt,
+                stored: ev.stored,
+                file_id: ev.file_id,
+                pending: false,
+              }],
             }));
           // 🧠 extended reasoning (grok-4 / grok-code-fast-1)
           if (ev.type === "thinking_start")
@@ -450,6 +477,15 @@ export default function ChatPage() {
       setBusy(false);
       busyRef.current = false;
     }
+  }
+
+  /** ✏️ Rewind from a user turn and resend the edited text. */
+  async function editMessage(index: number, text: string) {
+    if (busy) return;
+    const target = msgs[index];
+    if (!target?.id) return;
+    setMsgs((m) => m.slice(0, index));
+    await send(text, true, false, false, target.id);
   }
 
   /** 🎨 Edit a generation — prefill the composer with a remix instruction.
@@ -795,7 +831,7 @@ export default function ChatPage() {
           <span className="flex-1">{billingNote}</span>
           {billingCta === "upgrade" && (
             <button
-              onClick={() => router.push("/settings")}
+              onClick={() => router.push("/upgrade")}
               className="rounded-lg bg-accent text-black font-semibold px-3 py-1 hover:brightness-110 transition shrink-0"
             >
               ✨ Upgrade to Pro
@@ -898,6 +934,11 @@ export default function ChatPage() {
                 }
                 onEditMedia={editMedia}
                 onDeleteMedia={deleteMedia}
+                onEditUser={
+                  !busy && m.role === "user" && m.id
+                    ? (text) => void editMessage(i, text)
+                    : undefined
+                }
               />
             </div>
           ))}
@@ -905,6 +946,25 @@ export default function ChatPage() {
       </div>
       {!emptyHome && (
         <>
+          {suggestions.length > 0 && !busy && (
+            <div className="shrink-0 border-t border-white/5 bg-[#0f0f10]/80 px-3 py-2 sm:px-4">
+              <nav
+                className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 xl:max-w-4xl"
+                aria-label="Suggested follow-ups"
+              >
+                {suggestions.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => void send(s, true)}
+                    className="touch-manipulation inline-flex max-w-full items-center rounded-full border border-white/8 bg-[#141415] px-3.5 py-1.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    <span className="truncate">{s}</span>
+                  </button>
+                ))}
+              </nav>
+            </div>
+          )}
           {pickerEl(false)}
           {composerEl(false)}
         </>

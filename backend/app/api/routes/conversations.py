@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...db.models import Conversation, Message, SharedLink, User
 from ...db.session import get_db
-from ...schemas import ConversationCreate, RenameRequest
+from ...schemas import ConversationCreate, ConversationUpdate
 from ...services.recall import delete_chat_memory
 from ..deps import get_current_user
 
@@ -18,6 +18,7 @@ def conv_out(c: Conversation) -> dict:
         "id": c.id,
         "title": c.title,
         "project_id": c.project_id,
+        "pinned": bool(getattr(c, "pinned", False)),
         "created_at": c.created_at.isoformat() if c.created_at else None,
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
@@ -40,7 +41,8 @@ async def list_conversations(db: AsyncSession = Depends(get_db), user: User = De
         await db.execute(
             select(Conversation)
             .where(Conversation.user_id == user.id)
-            .order_by(Conversation.updated_at.desc())
+            # Pinned chats stay on top; recency still wins inside each group.
+            .order_by(Conversation.pinned.desc(), Conversation.updated_at.desc())
         )
     ).scalars().all()
     return [conv_out(c) for c in rows]
@@ -97,12 +99,18 @@ async def get_conversation(cid: str, db: AsyncSession = Depends(get_db), user: U
 
 
 @router.patch("/{cid}")
-async def rename_conversation(
-    cid: str, req: RenameRequest, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
+async def update_conversation(
+    cid: str, req: ConversationUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)
 ):
+    if req.title is None and req.pinned is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to update")
     conv = await _get_owned(db, user, cid)
-    conv.title = req.title[:200]
+    if req.title is not None:
+        conv.title = req.title[:200]
+    if req.pinned is not None:
+        conv.pinned = bool(req.pinned)
     await db.commit()
+    await db.refresh(conv)
     return conv_out(conv)
 
 

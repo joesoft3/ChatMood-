@@ -214,7 +214,7 @@ chatmood/
 | **Doc-RAG** (docs auto-embedded; cross-chat semantic retrieval) | ✅ |
 | **Multi-agent mode** (planner → researcher/coder/writer) | ✅ — toggle 🤖 in the composer |
 | **DeepSearch** (multi-round agentic research, gap analysis, cited report) | ✅ — toggle 🔭 in the composer |
-| **Pro chat UX** — stop generation, regenerate, copy + code-copy, read-aloud, export .md, rename chats, ⌘K / `/` / Esc shortcuts, per-answer model badge, persistent custom instructions | ✅ |
+| **Pro chat UX** — stop generation, regenerate, **edit & resend**, copy + code-copy, read-aloud, export .md, rename + **pin** chats, suggested follow-ups, ⌘K / `/` / Esc shortcuts, per-answer model badge, persistent custom instructions | ✅ |
 | **Alembic migrations** (baseline + guarded upgrades) | ✅ new |
 | **Observability** — Prometheus metrics, LLM instrumentation, request-id logs, health/ready probes, optional OpenTelemetry tracing | ✅ new |
 | **Owner-panel floating button** — 👑 floating Admin pill on every app page (admins only, server-verified) | ✅ v1.8.0 |

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
-import { Brain, Check, Clapperboard, Copy, Download, RotateCcw, Search, Sparkles, Square, Swords, Trash2, Volume2, Wand2 } from "lucide-react";
+import { Brain, Check, Clapperboard, Copy, Download, Pencil, RotateCcw, Search, Sparkles, Square, Swords, Trash2, Volume2, Wand2, X } from "lucide-react";
 import { apiFetch, resolveMediaUrl } from "@/lib/api";
 import ArenaPanel from "./ArenaPanel";
 import ThinkingPanel from "./ThinkingPanel";
@@ -74,6 +74,7 @@ export interface ChatMedia {
 }
 
 export interface ChatMsg {
+  id?: string;
   role: "user" | "assistant" | "system";
   content: string;
   author?: string;
@@ -350,6 +351,7 @@ export default function MessageBubble({
   onRematch,
   onEditMedia,
   onDeleteMedia,
+  onEditUser,
   isStreaming = false,
 }: {
   msg: ChatMsg;
@@ -359,11 +361,15 @@ export default function MessageBubble({
   onEditMedia?: (m: ChatMedia) => void;
   /** 🗑 Remove a generation from the user's library. */
   onDeleteMedia?: (m: ChatMedia) => void;
+  /** ✏️ Rewind the thread from this user turn and resend. */
+  onEditUser?: (text: string) => void;
   isStreaming?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [reading, setReading] = useState(false);
   const [readError, setReadError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(msg.content);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   async function copyMessage() {
@@ -400,11 +406,81 @@ export default function MessageBubble({
   if (msg.role === "user") {
     return (
       <div className="flex justify-end mood-fade-up">
-        <div className="flex max-w-[min(88%,42rem)] flex-col items-end gap-1">
+        <div className="group/user flex max-w-[min(88%,42rem)] flex-col items-end gap-1">
           {msg.author && <span className="text-[10px] text-gray-500 pr-1">🧑 {msg.author}</span>}
-          <div className="rounded-[1.55rem] border border-accent/20 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_12px_28px_rgb(0_0_0/0.14)] whitespace-pre-wrap [overflow-wrap:anywhere]">
-            {msg.content}
-          </div>
+          {editing ? (
+            <div className="w-full min-w-[16rem] rounded-[1.55rem] border border-accent/40 bg-[#171718] p-3 shadow-[0_12px_28px_rgb(0_0_0/0.14)]">
+              <label className="sr-only" htmlFor={`edit-msg-${msg.id ?? "draft"}`}>
+                Edit your message
+              </label>
+              <textarea
+                id={`edit-msg-${msg.id ?? "draft"}`}
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    const next = editText.trim();
+                    if (!next || !onEditUser) return;
+                    setEditing(false);
+                    onEditUser(next);
+                  }
+                  if (e.key === "Escape") {
+                    setEditing(false);
+                    setEditText(msg.content);
+                  }
+                }}
+                rows={Math.min(8, Math.max(2, editText.split("\n").length))}
+                className="w-full resize-none bg-transparent text-sm text-gray-100 outline-none placeholder-gray-600"
+              />
+              <div className="mt-2 flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(false);
+                    setEditText(msg.content);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-gray-400 hover:bg-white/5 hover:text-white"
+                >
+                  <X size={12} /> Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!editText.trim() || !onEditUser}
+                  onClick={() => {
+                    const next = editText.trim();
+                    if (!next || !onEditUser) return;
+                    setEditing(false);
+                    onEditUser(next);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg bg-accent px-2.5 py-1 text-[11px] font-semibold text-black hover:brightness-110 disabled:opacity-40"
+                >
+                  <Check size={12} /> Save &amp; resend
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-[1.55rem] border border-accent/20 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_12px_28px_rgb(0_0_0/0.14)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+                {msg.content}
+              </div>
+              {onEditUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditText(msg.content);
+                    setEditing(true);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] text-gray-500 opacity-100 sm:opacity-0 sm:group-hover/user:opacity-100 hover:text-white transition"
+                  aria-label="Edit message"
+                  title="Edit and resend"
+                >
+                  <Pencil size={12} /> Edit
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
     );

@@ -5,6 +5,41 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ---
 
+## 2026-08-18
+
+### ✏️📌💬 Finish the chat — edit, pin, follow-ups, and a live media-id bug
+
+The chat surface was one layer short of feeling finished. Four holes, one pass.
+
+- **Download/edit/delete on a freshly generated image did nothing.** The
+  backend already put `file_id` on the `media` SSE event (PR #24) but the
+  web handler dropped it, so the manage buttons hid until you reloaded the
+  thread. The type, the handler, and the media-flow test now all carry the
+  id through.
+- **✏️ Edit a user message.** Hover (or tap) Edit on your bubble, change
+  the text, Save & resend. The server rewinds from that turn — that
+  message and everything after it are deleted, then the new text is sent
+  as a normal turn. Cross-tenant and assistant-id edits 404. The `meta`
+  event now includes `user_message_id` so the just-sent bubble is
+  editable without a reload.
+- **💬 Suggested follow-ups.** After a text answer, three tap-to-send
+  chips land above the composer (cheap model, 4s budget, fail-open, skipped
+  in quota-economy). They never delay the last token.
+- **📌 Pin a chat.** Sidebar pin keeps it above recency; unpin restores
+  the old order. `PATCH /conversations/{id}` now accepts `{title}`,
+  `{pinned}`, or both. Migration `0028_conversation_pins` is
+  existence-guarded.
+- **Upgrade CTA** from a plan-limit banner now goes to `/upgrade`, not
+  Settings.
+- **Vercel cache headers** so the HTML shell is `no-store` and hashed
+  `/_next/static/*` assets stay immutable — the live site can no longer
+  pin a stale layout after a successful deploy.
+
+Tests: +8 in `tests/test_chat_finish.py`, plus a `file_id` /
+`user_message_id` assertion on the existing image SSE contract.
+
+---
+
 ## 2026-07-27
 
 ### 🔐 Sign-in page — autofill, labels, and a heading that isn't a duplicate

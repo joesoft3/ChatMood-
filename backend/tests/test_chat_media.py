@@ -107,6 +107,9 @@ def test_image_flow_sse_contract(env, monkeypatch):
             assert start["kind"] == "image" and "kente robot" in start["prompt"]
             media = next(e for e in evs if e["type"] == "media")
             assert media["url"] == "https://cdn.example/archived.png" and media["stored"] == "r2"
+            # file_id is what makes download/edit/delete work before a reload.
+            assert media["file_id"] == "file-img-1"
+            assert evs[0].get("user_message_id")
             meta = evs[0]
             assert meta["model"] == "ChatMood Canvas"  # friendly label only — no vendor names
             # assistant persisted with meta.media (reload contract)
