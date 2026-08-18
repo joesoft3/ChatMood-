@@ -23,6 +23,7 @@ def user_out(u: User) -> dict:
         "plan": u.plan,
         "custom_instructions": u.custom_instructions,
         "fun_mode": bool(getattr(u, "fun_mode", False)),
+        "study_mode": bool(getattr(u, "study_mode", False)),
         "is_admin": is_effective_admin(u),
     }
 
@@ -163,11 +164,13 @@ async def update_preferences(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Personalization: persistent custom instructions + Fun-mode preference."""
+    """Personalization: persistent custom instructions + Fun / Study preferences."""
     if req.custom_instructions is not None:
         user.custom_instructions = req.custom_instructions.strip() or None
     if req.fun_mode is not None:
         user.fun_mode = bool(req.fun_mode)
+    if req.study_mode is not None:
+        user.study_mode = bool(req.study_mode)
     await db.commit()
     await db.refresh(user)
     return user_out(user)

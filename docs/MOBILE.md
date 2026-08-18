@@ -13,6 +13,7 @@ The chat screen (`mobile/lib/chat_screen.dart`) now matches the web finish pass:
 | 💬 Follow-ups | After a text answer, up to three tap-to-send chips land above the composer. | SSE `suggestions` |
 | ⬇✏️🗑 Media | Live and restored generations carry `file_id`. Download shares via the stable `/files/{id}/download` route; Edit prefills the composer; Delete removes the library row and the card. | `GET/DELETE /files/{id}` |
 | 😄 Fun / 👻 Temporary | Drawer toggles. Fun sends `fun: true`; Temporary hides the chat from history and skips memory writes. | `POST /chat/stream` |
+| 📚 Study mode | Drawer toggle. Persists via `PATCH /auth/preferences` `{study_mode}` and sends `study: true` on the next turn. | `POST /chat/stream` `{study}` |
 
 ## Navigation
 

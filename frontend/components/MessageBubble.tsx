@@ -7,7 +7,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { downloadFile, downloadUrl, mediaFilename } from "@/lib/download";
-import { Brain, Check, Clapperboard, Copy, Download, Pencil, RotateCcw, Search, Sparkles, Square, Swords, Trash2, Volume2, Wand2, X } from "lucide-react";
+import { Brain, Check, Clapperboard, Copy, Download, Pencil, RotateCcw, Search, Sparkles, Square, Swords, ThumbsDown, ThumbsUp, Trash2, Volume2, Wand2, X } from "lucide-react";
 import { apiFetch, resolveMediaUrl } from "@/lib/api";
 import ArenaPanel from "./ArenaPanel";
 import ThinkingPanel from "./ThinkingPanel";
@@ -90,6 +90,7 @@ export interface ChatMsg {
   arena?: ArenaState;
   think?: ThinkState;
   media?: ChatMedia[];
+  feedback?: "up" | "down" | null;
 }
 
 const AGENT_ICON: Record<string, string> = { researcher: "🔍", coder: "⌨️", writer: "✍️", critic: "🧐" };
@@ -356,6 +357,8 @@ export default function MessageBubble({
   onDeleteMedia,
   onEditUser,
   onOpenCanvas,
+  onFeedback,
+  onContinue,
   isStreaming = false,
 }: {
   msg: ChatMsg;
@@ -369,6 +372,8 @@ export default function MessageBubble({
   onEditUser?: (text: string) => void;
   /** Open this answer in the Grok-style Canvas workspace. */
   onOpenCanvas?: (title: string, content: string) => void;
+  onFeedback?: (rating: "up" | "down" | null) => void;
+  onContinue?: () => void;
   isStreaming?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
@@ -626,6 +631,31 @@ export default function MessageBubble({
                 >
                   Canvas
                 </button>
+              )}
+              {onContinue && (
+                <button onClick={onContinue} title="Continue generating" className="rounded-lg px-2 py-1 hover:bg-white/5 hover:text-gray-300 transition text-[12px]">
+                  Continue
+                </button>
+              )}
+              {onFeedback && (
+                <>
+                  <button
+                    onClick={() => onFeedback(msg.feedback === "up" ? null : "up")}
+                    title="Good response"
+                    className={`rounded-lg px-2 py-1 hover:bg-white/5 transition ${msg.feedback === "up" ? "text-accent" : "hover:text-gray-300"}`}
+                    aria-pressed={msg.feedback === "up"}
+                  >
+                    <ThumbsUp size={13} />
+                  </button>
+                  <button
+                    onClick={() => onFeedback(msg.feedback === "down" ? null : "down")}
+                    title="Bad response"
+                    className={`rounded-lg px-2 py-1 hover:bg-white/5 transition ${msg.feedback === "down" ? "text-red-400" : "hover:text-gray-300"}`}
+                    aria-pressed={msg.feedback === "down"}
+                  >
+                    <ThumbsDown size={13} />
+                  </button>
+                </>
               )}
               {msg.model && <span className="text-[10px] ml-auto rounded-full border border-white/5 bg-white/5 px-2 py-0.5">{msg.model}</span>}
             </div>

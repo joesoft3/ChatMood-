@@ -97,6 +97,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _arenaMode = false;
   bool _thinkOn = false;
   bool _funMode = false;
+  bool _studyMode = false;
   bool _temporary = false;
   String _model = 'auto';
   bool _recording = false;
@@ -132,6 +133,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             if (_userName.isNotEmpty) {
               _userName = _userName[0].toUpperCase() + _userName.substring(1);
             }
+            _funMode = data['fun_mode'] == true;
+            _studyMode = data['study_mode'] == true;
           });
         }
       }
@@ -515,6 +518,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       'model': _model,
       'think': _thinkOn,
       'fun': _funMode,
+      'study': _studyMode,
       'temporary': _temporary,
       'arena': useArena,
       if (rematch) 'rematch': true,
@@ -1630,7 +1634,22 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     subtitle: const Text('wittier Grok voice — facts stay true',
                         style: TextStyle(fontSize: 10, color: Colors.grey)),
                     value: _funMode,
-                    onChanged: (v) => setState(() => _funMode = v),
+                    onChanged: (v) {
+                      setState(() => _funMode = v);
+                      Api.patch('/auth/preferences', {'fun_mode': v});
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    dense: true,
+                    secondary: const Icon(Icons.menu_book_outlined, size: 18),
+                    title: const Text('📚 Study mode', style: TextStyle(fontSize: 13)),
+                    subtitle: const Text('Socratic tutor — hints first, then a quiz',
+                        style: TextStyle(fontSize: 10, color: Colors.grey)),
+                    value: _studyMode,
+                    onChanged: (v) {
+                      setState(() => _studyMode = v);
+                      Api.patch('/auth/preferences', {'study_mode': v});
+                    },
                   ),
                   SwitchListTile.adaptive(
                     dense: true,

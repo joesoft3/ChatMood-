@@ -16,6 +16,7 @@ class LoginRequest(BaseModel):
 class PreferencesUpdate(BaseModel):
     custom_instructions: str | None = Field(default=None, max_length=2000)
     fun_mode: bool | None = None  # 😄 persist Grok-style Fun personality
+    study_mode: bool | None = None  # 📚 persist ChatGPT-style Study tutor
 
 
 class AccountDeleteRequest(BaseModel):
@@ -50,6 +51,7 @@ class ConversationUpdate(BaseModel):
 
     title: str | None = Field(default=None, min_length=1, max_length=200)
     pinned: bool | None = None
+    archived: bool | None = None  # 📦 hide from live history without deleting
 
 
 class ChatRequest(BaseModel):
@@ -72,6 +74,9 @@ class ChatRequest(BaseModel):
     edit_from: str | None = None      # ✏️ rewind: delete this user message + everything after, then resend
     fun: bool = False                 # 😄 Fun mode for this turn (else user.fun_mode)
     temporary: bool = False           # 👻 incognito: no history, no memory write
+    study: bool = False               # 📚 Study mode for this turn (else user.study_mode)
+    gpt_id: str | None = None         # 🤖 run as a custom / catalog GPT
+    continue_gen: bool = False        # ▶️ continue the last assistant message (no new user turn)
 
 
 class WorkspaceCreate(BaseModel):
@@ -164,6 +169,29 @@ class AdminPushTest(BaseModel):
 class MemoryUpdate(BaseModel):
     fact: str = Field(min_length=1, max_length=500)
     category: str | None = Field(default=None, max_length=24)
+
+
+class FeedbackRequest(BaseModel):
+    rating: str | None = Field(default=None, pattern="^(up|down)$")
+    note: str | None = Field(default=None, max_length=500)
+
+
+class GptCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=400)
+    instructions: str = Field(default="", max_length=8_000)
+    emoji: str = Field(default="🤖", max_length=8)
+    starters: list[str] = Field(default_factory=list, max_length=4)
+    file_ids: list[str] = Field(default_factory=list, max_length=12)
+
+
+class GptUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    description: str | None = Field(default=None, max_length=400)
+    instructions: str | None = Field(default=None, max_length=8_000)
+    emoji: str | None = Field(default=None, max_length=8)
+    starters: list[str] | None = Field(default=None, max_length=4)
+    file_ids: list[str] | None = Field(default=None, max_length=12)
 
 
 class ImageRequest(BaseModel):

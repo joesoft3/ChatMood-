@@ -16,6 +16,7 @@ interface Me {
   plan: string;
   custom_instructions?: string | null;
   fun_mode?: boolean;
+  study_mode?: boolean;
 }
 
 interface Mem {
@@ -297,6 +298,7 @@ export default function SettingsPage() {
   const [instructions, setInstructions] = useState("");
   const [instrSaved, setInstrSaved] = useState(false);
   const [funMode, setFunMode] = useState(false);
+  const [studyMode, setStudyMode] = useState(false);
   const [editingMem, setEditingMem] = useState<string | null>(null);
   const [editFact, setEditFact] = useState("");
   const [usage, setUsage] = useState<UsageSummary | null>(null);
@@ -1001,6 +1003,7 @@ export default function SettingsPage() {
             actions={
               <>
                 <StudioActionLink href="/chat">💬 Chat</StudioActionLink>
+                <StudioActionLink href="/gpts">🤖 GPTs</StudioActionLink>
                 <StudioActionLink href="/plugins">🧩 Plugins</StudioActionLink>
                 <StudioActionLink href="/files">🗂 Files</StudioActionLink>
               </>
@@ -1977,6 +1980,22 @@ export default function SettingsPage() {
                   className="accent-[#7c9bff]"
                 />
                 😄 Fun mode — wittier, more Grok. Facts stay true.
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={studyMode}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setStudyMode(next);
+                    void apiFetch("/auth/preferences", {
+                      method: "PATCH",
+                      body: JSON.stringify({ study_mode: next }),
+                    }).catch(() => {});
+                  }}
+                  className="accent-[#7c9bff]"
+                />
+                📚 Study mode — tutor first. Hints, then a quiz. Not an answer key.
               </label>
               <textarea
                 value={instructions}

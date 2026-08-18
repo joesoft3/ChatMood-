@@ -20,6 +20,7 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     fun_mode: Mapped[bool] = mapped_column(default=False)  # 😄 Grok-style Fun personality
+    study_mode: Mapped[bool] = mapped_column(default=False)  # 📚 ChatGPT-style Socratic tutor
     plan: Mapped[str] = mapped_column(String(20), default="free")
     is_admin: Mapped[bool] = mapped_column(default=False)  # app-owner panel access (ADMIN_EMAILS env also grants)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -75,6 +76,8 @@ class Conversation(Base):
     title: Mapped[str] = mapped_column(String(200), default="New chat")
     pinned: Mapped[bool] = mapped_column(default=False)  # 📌 stays at the top of the sidebar
     temporary: Mapped[bool] = mapped_column(default=False)  # 👻 Grok-style: hidden from history, no memory write
+    archived: Mapped[bool] = mapped_column(default=False)  # 📦 ChatGPT-style: hidden from live history, not deleted
+    gpt_id: Mapped[str | None] = mapped_column(String(48), nullable=True, index=True)  # custom GPT / catalog id
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)  # rolling cross-chat recall summary
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -476,6 +479,30 @@ class ReelSave(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
+    )
+
+
+class CustomGpt(Base):
+    """Custom GPT — a reusable ChatGPT-style assistant the user built.
+
+    Catalog starters (`catalog:…`) live in code, not here. User-owned rows carry
+    a standing instruction, conversation starters, and optional knowledge-file
+    ids (FileAsset ids). Deleting a GPT never deletes the chats that used it.
+    """
+
+    __tablename__ = "custom_gpts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    description: Mapped[str] = mapped_column(Text, default="")
+    instructions: Mapped[str] = mapped_column(Text, default="")
+    emoji: Mapped[str] = mapped_column(String(8), default="🤖")
+    starters: Mapped[list] = mapped_column(JSON, default=list)
+    file_ids: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
 

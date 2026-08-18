@@ -7,6 +7,34 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 🤖 ChatGPT-parity pack — Custom GPTs, Study, archive, search, ratings, Continue
+
+Nothing was removed. This pack adds the ChatGPT surfaces ChatMood was still
+missing so the product can merge and deploy as a serious assistant, not a
+thin Grok wrapper.
+
+- **🤖 Custom GPTs.** `/gpts` is a real store: eight catalog assistants
+  (Writing Coach, Code Reviewer, Interview Prep, Data Analyst, Study Tutor,
+  Meeting Notes, Email Pro, Daily Pulse) plus private user-built GPTs with
+  instructions, starters and knowledge files. `/chat?gpt=` starts a thread
+  that keeps that brief on every turn.
+- **📚 Study mode.** Socratic tutor on the model row, Settings, and Flutter
+  drawer. Persists as `users.study_mode`; a turn can also send `study: true`.
+- **📦 Archive.** Hide a chat from the live sidebar without deleting it.
+  Restore from Archived. `conversations.archived`.
+- **🔎 Full-text search.** The sidebar search now hits titles *and* message
+  bodies (`GET /conversations/search?q=`).
+- **👍👎 Ratings.** Thumbs on an assistant turn store `meta.feedback`.
+- **▶️ Continue.** Grow the last answer in place — no extra user turn.
+- **⎘ Duplicate + JSON export.** Fork a thread; download JSON or Markdown
+  from the API. The existing client Markdown export stays.
+- **🌅 Pulse, honestly.** Daily Pulse is a catalog GPT; **Schedule daily
+  Pulse** creates a real 08:00 UTC task with live search. Not a fake
+  always-on agent.
+
+Migration `0030_chatgpt_parity` is existence-guarded. Tests:
+`test_chatgpt_parity.py`. Mobile `1.9.9+25`.
+
 ### 😄 Grok-parity pack — Fun, temporary chats, editable memory, DeeperSearch, Canvas, math
 
 ChatMood already had the Grok core. This pack closes the remaining *user-facing*
