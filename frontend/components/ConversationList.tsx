@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MessageSquare, Plus, Search, Trash2 } from "lucide-react";
+import { MessageSquare, Pin, PinOff, Plus, Search, Trash2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
 import { useConversations } from "@/lib/conversations";
@@ -11,7 +11,7 @@ import { useConversations } from "@/lib/conversations";
 export default function ConversationList({ onNavigate }: { onNavigate?: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { convs, activeId, setActiveId, remove, refresh } = useConversations();
+  const { convs, activeId, setActiveId, remove, refresh, pin } = useConversations();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [query, setQuery] = useState("");
@@ -102,9 +102,23 @@ export default function ConversationList({ onNavigate }: { onNavigate?: () => vo
               />
             ) : (
               <span className="flex-1 truncate" title="Double-click to rename">
+                {c.pinned ? "📌 " : ""}
                 {c.title || "New chat"}
               </span>
             )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                void pin(c.id, !c.pinned);
+              }}
+              className={`md:opacity-0 md:group-hover:opacity-100 transition ${
+                c.pinned ? "opacity-100 text-accent" : "text-gray-500 hover:text-white"
+              }`}
+              aria-label={c.pinned ? "Unpin chat" : "Pin chat"}
+              title={c.pinned ? "Unpin" : "Pin to top"}
+            >
+              {c.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();

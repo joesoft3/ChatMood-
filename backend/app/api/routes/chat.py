@@ -14,6 +14,7 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +67,38 @@ async def summarize_thinking(trace: str) -> str | None:
         return out.strip() or None
     except Exception:
         return None
+
+
+async def suggest_followups(user_msg: str, reply: str) -> list[str]:
+    """3 tap-to-send follow-ups. Fail-open, quota-economy skip, never blocks the answer."""
+    if settings.QUOTA_ECONOMY or not (user_msg or "").strip() or not (reply or "").strip():
+        return []
+    try:
+        out = await asyncio.wait_for(
+            llm.complete(
+                [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Given this exchange, propose exactly 3 short follow-up questions "
+                            "the user might tap next. One line each, no numbering, no quotes, "
+                            "under 8 words.\n\nUser: "
+                            + user_msg[:400]
+                            + "\n\nAssistant: "
+                            + reply[:800]
+                        ),
+                    }
+                ],
+                max_tokens=80,
+            ),
+            timeout=4.0,
+        )
+        lines = [ln.strip(" \t-•0123456789.)") for ln in (out or "").splitlines() if ln.strip()]
+        clean = [ln[:80] for ln in lines if len(ln) >= 3]
+        return clean[:3]
+    except Exception:
+        return []
+
 
 SYSTEM_PROMPT = """You are ChatMood — a truthful, witty, maximally helpful AI assistant (Grok-style personality).
 - Answer directly. Use markdown. Be concise by default, thorough when the question warrants it.
@@ -332,6 +365,36 @@ async def chat_stream(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty message")
     await enforce_rate_limit(f"chat:{user.id}", settings.CHAT_RATE_LIMIT_PER_MIN * plan_rate_mult(user.plan))
 
+    # ✏️ Edit: rewind the thread to a specific user message, then resend the new text.
+    # Mutually exclusive with regenerate — edit is the more specific rewind.
+    if req.edit_from:
+        if not req.conversation_id or not req.message.strip():
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Nothing to edit")
+        conv = await db.get(Conversation, req.conversation_id)
+        if not conv or conv.user_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
+        rows = (
+            await db.execute(
+                select(Message)
+                .where(Message.conversation_id == conv.id)
+                # created_at is 1s on sqlite — when a user turn and its reply
+                # share a timestamp, `role desc` puts "user" before "assistant"
+                # so rewind doesn't leave the old answer sitting above the cut.
+                .order_by(Message.created_at.asc(), Message.role.desc(), Message.id.asc())
+            )
+        ).scalars().all()
+        idx = next((i for i, m in enumerate(rows) if m.id == req.edit_from), None)
+        if idx is None or rows[idx].role != "user":
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Message not found")
+        doomed = rows[idx:]
+        await db.execute(sql_delete(Message).where(Message.id.in_([m.id for m in doomed])))
+        for m in doomed:
+            db.expunge(m)  # drop from identity map so commit can't resurrect them
+        await db.flush()
+        db.expire(conv, ["messages"])
+        req.files = []
+        req.regenerate = False
+
     # Regenerate: replay the last user message (delete previous exchange, resend cleanly)
     if req.regenerate:
         if not req.conversation_id:
@@ -360,14 +423,16 @@ async def chat_stream(
     conv, created = await get_or_create_conversation(
         db, user, req.conversation_id, req.message, req.workspace_id, req.project_id
     )
-    db.add(
-        Message(conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files})
+    user_row = Message(
+        conversation_id=conv.id, user_id=user.id, role="user", content=req.message, meta={"files": req.files}
     )
+    db.add(user_row)
     for fid in req.files[:6]:  # link assets to the conversation
         a = await db.get(FileAsset, fid)
         if a and a.user_id == user.id:
             a.conversation_id = conv.id
     await db.commit()
+    user_message_id = user_row.id
 
     # 🎨🎬 In-chat creation (v1.9.7) — "create an image of…" / "make a video of…"
     # Routed BEFORE context assembly: zero LLM classification cost, no memory/RAG
@@ -404,6 +469,7 @@ async def chat_stream(
                     CreateIntent(kind="image", prompt=req.message.strip() or "Remix this image"),
                     bg,
                     reference_image=asset,
+                    user_message_id=user_message_id,
                 )
 
         if not req.files:
@@ -413,7 +479,7 @@ async def chat_stream(
             else:
                 intent = route_media_intent(req.message, last_media)
             if intent:
-                return await _media_stream(req, db, user, conv, created, intent, bg)
+                return await _media_stream(req, db, user, conv, created, intent, bg, user_message_id=user_message_id)
 
     messages, model, live_search = await build_messages(
         db, user, conv.id, req.message, req.files, req.search, created,
@@ -443,7 +509,15 @@ async def chat_stream(
         traces: list[str] = []
         think_t0 = time.perf_counter()
         try:
-            yield sse({"type": "meta", "conversation_id": conv.id, "model": model, "created": created})
+            yield sse(
+                {
+                    "type": "meta",
+                    "conversation_id": conv.id,
+                    "model": model,
+                    "created": created,
+                    "user_message_id": user_message_id,
+                }
+            )
             if tool_calls:
                 yield sse({"type": "tools", "calls": tool_calls})
             if pending_actions:
@@ -502,6 +576,11 @@ async def chat_stream(
             bg.add_task(update_conversation_summary, user.id, conv.id)
             if created:
                 bg.add_task(generate_title, conv.id, req.message)
+            # Follow-ups AFTER the answer is persisted so a slow rewrite never
+            # delays the last token. Fail-open: missing chips beat a hung turn.
+            followups = await suggest_followups(req.message, reply)
+            if followups:
+                yield sse({"type": "suggestions", "suggestions": followups})
             yield sse({"type": "done"})
         except Exception as e:
             log.exception("chat stream failed")
@@ -759,6 +838,7 @@ async def _media_stream(
     intent: CreateIntent,
     bg: BackgroundTasks,
     reference_image: FileAsset | None = None,
+    user_message_id: str | None = None,
 ) -> StreamingResponse:
     """🎨🎬 One SSE contract for in-chat creations: meta → media_start →
     (media_progress…) → media → done. The assistant message persists with
@@ -788,7 +868,15 @@ async def _media_stream(
                 if kind == "image" and reference_image is not None
                 else await _resolve_chat_media_prompt(db, conv.id, req.message, prompt, kind)
             )
-            yield sse({"type": "meta", "conversation_id": conv.id, "model": model_label, "created": created})
+            yield sse(
+                {
+                    "type": "meta",
+                    "conversation_id": conv.id,
+                    "model": model_label,
+                    "created": created,
+                    "user_message_id": user_message_id,
+                }
+            )
             yield sse({"type": "media_start", "kind": kind, "prompt": resolved_prompt})
             if kind == "image":
                 url = await llm.generate_image(resolved_prompt)

@@ -19,6 +19,7 @@ export interface ChatPayload {
   arena_extra?: string; // extra provider (grok-code-fast-1 | gemini-2.5-flash) when keys exist
   rematch?: boolean;    // ⚔️ rematch — drafters try to beat the previous winner
   mode?: string;        // 🎨🎬 force in-chat creation: "image" | "video" (undefined = auto-detect)
+  edit_from?: string;   // ✏️ rewind from this user message id, then resend
 }
 
 export interface ChatEvent {
@@ -74,8 +75,11 @@ export interface ChatEvent {
   url?: string;              // media: render URL
   prompt?: string;           // media_start | media: the cleaned generation prompt
   stored?: string;           // media: r2 | local | hotlink
+  file_id?: string;          // media: FileAsset id so download/edit/delete work before reload
   stage?: string;            // media_progress: scenes | compositing
   done?: number;             // media_progress progress counter
+  user_message_id?: string;  // meta: persisted id of the user turn we just wrote
+  suggestions?: string[];    // tap-to-send follow-ups after the answer
 }
 
 async function sseErrorMessage(res: Response): Promise<string> {

@@ -44,6 +44,13 @@ class RenameRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
 
 
+class ConversationUpdate(BaseModel):
+    """PATCH /conversations/{id} — any subset; at least one field required."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    pinned: bool | None = None
+
+
 class ChatRequest(BaseModel):
     conversation_id: str | None = None
     workspace_id: str | None = None  # create/share this conversation in a team workspace
@@ -61,6 +68,7 @@ class ChatRequest(BaseModel):
     arena_extra: str | None = None    # extra arena panelist: gemini-2.5-flash | grok-code-fast-1
     rematch: bool = False             # ⚔️ rematch: drafters try to beat the previous arena winner
     mode: str | None = None           # 🎨🎬 v1.9.7: force "image" | "video" in-chat creation (None = auto-detect)
+    edit_from: str | None = None      # ✏️ rewind: delete this user message + everything after, then resend
 
 
 class WorkspaceCreate(BaseModel):

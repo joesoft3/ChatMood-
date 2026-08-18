@@ -72,6 +72,7 @@ class Conversation(Base):
     )  # 🗂 filed under a Project (instructions + pinned files apply). No FK: projects
     # is created by a later migration, and a plain column keeps create_all order-free.
     title: Mapped[str] = mapped_column(String(200), default="New chat")
+    pinned: Mapped[bool] = mapped_column(default=False)  # 📌 stays at the top of the sidebar
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)  # rolling cross-chat recall summary
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

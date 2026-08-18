@@ -7,6 +7,8 @@ import { apiFetch, token } from "./api";
 export interface ConvItem {
   id: string;
   title: string;
+  pinned?: boolean;
+  updated_at?: string | null;
 }
 
 /** Legacy key retained for integrations that still clear the previous selection. */
@@ -20,6 +22,7 @@ interface CtxType {
   setActiveId: (id: string | null) => void;
   refresh: () => Promise<void>;
   remove: (id: string) => Promise<void>;
+  pin: (id: string, pinned: boolean) => Promise<void>;
 }
 
 const Ctx = createContext<CtxType | null>(null);
@@ -91,6 +94,18 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  const pin = useCallback(async (id: string, pinned: boolean) => {
+    setConvs((c) => {
+      const next = c.map((x) => (x.id === id ? { ...x, pinned } : x));
+      return next.sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+    });
+    try {
+      await apiFetch(`/conversations/${id}`, { method: "PATCH", body: JSON.stringify({ pinned }) });
+    } catch {
+      void refresh();
+    }
+  }, [refresh]);
+
   const remove = useCallback(async (id: string) => {
     setConvs((c) => c.filter((x) => x.id !== id));
     setActiveIdState((curr) => {
@@ -111,6 +126,6 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   }, []);
 
   return (
-    <Ctx.Provider value={{ convs, activeId, setActiveId, refresh, remove }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ convs, activeId, setActiveId, refresh, remove, pin }}>{children}</Ctx.Provider>
   );
 }
