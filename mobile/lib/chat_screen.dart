@@ -6,8 +6,10 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
 import 'design_screen.dart';
@@ -18,8 +20,11 @@ import 'tasks_screen.dart';
 
 import 'api.dart';
 import 'arena_view.dart';
+import 'chat_models.dart';
 import 'login_screen.dart';
 import 'main.dart';
+
+export 'chat_models.dart';
 
 const Color lightBase = Color(0xFFF8F9FA);
 const Color lightPanel = Colors.white;
@@ -34,45 +39,9 @@ class AgentStep {
   String? preview;
 }
 
-/// 🎨🎬 In-chat creation (v1.9.7): image/video generated inline from the chat box.
-class ChatMedia {
-  ChatMedia({
-    required this.kind,
-    this.url,
-    this.prompt,
-    this.stored,
-    this.pending = false,
-    this.stage,
-    this.done,
-    this.total,
-  });
-
-  final String kind; // 'image' | 'video'
-  String? url;
-  String? prompt;
-  String? stored; // r2 | local | hotlink
-  bool pending;
-  String? stage; // scenes | compositing
-  int? done;
-  int? total;
-
-  /// Reload contract: assistant meta.media[0] re-renders the artifact.
-  static ChatMedia? fromMeta(dynamic meta) {
-    if (meta is! Map) return null;
-    final list = meta['media'];
-    if (list is! List || list.isEmpty || list.first is! Map) return null;
-    final m = Map<dynamic, dynamic>.from(list.first as Map);
-    return ChatMedia(
-      kind: '${m['kind'] ?? 'image'}',
-      url: m['url'] as String?,
-      prompt: m['prompt'] as String?,
-      stored: m['stored'] as String?,
-    );
-  }
-}
-
 class ChatMsg {
-  ChatMsg({required this.role, required this.text, this.author});
+  ChatMsg({this.id, required this.role, required this.text, this.author});
+  String? id; // server message id — required to ✏️ edit & resend
   final String role; // 'user' | 'assistant'
   String text;
   String? author; // display label for user messages in team workspaces
@@ -84,9 +53,10 @@ class ChatMsg {
 }
 
 class Conversation {
-  Conversation({required this.id, required this.title});
+  Conversation({required this.id, required this.title, this.pinned = false});
   final String id;
   final String title;
+  bool pinned;
 }
 
 class Workspace {
@@ -118,6 +88,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final _player = AudioPlayer();
   int _homeTab = 0; // 🏠 Grok-style home: 0 = Ask (chat), Imagine → creation studios
   List<Conversation> _conversations = [];
+  List<String> _suggestions = [];
   String? _conversationId;
   String? _recordPath;
   bool _busy = false;
@@ -199,6 +170,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _conversationId = null;
       _messages.clear();
       _files.clear();
+      _suggestions = [];
     });
     _loadConversations(); // keep the drawer instantly current
   }
@@ -209,7 +181,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         final data = await Api.get('/conversations');
         setState(() {
           _conversations = [
-            for (final c in (data as List)) Conversation(id: c['id'] as String, title: c['title'] as String),
+            for (final c in (data as List))
+              Conversation(
+                id: c['id'] as String,
+                title: c['title'] as String? ?? 'New chat',
+                pinned: c['pinned'] == true,
+              ),
           ];
         });
       } else {
@@ -247,6 +224,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _conversationId = null;
       _messages.clear();
       _files.clear();
+      _suggestions = [];
       _authors = {};
     });
     _loadConversations();
@@ -310,6 +288,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     setState(() {
       _conversationId = id;
       _messages.clear();
+      _suggestions = [];
       _busy = true;
     });
     try {
@@ -326,6 +305,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             for (final m in (data['messages'] as List))
               if (m['role'] == 'user' || m['role'] == 'assistant')
                 ChatMsg(
+                  id: m['id'] as String?,
                   role: m['role'] as String,
                   text: m['content'] as String,
                   author: (m['role'] == 'user' && _workspace != null && m['user_id'] != null)
@@ -352,6 +332,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       _conversationId = null;
       _messages.clear();
       _files.clear();
+      _suggestions = [];
     });
   }
 
@@ -372,15 +353,152 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     await _sendMessage(text);
   }
 
-  /// Core send path — also reused by ⚔️ rematch (replays the last question).
-  Future<void> _sendMessage(String text, {bool rematch = false}) async {
+  /// ✏️ Rewind from a user turn and resend the edited text.
+  /// edit_from lives on /chat/stream only — force that path so the server
+  /// actually deletes the old turn instead of appending a new one.
+  Future<void> _editMessage(int index, String text) async {
+    if (_busy) return;
+    final target = (index >= 0 && index < _messages.length) ? _messages[index] : null;
+    final id = target?.id;
+    if (id == null || id.isEmpty) return;
+    setState(() {
+      _messages.removeRange(index, _messages.length);
+      _suggestions = [];
+    });
+    await _sendMessage(text, editFrom: id);
+  }
+
+  Future<void> _togglePin(Conversation c) async {
+    final next = !c.pinned;
+    setState(() {
+      c.pinned = next;
+      _conversations.sort((a, b) {
+        if (a.pinned == b.pinned) return 0;
+        return a.pinned ? -1 : 1;
+      });
+    });
+    try {
+      await Api.patch('/conversations/${c.id}', {'pinned': next});
+    } catch (_) {
+      await _loadConversations();
+    }
+  }
+
+  Future<void> _deleteConversation(Conversation c) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: lightPanel,
+        title: const Text('Delete this chat?'),
+        content: Text(
+          '“${c.title}” will be removed from your history. This cannot be undone.',
+          style: const TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.delete('/conversations/${c.id}');
+      if (!mounted) return;
+      setState(() {
+        _conversations.removeWhere((x) => x.id == c.id);
+        if (_conversationId == c.id) {
+          _conversationId = null;
+          _messages.clear();
+          _files.clear();
+          _suggestions = [];
+        }
+      });
+    } catch (e) {
+      _toast('Could not delete chat');
+    }
+  }
+
+  void _editMedia(ChatMedia media) {
+    final verb = media.kind == 'image' ? 'Edit this image' : 'Edit this video';
+    _prefill('$verb: ');
+  }
+
+  Future<void> _deleteMedia(ChatMedia media) async {
+    if (!media.manageable) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: lightPanel,
+        title: const Text('Delete this generation?'),
+        content: const Text(
+          'It will be removed from your library. This cannot be undone.',
+          style: TextStyle(fontSize: 13, color: Colors.black54),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await Api.delete('/files/${media.fileId}');
+      if (!mounted) return;
+      setState(() {
+        for (final m in _messages) {
+          if (m.media?.fileId == media.fileId) m.media = null;
+        }
+      });
+    } catch (_) {
+      _toast("Couldn't delete that file");
+    }
+  }
+
+  Future<void> _downloadMedia(ChatMedia media) async {
+    try {
+      List<int> bytes;
+      if (media.manageable) {
+        bytes = await Api.getBytes('/files/${media.fileId}/download');
+      } else if ((media.url ?? '').isNotEmpty) {
+        final res = await http.get(Uri.parse(media.url!)).timeout(const Duration(seconds: 60));
+        if (res.statusCode >= 400) throw Exception('HTTP ${res.statusCode}');
+        bytes = res.bodyBytes;
+      } else {
+        return;
+      }
+      final name = mediaFilename(media.prompt, media.kind);
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/$name';
+      await File(path).writeAsBytes(bytes, flush: true);
+      await Share.shareXFiles(
+        [XFile(path, mimeType: media.kind == 'image' ? 'image/png' : 'video/mp4')],
+        text: media.prompt ?? 'Made with ChatMood',
+      );
+    } catch (_) {
+      _toast('Download failed');
+    }
+  }
+
+  /// Core send path — also reused by ⚔️ rematch (replays the last question)
+  /// and ✏️ edit-and-resend (rewinds from a user turn).
+  Future<void> _sendMessage(String text, {bool rematch = false, String? editFrom}) async {
     if (text.isEmpty || _busy) return;
     _poke();
-    final useArena = _arenaMode || rematch;
-    final fileIds = rematch ? <String>[] : _files.map((f) => f.id).toList();
+    final editing = editFrom != null && editFrom.isNotEmpty;
+    final useArena = !editing && (_arenaMode || rematch);
+    final fileIds = (rematch || editing) ? <String>[] : _files.map((f) => f.id).toList();
     final assistant = ChatMsg(role: 'assistant', text: '');
     setState(() {
       _busy = true;
+      _suggestions = [];
       _messages.add(ChatMsg(role: 'user', text: text));
       _messages.add(assistant);
       if (!rematch) _files.clear();
@@ -389,24 +507,37 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final payload = {
       'conversation_id': _conversationId,
       'message': text,
-      'files': _agentMode ? <String>[] : fileIds,
+      'files': _agentMode && !editing ? <String>[] : fileIds,
       'search': _search,
       'workspace_id': _workspace?.id, // personal chats send null — server ignores it
       'model': _model,
       'think': _thinkOn,
       'arena': useArena,
       if (rematch) 'rematch': true,
+      if (editing) 'edit_from': editFrom,
     };
-    final endpoint = _agentMode && !rematch
-        ? '/agents/stream'
-        : useArena
-            ? '/agents/arena/stream'
-            : '/chat/stream';
+    // edit_from is honored only on /chat/stream — force that path on a rewind.
+    final endpoint = editing
+        ? '/chat/stream'
+        : _agentMode && !rematch
+            ? '/agents/stream'
+            : useArena
+                ? '/agents/arena/stream'
+                : '/chat/stream';
     try {
       await for (final ev in Api.streamTo(endpoint, payload)) {
         switch (ev['type']) {
           case 'meta':
             _conversationId ??= ev['conversation_id'] as String?;
+            final uid = ev['user_message_id'] as String?;
+            if (uid != null && uid.isNotEmpty) {
+              for (var i = _messages.length - 1; i >= 0; i--) {
+                if (_messages[i].role == 'user') {
+                  _messages[i].id = uid;
+                  break;
+                }
+              }
+            }
             break;
           case 'plan':
             setState(() {
@@ -450,14 +581,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             break;
           case 'media': // ✅ artifact ready
             setState(() {
+              final rawId = '${ev['file_id'] ?? ''}';
               assistant.media = ChatMedia(
                 kind: '${ev['kind'] ?? 'image'}',
                 url: ev['url'] as String?,
                 prompt: ev['prompt'] as String?,
                 stored: ev['stored'] as String?,
+                fileId: rawId.isEmpty ? null : rawId,
               );
             });
             _scrollToBottom();
+            break;
+          case 'suggestions':
+            final list = ev['suggestions'];
+            if (list is List) {
+              setState(() {
+                _suggestions = [
+                  for (final s in list)
+                    if ('$s'.trim().isNotEmpty) '$s'.trim(),
+                ].take(3).toList();
+              });
+            }
             break;
           case 'topic':
             setState(() {
@@ -1539,11 +1683,42 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       itemCount: _conversations.length,
                       itemBuilder: (context, i) {
                         final c = _conversations[i];
+                        final personal = _workspace == null;
                         return ListTile(
                           dense: true,
                           selected: c.id == _conversationId,
-                          title: Text(c.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          leading: c.pinned
+                              ? const Icon(Icons.push_pin, size: 16, color: lightAccent)
+                              : null,
+                          title: Text(
+                            c.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           onTap: () => _openConversation(c.id),
+                          trailing: personal
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      tooltip: c.pinned ? 'Unpin' : 'Pin to top',
+                                      icon: Icon(
+                                        c.pinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                        size: 16,
+                                        color: c.pinned ? lightAccent : Colors.black45,
+                                      ),
+                                      onPressed: () => _togglePin(c),
+                                    ),
+                                    IconButton(
+                                      visualDensity: VisualDensity.compact,
+                                      tooltip: 'Delete chat',
+                                      icon: Icon(Icons.delete_outline, size: 16, color: Colors.red.shade300),
+                                      onPressed: () => _deleteConversation(c),
+                                    ),
+                                  ],
+                                )
+                              : null,
                         );
                       },
                     ),
@@ -1644,13 +1819,48 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         controller: _scroll,
                         padding: const EdgeInsets.all(12),
                         itemCount: _messages.length,
-                        itemBuilder: (context, i) => _Bubble(
-                              _messages[i],
-                              canRematch: !_busy,
-                              onRematch: _rematch,
-                            ),
+                        itemBuilder: (context, i) {
+                          final m = _messages[i];
+                          return _Bubble(
+                            m,
+                            canRematch: !_busy,
+                            onRematch: _rematch,
+                            onEditUser: !_busy &&
+                                    _workspace == null &&
+                                    m.role == 'user' &&
+                                    (m.id ?? '').isNotEmpty
+                                ? (text) => _editMessage(i, text)
+                                : null,
+                            onEditMedia: _editMedia,
+                            onDeleteMedia: _deleteMedia,
+                            onDownloadMedia: _downloadMedia,
+                          );
+                        },
                       ),
               ),
+              if (!emptyHome && _suggestions.isNotEmpty && !_busy)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final s in _suggestions)
+                        ActionChip(
+                          label: Text(
+                            s,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () => _sendMessage(s),
+                          backgroundColor: Colors.white,
+                          side: const BorderSide(color: lightLine),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                    ],
+                  ),
+                ),
               if (!emptyHome && _files.isNotEmpty) _filesRow(),
               if (!emptyHome)
                 SafeArea(
@@ -1669,41 +1879,150 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 }
 
-class _Bubble extends StatelessWidget {
-  const _Bubble(this.msg, {this.canRematch = false, this.onRematch});
+class _Bubble extends StatefulWidget {
+  const _Bubble(
+    this.msg, {
+    this.canRematch = false,
+    this.onRematch,
+    this.onEditUser,
+    this.onEditMedia,
+    this.onDeleteMedia,
+    this.onDownloadMedia,
+  });
   final ChatMsg msg;
   final bool canRematch; // arena verdict visible + screen not busy
   final VoidCallback? onRematch;
+  final ValueChanged<String>? onEditUser;
+  final ValueChanged<ChatMedia>? onEditMedia;
+  final ValueChanged<ChatMedia>? onDeleteMedia;
+  final ValueChanged<ChatMedia>? onDownloadMedia;
+
+  @override
+  State<_Bubble> createState() => _BubbleState();
+}
+
+class _BubbleState extends State<_Bubble> {
+  bool _editing = false;
+  late final TextEditingController _edit;
+
+  @override
+  void initState() {
+    super.initState();
+    _edit = TextEditingController(text: widget.msg.text);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Bubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.msg.text != widget.msg.text && !_editing) {
+      _edit.text = widget.msg.text;
+    }
+  }
+
+  @override
+  void dispose() {
+    _edit.dispose();
+    super.dispose();
+  }
+
+  void _commitEdit() {
+    final next = _edit.text.trim();
+    if (next.isEmpty || widget.onEditUser == null) return;
+    setState(() => _editing = false);
+    widget.onEditUser!(next);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final msg = widget.msg;
     if (msg.role == 'user') {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
           margin: const EdgeInsets.only(bottom: 12, left: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: lightAccent.withOpacity(0.12),
-            border: Border.all(color: lightAccent.withOpacity(0.25)),
-            borderRadius: BorderRadius.circular(16),
-          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (msg.author != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: lightAccent.withOpacity(0.12),
+                  border: Border.all(color: lightAccent.withOpacity(_editing ? 0.55 : 0.25)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (msg.author != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Text(
+                          msg.author!,
+                          style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    if (_editing)
+                      TextField(
+                        controller: _edit,
+                        autofocus: true,
+                        minLines: 1,
+                        maxLines: 8,
+                        style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.4),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onSubmitted: (_) => _commitEdit(),
+                      )
+                    else
+                      Text(
+                        msg.text,
+                        style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.4),
+                      ),
+                  ],
+                ),
+              ),
+              if (_editing)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: Text(
-                    msg.author!,
-                    style: const TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600),
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          _edit.text = msg.text;
+                          setState(() => _editing = false);
+                        },
+                        child: const Text('Cancel', style: TextStyle(fontSize: 12)),
+                      ),
+                      FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: lightAccent,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: _commitEdit,
+                        child: const Text('Save & resend', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                )
+              else if (widget.onEditUser != null)
+                TextButton.icon(
+                  onPressed: () {
+                    _edit.text = msg.text;
+                    setState(() => _editing = true);
+                  },
+                  icon: const Icon(Icons.edit_outlined, size: 13),
+                  label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    foregroundColor: Colors.black54,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                   ),
                 ),
-              Text(
-                msg.text,
-                style: const TextStyle(color: Colors.black87, fontSize: 15, height: 1.4),
-              ),
             ],
           ),
         ),
@@ -1757,12 +2076,17 @@ class _Bubble extends StatelessWidget {
             ArenaPanel(
               live: msg.arenaLive,
               verdict: msg.arenaData,
-              onRematch: msg.arenaData != null && canRematch ? onRematch : null,
+              onRematch: msg.arenaData != null && widget.canRematch ? widget.onRematch : null,
             ),
           if (msg.media != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: _MediaCard(media: msg.media!),
+              child: _MediaCard(
+                media: msg.media!,
+                onDownload: widget.onDownloadMedia,
+                onEdit: widget.onEditMedia,
+                onDelete: widget.onDeleteMedia,
+              ),
             ),
           msg.text.isEmpty
               ? (msg.media == null
@@ -1792,8 +2116,11 @@ class _Bubble extends StatelessWidget {
 /// 🎨🎬 In-chat creation card: shimmer-ish progress while generating →
 /// image (tap = fullscreen) or an inline video player (lazy init on first play).
 class _MediaCard extends StatelessWidget {
-  const _MediaCard({required this.media});
+  const _MediaCard({required this.media, this.onDownload, this.onEdit, this.onDelete});
   final ChatMedia media;
+  final ValueChanged<ChatMedia>? onDownload;
+  final ValueChanged<ChatMedia>? onEdit;
+  final ValueChanged<ChatMedia>? onDelete;
 
   String get _stageLabel {
     if (media.kind == 'image') return '🎨 Painting your image…';

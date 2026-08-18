@@ -2,6 +2,17 @@
 
 The Flutter app (`mobile/lib/films_screen.dart`) mirrors the web `/films` gallery and supports the full film lifecycle: render, poll, play, share, delete, resume.
 
+## Chat finish (web parity)
+
+The chat screen (`mobile/lib/chat_screen.dart`) now matches the web finish pass:
+
+| Feature | How it works | API |
+|---|---|---|
+| ✏️ Edit & resend | Tap **Edit** on your bubble, change the text, **Save & resend**. The client truncates the thread locally and posts `edit_from` on `/chat/stream` so the server rewinds that turn. Hidden in team workspaces (owner-only). | `POST /chat/stream` `{edit_from}` |
+| 📌 Pin / delete | Drawer pin keeps a personal chat above recency; unpin restores order. Delete confirms, then `DELETE`s the conversation. | `PATCH /conversations/{id}` `{pinned}` · `DELETE /conversations/{id}` |
+| 💬 Follow-ups | After a text answer, up to three tap-to-send chips land above the composer. | SSE `suggestions` |
+| ⬇✏️🗑 Media | Live and restored generations carry `file_id`. Download shares via the stable `/files/{id}/download` route; Edit prefills the composer; Delete removes the library row and the card. | `GET/DELETE /files/{id}` |
+
 ## Navigation
 
 Drawer → **🎞 Films** opens `FilmsScreen`. It reads from `GET /media/films` every 8 s (`Timer.periodic`) and updates the grid live.

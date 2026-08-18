@@ -7,6 +7,33 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 📱 Finish the chat on Flutter — edit, pin, follow-ups, media file_id
+
+The last pass finished the *web* chat. The phone still treated a just-generated
+image as a dead preview, had no way to rewind a mistyped turn, and listed
+every chat in recency order with no pin. Same four holes, same contracts.
+
+- **✏️ Edit & resend.** Tap Edit on your bubble, change the text, Save &
+  resend. The client drops that turn and everything after it, then posts
+  `edit_from` on `/chat/stream` (the only endpoint that honors a rewind —
+  arena/agent paths are forced off so the old answer cannot linger). The
+  `meta.user_message_id` is stored on the just-sent bubble so you can edit
+  it without reloading the thread. Hidden in team workspaces: the API is
+  owner-only.
+- **📌 Pin / 🗑 delete in the drawer.** Personal chats get a pin (stays
+  above recency, same `PATCH {pinned}` as the web sidebar) and a delete
+  with a confirm. Team lists stay read-only.
+- **💬 Suggested follow-ups.** After a text answer, up to three
+  tap-to-send chips land above the composer from the `suggestions` SSE
+  event. Cleared on send, new chat, and idle home-reset.
+- **⬇✏️🗑 Media `file_id`.** The live `media` event and restored
+  `meta.media` now carry the FileAsset id. Download goes through the
+  stable `/files/{id}/download` route into the share sheet (hotlinks fall
+  back to a plain GET). Edit prefills “Edit this image/video:”. Delete
+  confirms, then `DELETE /files/{id}` and drops the card locally.
+
+`mobile` version `1.9.8+24`.
+
 ### ✏️📌💬 Finish the chat — edit, pin, follow-ups, and a live media-id bug
 
 The chat surface was one layer short of feeling finished. Four holes, one pass.
