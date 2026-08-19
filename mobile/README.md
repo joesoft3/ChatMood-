@@ -1,6 +1,6 @@
 # ChatMood — Flutter mobile client
 
-Native Android/iOS client for the ChatMood API (`backend/`, `/api/v1`): email login,
+Native Android/iOS client for the ChatMood API (`backend/`, `/api/v1`): email login / access-code registration,
 conversation drawer, **streaming** chat with live-search toggle and markdown rendering,
 voice messages (STT + TTS playback), file attachments, agent-mode with live step view,
 and **team workspaces** — switch between personal and team chats in the drawer, per-author

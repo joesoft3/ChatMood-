@@ -41,10 +41,37 @@ body {
 }
 
 body {
-  background: rgb(var(--mood-base));
+  background:
+    radial-gradient(circle at 12% -12%, rgb(var(--mood-accent) / 0.18), transparent 26rem),
+    radial-gradient(circle at 92% 6%, rgb(var(--mood-text) / 0.08), transparent 22rem),
+    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)) 42%, rgb(var(--mood-panel) / 0.72));
   color: rgb(var(--mood-text));
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
+  accent-color: rgb(var(--mood-accent));
+  text-rendering: optimizeLegibility;
+}
+
+/* Global refresh polish: keep focus, selection and native widgets consistent
+   across every route without requiring each page to remember local classes. */
+::selection {
+  background: rgb(var(--mood-accent) / 0.32);
+  color: rgb(var(--mood-text));
+}
+:focus-visible {
+  outline: 2px solid rgb(var(--mood-accent) / 0.86);
+  outline-offset: 3px;
+}
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+[data-theme="light"] body {
+  background:
+    radial-gradient(circle at 12% -12%, rgb(var(--mood-accent) / 0.16), transparent 26rem),
+    radial-gradient(circle at 92% 6%, rgb(255 255 255 / 0.88), transparent 22rem),
+    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)) 42%, rgb(var(--mood-line) / 0.28));
 }
 
 /* Explicit input color fixes the invisible-typed-text bug on mobile browsers. */

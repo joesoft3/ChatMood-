@@ -17,15 +17,28 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _accessCode = TextEditingController();
   bool _register = false;
   bool _busy = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    _accessCode.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     final email = _email.text.trim();
     final password = _password.text;
-    if (email.isEmpty || password.length < 8) {
-      setState(() => _error = 'Email + password (min 8 chars) required.');
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Email + password required.');
+      return;
+    }
+    if (_register && password.length < 8) {
+      setState(() => _error = 'Choose a password with at least 8 characters.');
       return;
     }
     setState(() {
@@ -34,9 +47,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       if (_register) {
+        final code = _accessCode.text.trim();
         await Api.post('/auth/register', {
           'email': email,
           'password': password,
+          if (code.isNotEmpty) 'app_password': code,
         });
       }
       final res = await Api.post('/auth/login', {'email': email, 'password': password});
@@ -86,6 +101,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     onSubmitted: (_) => _submit(),
                     decoration: const InputDecoration(labelText: 'Password'),
                   ),
+                  if (_register) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _accessCode,
+                      obscureText: true,
+                      autocorrect: false,
+                      onSubmitted: (_) => _submit(),
+                      decoration: const InputDecoration(
+                        labelText: 'App access code (if required)',
+                        helperText: 'Enter the owner-provided code if this deployment asks for one.',
+                      ),
+                    ),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 12),
                     Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
@@ -102,7 +130,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Text(_busy ? 'Please wait…' : (_register ? 'Sign up' : 'Sign in')),
                   ),
                   TextButton(
-                    onPressed: () => setState(() => _register = !_register),
+                    onPressed: () => setState(() {
+                      _register = !_register;
+                      _error = null;
+                    }),
                     child: Text(_register ? 'Have an account? Sign in' : "New here? Create an account"),
                   ),
                 ],
