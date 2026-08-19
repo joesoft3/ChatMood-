@@ -1,5 +1,5 @@
 import AuthScreen from "@/components/AuthScreen";
 
-export default function LoginPage() {
+export default function SignInPage() {
   return <AuthScreen mode="login" />;
 }

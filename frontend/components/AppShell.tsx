@@ -8,6 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import ConversationList from "./ConversationList";
 import ErrorBoundary from "./ErrorBoundary";
 import { API, apiFetch, token } from "@/lib/api";
+import { currentNextPath, signInHref } from "@/lib/auth";
 import { applyAccent, applyFavicon, BrandMark } from "@/lib/brand";
 
 // 👑 The owner panel entry points (floating button + drawer link) are shown ONLY
@@ -74,8 +75,8 @@ export default function AppShell({
 
   // Auth guard for every page that uses the shell
   useEffect(() => {
-    if (!token.get()) router.push("/login");
-  }, [router]);
+    if (!token.get()) router.push(signInHref(currentNextPath()));
+  }, [router, pathname]);
 
   // Owner panel entry: visible ONLY to the owner email (server still
   // double-checks is_admin on every /admin API call — this gate is purely

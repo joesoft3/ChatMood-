@@ -25,7 +25,7 @@ const EXPLORE_ITEMS: ExploreItem[] = [
 /**
  * 🧭 Landing navigation — sticky, glassy bar with the brand, an accessible
  * Explore dropdown (button + arrow/Escape/outside-click handling), and the
- * sign-in / get-started actions. Keyboard: ↑/↓ move through items, Esc
+ * Sign in / Sign up actions. Keyboard: ↑/↓ move through items, Esc
  * closes and refocuses the trigger, Tab follows natural focus order.
  */
 export default function LandingNav() {
@@ -122,10 +122,10 @@ export default function LandingNav() {
             Sign in
           </Link>
           <Link
-            href="/login"
+            href="/signup"
             className="rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-black transition hover:brightness-110"
           >
-            Get started
+            Sign up
           </Link>
         </div>
       </nav>

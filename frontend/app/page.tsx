@@ -72,16 +72,16 @@ export default function Home() {
           </div>
           <div className="flex flex-wrap justify-center gap-3 pt-2">
             <Link
-              href="/login"
+              href="/signup"
               className="rounded-2xl bg-accent px-6 py-3 font-semibold text-black transition hover:brightness-110 shadow-[0_12px_28px_rgb(var(--mood-accent)/0.3)]"
             >
-              Get started — free
+              Sign up — free
             </Link>
             <Link
-              href="/chat"
+              href="/login"
               className="rounded-2xl border border-white/20 bg-black/25 px-6 py-3 backdrop-blur-sm transition hover:bg-white/10"
             >
-              Open the app
+              Sign in
             </Link>
           </div>
         </div>
@@ -206,6 +206,9 @@ export default function Home() {
             </Link>
             <Link href="/login" className="inline-flex min-h-[44px] items-center transition hover:text-gray-300">
               Sign in
+            </Link>
+            <Link href="/signup" className="inline-flex min-h-[44px] items-center transition hover:text-gray-300">
+              Sign up
             </Link>
           </span>
         </div>

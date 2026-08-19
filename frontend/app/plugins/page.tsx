@@ -6,6 +6,7 @@ import { CheckCircle2, Hand, Link2, Loader2, Puzzle, RefreshCw, ShieldCheck, Tra
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch } from "@/lib/api";
+import { currentNextPath, signInHref } from "@/lib/auth";
 
 interface PluginStatus {
   provider: string;
@@ -88,7 +89,7 @@ export default function PluginsPage() {
       setPending(a.actions);
       setLastSyncAt(Date.now());
     } catch (e: any) {
-      if ((e.message ?? "").includes("401")) router.push("/login");
+      if ((e.message ?? "").includes("401")) router.push(signInHref(currentNextPath()));
     } finally {
       setRefreshing(false);
     }

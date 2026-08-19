@@ -28,7 +28,9 @@ page.on("console", (msg) => {
 
 const checks = [
   ["/", "ChatMood", "hero copy"],
-  ["/login", "ChatMood", "login shell"],
+  ["/login", "Sign in", "sign-in shell"],
+  ["/signup", "Sign up", "sign-up shell"],
+  ["/signin", "Sign in", "sign-in alias"],
   ["/terms", "Terms", "terms body"],
   ["/privacy", "Privacy", "privacy body"],
   ["/f/deadbeefdeadbeefdeadbeefdeadbeef", "expired", "graceful share 404 state"],
