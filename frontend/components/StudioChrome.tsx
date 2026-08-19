@@ -119,10 +119,10 @@ export function StudioEmptyState({
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 py-10 sm:py-14">
       <div className="flex flex-col items-center gap-3 text-center select-none">
-        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#141415] border border-white/8 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)] text-xl">
+        <span className="grid h-11 w-11 place-items-center rounded-full bg-composer text-xl">
           {emoji}
         </span>
-        <h2 className="text-center text-[clamp(1.5rem,3.5vw,2rem)] font-semibold tracking-tight text-white">
+        <h2 className="text-center text-[32px] font-semibold tracking-tight text-gray-100">
           {title}
         </h2>
         <p className="max-w-xl text-center text-sm leading-relaxed text-gray-400">{description}</p>

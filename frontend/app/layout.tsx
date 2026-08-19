@@ -34,7 +34,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover", // edge-to-edge on notched phones
-  themeColor: "#0b0f14",
+  themeColor: "#212121",
   // Resize the app when the on-screen keyboard opens (Chrome/Android),
   // so the composer and tab bar stay visible while typing.
   interactiveWidget: "resizes-content",

@@ -2,30 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ---------------------------------------------------------- Arena palette
-   Arena's current identity uses warm paper/sand lights and worn leather
-   darks. Keep the palette in RGB tokens so every Tailwind surface, border,
-   input and text color can follow the same theme without hidden black boxes.
-   Palette reference: white #fff, gray-01 #f5f1ec, gray-02 #ebe7e2,
-   gray-03 #c7c2bc, gray-04 #8b887e, gray-05 #66615a, gray-06 #403c38,
-   gray-07 #2b2b29, black #1c1c1a, teal #31b8b5. */
+/* ---------------------------------------------------------- ChatGPT-home palette
+   Cool neutrals matching chatgpt.com: charcoal main canvas, near-black sidebar,
+   mid-gray composer, and a restrained brand green for rare accents. Tokens stay
+   RGB so every Tailwind surface follows dark/light without hidden black boxes. */
 :root {
-  --mood-base: 28 28 26;       /* Arena black */
-  --mood-panel: 43 43 41;      /* Arena gray-07 */
-  --mood-line: 64 60 56;       /* Arena gray-06 */
-  --mood-accent: 49 184 181;   /* Arena teal */
-  --mood-text: 245 241 236;    /* Arena gray-01 */
-  --mood-muted: 199 194 188;   /* Arena gray-03 */
+  --mood-base: 33 33 33;         /* #212121 main canvas */
+  --mood-panel: 23 23 23;        /* #171717 sidebar */
+  --mood-line: 47 47 47;         /* #2f2f2f */
+  --mood-accent: 16 163 127;     /* #10a37f */
+  --mood-text: 236 236 236;      /* #ececec */
+  --mood-muted: 142 142 160;     /* #8e8ea0 */
+  --mood-composer: 48 48 48;     /* #303030 */
   color-scheme: dark;
 }
 
 [data-theme="light"] {
-  --mood-base: 245 241 236;    /* Arena gray-01 — weathered notebook page */
-  --mood-panel: 255 255 255;   /* Arena white */
-  --mood-line: 199 194 188;    /* Arena gray-03 */
-  --mood-accent: 49 184 181;   /* Arena teal */
-  --mood-text: 28 28 26;       /* Arena black */
-  --mood-muted: 102 97 90;     /* Arena gray-05 */
+  --mood-base: 255 255 255;
+  --mood-panel: 249 249 249;
+  --mood-line: 227 227 227;
+  --mood-accent: 16 163 127;
+  --mood-text: 13 13 13;
+  --mood-muted: 110 110 124;
+  --mood-composer: 244 244 244;
   color-scheme: light;
 }
 
@@ -41,10 +40,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at 12% -12%, rgb(var(--mood-accent) / 0.18), transparent 26rem),
-    radial-gradient(circle at 92% 6%, rgb(var(--mood-text) / 0.08), transparent 22rem),
-    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)) 42%, rgb(var(--mood-panel) / 0.72));
+  background: rgb(var(--mood-base));
   color: rgb(var(--mood-text));
   overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
@@ -55,23 +51,17 @@ body {
 /* Global refresh polish: keep focus, selection and native widgets consistent
    across every route without requiring each page to remember local classes. */
 ::selection {
-  background: rgb(var(--mood-accent) / 0.32);
+  background: rgb(var(--mood-text) / 0.18);
   color: rgb(var(--mood-text));
 }
 :focus-visible {
-  outline: 2px solid rgb(var(--mood-accent) / 0.86);
-  outline-offset: 3px;
+  outline: 2px solid rgb(var(--mood-text) / 0.45);
+  outline-offset: 2px;
 }
 button,
 a,
 [role="button"] {
   touch-action: manipulation;
-}
-[data-theme="light"] body {
-  background:
-    radial-gradient(circle at 12% -12%, rgb(var(--mood-accent) / 0.16), transparent 26rem),
-    radial-gradient(circle at 92% 6%, rgb(255 255 255 / 0.88), transparent 22rem),
-    linear-gradient(180deg, rgb(var(--mood-base)), rgb(var(--mood-base)) 42%, rgb(var(--mood-line) / 0.28));
 }
 
 /* Explicit input color fixes the invisible-typed-text bug on mobile browsers. */
@@ -84,7 +74,7 @@ select {
 .composer-input::placeholder,
 textarea::placeholder,
 input::placeholder {
-  color: rgb(var(--mood-muted) / 0.75);
+  color: rgb(var(--mood-muted) / 0.85);
 }
 
 /* thin scrollbars */
@@ -111,7 +101,7 @@ input::placeholder {
 .hover\:text-gray-400:hover { color: rgb(var(--mood-text) / 0.82) !important; }
 .hover\:text-white:hover { color: rgb(var(--mood-text)) !important; }
 
-/* Keep translucent utility surfaces warm instead of default blue-gray. */
+/* Keep translucent utility surfaces on the ChatGPT gray ramp. */
 .bg-white\/5 { background-color: rgb(var(--mood-text) / 0.05) !important; }
 .bg-white\/10 { background-color: rgb(var(--mood-text) / 0.10) !important; }
 .hover\:bg-white\/5:hover { background-color: rgb(var(--mood-text) / 0.08) !important; }
@@ -119,26 +109,36 @@ input::placeholder {
 .border-white\/5,
 .border-white\/6,
 .border-white\/8,
-.border-white\/10 { border-color: rgb(var(--mood-line) / 0.62) !important; }
+.border-white\/10 { border-color: rgb(var(--mood-line) / 0.9) !important; }
 
 /* Dark-first components also contain literal Tailwind hex surfaces. Re-map
-   those exact tokens so light mode never produces a dark composer/sidebar,
-   and dark mode stays on Arena's leather/paper palette too. */
-[class~="bg-[#0b0b0c]"] { background-color: rgb(var(--mood-base)) !important; }
+   those exact tokens so light mode never produces a dark composer/sidebar. */
+[class~="bg-[#0b0b0c]"] { background-color: rgb(var(--mood-panel)) !important; }
 [class~="bg-[#0f0f10]"],
 [class~="bg-[#0f1011]"],
 [class~="bg-[#111214]"],
-[class~="bg-[#121213]"] { background-color: rgb(var(--mood-panel)) !important; }
+[class~="bg-[#121213]"] { background-color: rgb(var(--mood-base)) !important; }
 [class~="bg-[#141415]"],
 [class~="bg-[#171718]"],
-[class~="bg-[#0f1012]"] { background-color: rgb(var(--mood-panel)) !important; }
+[class~="bg-[#0f1012]"] { background-color: rgb(var(--mood-composer)) !important; }
 
-[data-theme="light"] .bg-black\/60 { background-color: rgb(28 28 26 / 0.45) !important; }
+[data-theme="light"] .bg-black\/60 { background-color: rgb(13 13 13 / 0.4) !important; }
 [data-theme="light"] .msg h1,
 [data-theme="light"] .msg h2,
 [data-theme="light"] .msg h3,
 [data-theme="light"] .msg h4 { color: rgb(var(--mood-text)); }
 
+.bg-composer { background-color: rgb(var(--mood-composer)); }
+
+/* ChatGPT send: inverted circle (white on dark, black on light). */
+.composer-send {
+  background: #fff;
+  color: #0d0d0d;
+}
+[data-theme="light"] .composer-send {
+  background: #0d0d0d;
+  color: #fff;
+}
 
 /* markdown message styling (ChatGPT-like readability without typography plugin) */
 .msg > :first-child {
@@ -149,7 +149,7 @@ input::placeholder {
 }
 .msg p {
   margin: 0.8em 0;
-  line-height: 1.72;
+  line-height: 1.75;
 }
 .msg ul {
   list-style: disc;
@@ -171,7 +171,7 @@ input::placeholder {
   font-weight: 650;
   margin: 1.15em 0 0.5em;
   line-height: 1.3;
-  color: #fff;
+  color: rgb(var(--mood-text));
 }
 .msg h1 {
   font-size: 1.32rem;
@@ -183,16 +183,19 @@ input::placeholder {
   font-size: 1.08rem;
 }
 .msg a {
-  color: #8bb0ff;
+  color: #7ab8ff;
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.18rem;
 }
+[data-theme="light"] .msg a {
+  color: #2563eb;
+}
 .msg code {
-  background: #1a1b1d;
+  background: rgb(var(--mood-composer));
   padding: 0.12rem 0.4rem;
   border-radius: 0.42rem;
-  border: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid rgb(var(--mood-line));
   font-size: 0.88em;
 }
 .msg pre {
@@ -205,14 +208,14 @@ input::placeholder {
   padding: 0;
 }
 .msg blockquote {
-  border-left: 3px solid #303237;
+  border-left: 3px solid rgb(var(--mood-line));
   padding-left: 0.9rem;
-  color: #9ca3af;
+  color: rgb(var(--mood-muted));
   margin: 0.8em 0;
 }
 .msg hr {
   border: 0;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgb(var(--mood-line));
   margin: 1rem 0;
 }
 .msg table {
@@ -222,11 +225,11 @@ input::placeholder {
 }
 .msg th,
 .msg td {
-  border: 1px solid #262626;
+  border: 1px solid rgb(var(--mood-line));
   padding: 0.45rem 0.7rem;
 }
 .msg th {
-  background: #111214;
+  background: rgb(var(--mood-composer));
 }
 
 @keyframes typing-blink {
@@ -339,12 +342,15 @@ svg {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.625rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
   flex-shrink: 0;
 }
 @media (max-width: 380px) {
   .composer-btn {
-    padding: 0.4rem;
+    width: 2rem;
+    height: 2rem;
   }
 }
 

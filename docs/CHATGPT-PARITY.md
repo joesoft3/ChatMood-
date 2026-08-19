@@ -18,6 +18,7 @@ the product feel one layer short of chatgpt.com.
 | Duplicate chat | Toolbar **Duplicate** forks the thread (`POST /conversations/{id}/duplicate`). |
 | Export JSON | `GET /conversations/{id}/export?format=json\|md` plus the existing client Markdown export. |
 | Pulse | Honest Pulse: the Daily Pulse catalog GPT + **Schedule daily Pulse** creates a real 08:00 UTC task with live search. Not a fake always-on agent. |
+| ChatGPT home | Empty `/chat` is the chatgpt.com home: left rail (New chat, Images, GPTs, Projects, Library, dated history, account), header model dropdown, centered **What can I help with?**, calm `+` composer, starter chips. Logged-in visitors skip the marketing page. |
 
 ## What this is *not*
 

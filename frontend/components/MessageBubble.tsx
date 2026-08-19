@@ -248,21 +248,20 @@ function PendingAssistantState({ msg }: { msg: ChatMsg }) {
   }
 
   return (
-    <div className="rounded-3xl border border-white/8 bg-[#171718] px-4 py-3.5 shadow-[0_12px_28px_rgb(0_0_0/0.14)]">
-      <div className="flex items-center gap-2 text-sm text-gray-200">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-accent/10">{icon}</span>
-        <span className="font-medium">{title}</span>
-        <span className="ml-auto inline-block h-2 w-2 animate-pulse rounded-full bg-accent/80" />
+    <div className="py-1">
+      <div className="flex items-center gap-2 text-sm text-gray-300">
+        <span className="inline-flex h-6 w-6 items-center justify-center">{icon}</span>
+        <span>{title}</span>
       </div>
-      <p className="mt-1.5 text-xs text-gray-500 leading-relaxed">{detail}</p>
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
+      <p className="mt-1 text-xs text-gray-500 leading-relaxed">{detail}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
         {activity.map((item, i) => (
           <span
             key={item}
-            className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/5 px-2.5 py-1 text-[11px] text-gray-400"
+            className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-[11px] text-gray-400"
             style={{ animationDelay: `${i * 120}ms` }}
           >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent/80 animate-pulse" />
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-gray-400 animate-pulse" />
             {item}
           </span>
         ))}
@@ -418,9 +417,9 @@ export default function MessageBubble({
     return (
       <div className="flex justify-end mood-fade-up">
         <div className="group/user flex max-w-[min(88%,42rem)] flex-col items-end gap-1">
-          {msg.author && <span className="text-[10px] text-gray-500 pr-1">🧑 {msg.author}</span>}
+          {msg.author && <span className="text-[10px] text-gray-500 pr-1">{msg.author}</span>}
           {editing ? (
-            <div className="w-full min-w-[16rem] rounded-[1.55rem] border border-accent/40 bg-[#171718] p-3 shadow-[0_12px_28px_rgb(0_0_0/0.14)]">
+            <div className="w-full min-w-[16rem] rounded-[1.55rem] bg-composer p-3">
               <label className="sr-only" htmlFor={`edit-msg-${msg.id ?? "draft"}`}>
                 Edit your message
               </label>
@@ -473,7 +472,7 @@ export default function MessageBubble({
             </div>
           ) : (
             <>
-              <div className="rounded-[1.55rem] border border-accent/20 bg-accent/15 px-4 py-3 text-sm text-gray-100 shadow-[0_12px_28px_rgb(0_0_0/0.14)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+              <div className="rounded-[1.55rem] bg-composer px-5 py-2.5 text-[15px] text-gray-100 whitespace-pre-wrap [overflow-wrap:anywhere]">
                 {msg.content}
               </div>
               {onEditUser && (
@@ -523,19 +522,19 @@ export default function MessageBubble({
 
   return (
     <div className="group flex items-start gap-3 sm:gap-4 mood-fade-up">
-      <div className="hidden sm:inline-flex mt-1 h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_8px_20px_rgb(0_0_0/0.16)]">
+      <div className="hidden sm:inline-flex mt-1 h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-gray-200">
         {assistantIcon}
       </div>
       <div className="min-w-0 flex-1 max-w-full">
-        <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
-          <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full border border-white/8 bg-white/5 text-accent shadow-[0_6px_18px_rgb(0_0_0/0.16)]">
+        <div className="mb-1 flex items-center gap-2 text-xs text-gray-500">
+          <span className="inline-flex sm:hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-gray-200">
             {assistantIcon}
           </span>
-          <span className="font-medium text-gray-300">ChatMood</span>
-          <span className="rounded-full border border-white/8 bg-white/5 px-2 py-0.5 text-[10px] text-gray-400">{headerLabel}</span>
-          {isStreaming && <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent/80" />}
+          <span className="font-medium text-gray-200">ChatMood</span>
+          {headerLabel !== "ChatMood" && <span className="text-[11px] text-gray-500">{headerLabel}</span>}
+          {isStreaming && <span className="inline-flex h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400" />}
         </div>
-        <div className="msg rounded-[1.55rem] sm:rounded-[1.8rem] border border-white/6 bg-[#141415]/96 px-4 sm:px-5 py-3.5 sm:py-4 text-gray-200 leading-relaxed text-[15px] shadow-[0_12px_28px_rgb(0_0_0/0.16)]">
+        <div className="msg text-gray-200 leading-relaxed text-[15px]">
           {msg.research && <ResearchPanel r={msg.research} />}
           {msg.steps && msg.steps.length > 0 && <AgentSteps steps={msg.steps} />}
           {msg.think && <ThinkingPanel state={msg.think} replayEvents={msg.think.events} />}

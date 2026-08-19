@@ -7,6 +7,26 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🏠 ChatGPT home style
+
+The product home is now the chatgpt.com layout — not a Grok studio with Ask /
+Imagine / Reel chrome.
+
+- **Empty `/chat`** is greeting → composer → starter chips. No brand bubble,
+  model-pill row, or tab strip. Model choice lives in a header dropdown.
+- **Composer** is a calm rounded bar: `+` opens attach/tools, mic and send sit
+  on the right, active modes are dismissible chips.
+- **Sidebar** is New chat, Images / GPTs / Projects / Library, a collapsed More
+  list, chats grouped Today / Yesterday / Previous 7 days, and an account footer.
+- **Messages** drop the boxed cards. User turns are a soft bubble; assistant
+  turns are plain text.
+- **Marketing `/`** matches the same home (Ask anything + chips). Signed-in
+  visitors go straight to `/chat`.
+- Palette shifts to ChatGPT neutrals (`#212121` canvas, `#171717` rail,
+  `#303030` composer) with a restrained brand green.
+
+---
+
 ### 🔐 First-class Sign up and Sign in
 
 Sign up and Sign in are now separate destinations instead of one `/login`
