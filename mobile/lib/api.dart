@@ -45,10 +45,22 @@ class Api {
     }
   }
 
+  static bool _isAnonAuth(String path) =>
+      path == '/auth/login' || path == '/auth/register' || path == '/auth/clerk';
+
+  static Future<String?> _tokenFor(String path) async =>
+      _isAnonAuth(path) ? null : await getToken();
+
   static Map<String, String> _headers(String? token) => {
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
       };
+
+  static Future<void> _forgetIfUnauthorized(int status, {required bool sentToken}) async {
+    if (sentToken && status == 401) {
+      await setToken(null);
+    }
+  }
 
   static String _error(http.Response res) {
     try {
@@ -64,22 +76,28 @@ class Api {
   // -------------------------------------------------------------- REST calls
   static Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body,
       {Duration timeout = const Duration(seconds: 30)}) async {
-    final token = await getToken();
+    final token = await _tokenFor(path);
     final res = await _client
         .post(Uri.parse('$baseUrl$path'), headers: _headers(token), body: jsonEncode(body))
         .timeout(timeout);
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   /// PATCH with a JSON body (⏰ task pause/resume/edit).
   static Future<Map<String, dynamic>> patch(String path, Map<String, dynamic> body,
       {Duration timeout = const Duration(seconds: 30)}) async {
-    final token = await getToken();
+    final token = await _tokenFor(path);
     final res = await _client
         .patch(Uri.parse('$baseUrl$path'), headers: _headers(token), body: jsonEncode(body))
         .timeout(timeout);
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
     return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
   }
@@ -91,28 +109,37 @@ class Api {
     final res = await _client
         .get(Uri.parse('$baseUrl$path'), headers: _headers(token))
         .timeout(timeout);
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     return res.bodyBytes;
   }
 
   static Future<dynamic> get(String path) async {
-    final token = await getToken();
+    final token = await _tokenFor(path);
     final res = await _client
         .get(Uri.parse('$baseUrl$path'), headers: _headers(token))
         .timeout(const Duration(seconds: 30));
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     return jsonDecode(res.body);
   }
 
   /// DELETE with a JSON body (account deletion etc.).
   static Future<Map<String, dynamic>> deleteJson(String path, Map<String, dynamic> body) async {
-    final token = await getToken();
+    final token = await _tokenFor(path);
     final req = http.Request('DELETE', Uri.parse('$baseUrl$path'));
     req.headers.addAll(_headers(token));
     req.body = jsonEncode(body);
     final streamed = await _client.send(req).timeout(const Duration(seconds: 30));
     final res = await http.Response.fromStream(streamed);
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     final decoded = res.body.isEmpty ? <String, dynamic>{} : jsonDecode(res.body);
     return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
   }
@@ -122,11 +149,14 @@ class Api {
       deleteJson('/auth/me', {'password': password});
 
   static Future<void> delete(String path) async {
-    final token = await getToken();
+    final token = await _tokenFor(path);
     final res = await _client
         .delete(Uri.parse('$baseUrl$path'), headers: _headers(token))
         .timeout(const Duration(seconds: 30));
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
   }
 
   // ------------------------------------------------------ multipart (voice/files)
@@ -144,7 +174,10 @@ class Api {
     req.files.add(http.MultipartFile.fromBytes(field, bytes, filename: filename));
     final streamed = await _client.send(req).timeout(const Duration(minutes: 3));
     final res = await http.Response.fromStream(streamed);
-    if (res.statusCode >= 400) throw Exception(_error(res));
+    if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
+      throw Exception(_error(res));
+    }
     final body = jsonDecode(res.body);
     return body is Map<String, dynamic> ? body : <String, dynamic>{};
   }
@@ -173,8 +206,12 @@ class Api {
     req.body = jsonEncode(payload);
     final res = await _client.send(req).timeout(const Duration(minutes: 6));
     if (res.statusCode >= 400) {
+      await _forgetIfUnauthorized(res.statusCode, sentToken: token != null);
       final body = await res.stream.bytesToString();
       final decoded = http.Response(body, res.statusCode);
+      if (res.statusCode == 401 && token != null) {
+        throw Exception('Your session expired — please sign in again.');
+      }
       throw Exception(_error(decoded));
     }
     var buf = '';

@@ -53,14 +53,26 @@ class MoodApp extends StatelessWidget {
   }
 }
 
-/// Decides between login and chat depending on a stored token.
+/// Decides between login and chat depending on a stored *and still valid* token.
 class _Gate extends StatelessWidget {
   const _Gate();
+
+  Future<String?> _session() async {
+    final token = await Api.getToken();
+    if (token == null || token.isEmpty) return null;
+    try {
+      await Api.get('/auth/me');
+      return token;
+    } catch (_) {
+      await Api.setToken(null);
+      return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
-      future: Api.getToken(),
+      future: _session(),
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));

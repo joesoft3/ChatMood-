@@ -100,8 +100,11 @@ export default function AppShell({
     if (!token.get()) return;
     apiFetch<{ is_admin?: boolean; email?: string; display_name?: string; plan?: string }>("/auth/me")
       .then(setMe)
-      .catch(() => {});
-  }, []);
+      .catch(() => {
+        // apiFetch already forgets a 401 session; if the token is gone, bounce.
+        if (!token.get()) router.push(signInHref(currentNextPath()));
+      });
+  }, [router]);
 
   useEffect(() => {
     const host = window.location.host;

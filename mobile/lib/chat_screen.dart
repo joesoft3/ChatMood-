@@ -667,7 +667,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         setState(() => assistant.text = '⚠️ Empty response');
       }
     } catch (e) {
-      setState(() => assistant.text = '⚠️ ${e.toString().replaceFirst('Exception: ', '')}');
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      setState(() => assistant.text = '⚠️ $msg');
+      final low = msg.toLowerCase();
+      if (low.contains('session expired') || low.contains('invalid or expired token')) {
+        await Api.setToken(null);
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
+        );
+        return;
+      }
     } finally {
       setState(() => _busy = false);
       _loadConversations();

@@ -7,6 +7,28 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🔐 Fix — chat always said "Invalid or expired token"
+
+A leftover `mood_token` in localStorage (or a JWT the current backend no longer
+accepts — secret rotated, already-expired, or the literal string `"undefined"`)
+was treated as signed-in. `/login` bounced straight back to `/chat`, every send
+401'd with **Invalid or expired token**, and there was no way out without
+clearing site data.
+
+- **Web + Flutter** now verify the stored JWT against `/auth/me` before treating
+  it as a session, and any authenticated 401 clears it and returns to sign-in
+  (`?expired=1` explains why). Login/register no longer attach a leftover Bearer.
+- **JWT minting** writes `exp` as a Unix timestamp (datetime encoding could
+  fail decode on the next request), floors TTL at 15 minutes so
+  `ACCESS_TOKEN_EXPIRE_MINUTES=0` cannot mint an already-dead token, and decode
+  allows 60s of clock skew.
+- Missing `Authorization` is a consistent **401** (not FastAPI's default 403).
+- Mobile `1.9.11+27`. Tests: `test_session_token.py`.
+
+---
+
+## 2026-08-19
+
 ### ❓ Landing FAQ — best questions, straight answers
 
 The landing page now answers the nine questions people actually ask, right
