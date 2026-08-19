@@ -7,6 +7,23 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### ❓ Landing FAQ — best questions, straight answers
+
+The landing page now answers the nine questions people actually ask, right
+above the footer (`#faq`, also in the nav's Explore menu):
+
+- "What is ChatMood?", "Is ChatMood free?", models, live web search,
+  image/video creation, memory, the mobile app, MoMo payments and privacy —
+  each a one-glance answer, no marketing fog.
+- Native `<details>` accordions: server-rendered (zero client JS), keyboard +
+  screen-reader accessible for free, styled to the home palette with an
+  animated chevron.
+- **FAQPage JSON-LD** is generated from the same `FAQ_ITEMS` source as the
+  rendered copy, so rich results can never drift from what visitors read.
+- e2e covers it: section renders, structured data present, accordion expands.
+
+---
+
 ### 🎬🆓 Free video cascade — Veo + Hugging Face join the chain
 
 `VIDEO_PROVIDER` gains two free-of-charge engines alongside reel /

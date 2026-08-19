@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import LandingComposer from "@/components/LandingComposer";
+import LandingFaq, { FAQ_ITEMS } from "@/components/LandingFaq";
 import LandingGate from "@/components/LandingGate";
 import LandingNav from "@/components/LandingNav";
 
@@ -69,6 +70,25 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <LandingFaq />
+
+      {/* FAQPage structured data — same copy as the rendered accordion (LandingFaq),
+          so rich results match what visitors actually read. */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: FAQ_ITEMS.map(([name, text]) => ({
+              "@type": "Question",
+              name,
+              acceptedAnswer: { "@type": "Answer", text },
+            })),
+          }),
+        }}
+      />
 
       <section className="border-t border-line px-4 py-14 sm:px-6">
         <div className="mx-auto max-w-4xl space-y-5 rounded-3xl bg-composer p-8 text-center sm:p-10 2xl:max-w-6xl">
