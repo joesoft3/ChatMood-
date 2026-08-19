@@ -28,6 +28,31 @@ def test_app_boots_and_wires_routers():
         assert any(expected in p for p in paths), f"missing route: {expected}"
 
 
+def test_root_redirects_humans_to_the_app():
+    """The public production link points at the API host — `/` must not 404.
+
+    Regression guard: moodai-alpha.vercel.app (the repo homepage URL) answered
+    `{"detail":"Not Found"}` at the root, so anyone following the production
+    link concluded the app was down. `/` now redirects to FRONTEND_URL (the
+    web app) in production and to /docs in local dev.
+    """
+    from fastapi.testclient import TestClient
+
+    import app.main as m
+
+    client = TestClient(m.app)  # no context manager → lifespan (DB/Redis) never runs
+    r = client.get("/", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    location = r.headers["location"]
+    assert location == "/docs" or location.startswith("http")
+
+
+def test_root_landing_stays_out_of_openapi():
+    import app.main as m
+
+    assert "/" not in m.app.openapi()["paths"]
+
+
 def test_notify_keeps_email_and_push_surface():
     # Both halves of the notification seam must exist together.
     assert callable(notify.send_email)          # workspace invites (Gmail plugin)

@@ -7,6 +7,21 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🔗 Production link opens the app, not a bare 404
+
+The public production URL (the GitHub repo homepage link and anything pointing
+at the API host, e.g. `moodai-alpha.vercel.app`) answered `{"detail":"Not
+Found"}` at `/`, so following it looked like the app was down.
+
+- **`GET /` now redirects** to the web app (`FRONTEND_URL`) with a 302.
+- Dev (`localhost` default) and the deploy guide's `https://pending`
+  placeholder fall back to `/docs`, so the bare API host always lands somewhere
+  useful.
+- Kept out of the OpenAPI schema (it is a human landing, not an API surface).
+- Regression-covered in `tests/test_boot.py`.
+
+---
+
 ### 🏠 ChatGPT home style
 
 The product home is now the chatgpt.com layout — not a Grok studio with Ask /

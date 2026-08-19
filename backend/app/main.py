@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from .api.deps import get_redis
@@ -138,6 +138,23 @@ app.include_router(gpts.router, prefix="/api/v1/gpts", tags=["gpts"])
 app.include_router(tasks.router, prefix="/api/v1/tasks", tags=["tasks"])
 app.include_router(apikeys.router, prefix="/api/v1/keys", tags=["api-keys"])
 app.include_router(public_api.router, prefix="/api/v1/public", tags=["public-api"])
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """Human landing for the bare API host.
+
+    The public production link (repo homepage, bookmarks, share posts) points
+    at this deployment, which only serves ``/api/v1`` + probes — so the root
+    used to answer ``{"detail":"Not Found"}`` and the app looked down. Send
+    humans to the web app (``FRONTEND_URL``); when that is unset, still the
+    localhost default (local dev), or still the deploy guide's ``https://pending``
+    placeholder, land on the interactive API docs instead.
+    """
+    target = settings.FRONTEND_URL.rstrip("/")
+    if not target or target.startswith(("http://localhost", "http://127.0.0.1", "https://pending")):
+        target = "/docs"
+    return RedirectResponse(target, status_code=302)
 
 
 @app.get("/healthz")

@@ -73,7 +73,10 @@ so the backend needs a **hosted Postgres**. Easiest first — full comparison in
 1. 🖱 **Deploy** (or **Deployments → ⋯ → Redeploy** after adding vars).
 2. ✅ Open **`https://YOUR-VERCEL-URL/healthz`** → `{"ok":true}` — **LIVE**.
 3. ✅ `…/docs` shows the interactive API explorer.
-4. 🖱 First request may take a few seconds (cold start) — normal.
+4. ✅ The **bare root `…/`** no longer 404s: it redirects (302) to the web app
+   once `FRONTEND_URL` is the real site URL — until then it lands on `/docs`.
+   Safe to use as the public production link.
+5. 🖱 First request may take a few seconds (cold start) — normal.
 
 Then finish wiring (same as the main click-sheet):
 
