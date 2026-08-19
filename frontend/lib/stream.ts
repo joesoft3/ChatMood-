@@ -1,6 +1,6 @@
 "use client";
 
-import { API, token } from "./api";
+import { API, forgetSession, token } from "./api";
 
 /** Shared SSE wire contract for every streaming surface (chat, agents, deepsearch). */
 export interface ChatPayload {
@@ -128,7 +128,14 @@ async function* streamSSE(
     }
     throw e;
   }
-  if (!res.ok || !res.body) throw new Error(await sseErrorMessage(res));
+  if (!res.ok || !res.body) {
+    const msg = await sseErrorMessage(res);
+    if (tk && res.status === 401) {
+      forgetSession("expired");
+      throw new Error("Your session expired — please sign in again.");
+    }
+    throw new Error(msg);
+  }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

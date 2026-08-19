@@ -12,21 +12,33 @@ from ..core.security import decode_token
 from ..db.models import ApiKey, User
 from ..db.session import get_db
 
-bearer = HTTPBearer()
+# auto_error=False so a missing header is 401 (not FastAPI's default 403
+# "Not authenticated") — same status the clients already treat as "sign in".
+bearer = HTTPBearer(auto_error=False)
+
+
+def _unauthorized(detail: str) -> HTTPException:
+    return HTTPException(
+        status.HTTP_401_UNAUTHORIZED,
+        detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
 
 
 async def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if creds is None or not (creds.credentials or "").strip():
+        raise _unauthorized("Not authenticated")
     try:
         payload = decode_token(creds.credentials)
         uid = payload.get("sub")
     except JWTError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
-    user = await db.get(User, uid) if uid else None
+        raise _unauthorized("Invalid or expired token")
+    user = await db.get(User, str(uid)) if uid else None
     if not user:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+        raise _unauthorized("User not found")
     return user
 
 
@@ -63,7 +75,7 @@ async def resolve_api_key(db: AsyncSession, secret: str) -> tuple[User, ApiKey] 
 
 
 async def get_api_caller(
-    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ) -> tuple[User, ApiKey]:
     """Auth for the public developer API (/api/v1/public/*) — API keys ONLY.
@@ -75,7 +87,8 @@ async def get_api_caller(
     """
     if not settings.PUBLIC_API_ENABLED:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Public API is disabled on this deployment")
-    resolved = await resolve_api_key(db, creds.credentials)
+    secret = (creds.credentials if creds else "") or ""
+    resolved = await resolve_api_key(db, secret)
     if not resolved:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED,

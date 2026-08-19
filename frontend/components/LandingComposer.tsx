@@ -23,7 +23,7 @@ export default function LandingComposer() {
   function go(prompt?: string) {
     const text = (prompt ?? value).trim();
     if (token.get()) {
-      router.push("/chat");
+      router.push("/chat"); // AppShell verifies; a dead token lands back on /login
       return;
     }
     const next = text ? `/signup?next=${encodeURIComponent("/chat")}` : "/signup";

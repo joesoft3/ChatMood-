@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Image as ImageIcon, Search, ShieldCheck, Sparkles } from "lucide-react";
-import { apiFetch, token } from "@/lib/api";
+import { apiFetch, token, verifySession } from "@/lib/api";
 import { BrandMark, useBrand } from "@/lib/brand";
 import { safeNextPath, signInHref, signUpHref } from "@/lib/auth";
 
@@ -51,11 +51,24 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
     const next = safeNextPath(params.get("next"));
     setNextPath(next);
     if (params.get("deleted") === "1") {
+      token.clear();
       setNotice("Your ChatMood account and data were permanently deleted.");
+      return;
     }
-    if (token.get() && params.get("deleted") !== "1") {
-      router.replace(next && next.startsWith("/") ? next : "/chat");
+    if (params.get("expired") === "1") {
+      token.clear();
+      setNotice("Your session expired. Please sign in again.");
     }
+    let cancelled = false;
+    (async () => {
+      if (!token.get()) return;
+      const ok = await verifySession();
+      if (cancelled) return;
+      if (ok) router.replace(next && next.startsWith("/") ? next : "/chat");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   async function submit(e: React.FormEvent) {

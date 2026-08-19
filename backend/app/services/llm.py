@@ -28,7 +28,16 @@ def friendly_ai_error(exc: Exception) -> str:
     if isinstance(exc, LLMNotConfigured):
         return "AI provider not configured — set XAI_API_KEY (get one at https://console.x.ai)."
     s = str(exc)
-    if "401" in s or "api key" in s.lower() or "authentication" in s.lower():
+    low = s.lower()
+    if (
+        "401" in s
+        or ("403" in s and "key" in low)
+        or "api key" in low
+        or "authentication" in low
+        or "invalid api key" in low
+        or "incorrect api key" in low
+        or "invalid x-api-key" in low
+    ):
         return "AI provider authentication failed — check XAI_API_KEY."
     return f"AI request failed: {s[:240]}"
 
