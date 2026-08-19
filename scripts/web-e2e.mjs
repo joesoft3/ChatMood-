@@ -27,7 +27,7 @@ page.on("console", (msg) => {
 });
 
 const checks = [
-  ["/", "ChatMood", "hero copy"],
+  ["/", "What can I help with?", "ChatGPT-style hero"],
   ["/login", "Sign in", "sign-in shell"],
   ["/signup", "Sign up", "sign-up shell"],
   ["/signin", "Sign in", "sign-in alias"],
@@ -53,7 +53,7 @@ for (const [path, needle, label] of checks) {
 // Landing-page tall content: also verify the feature grid + footer links exist
 try {
   await page.goto(WEB, { waitUntil: "networkidle", timeout: 30000 });
-  for (const feature of ["Arena v2", "Deep research", "Video with pure sound & voice"]) {
+  for (const feature of ["Arena", "Deep research", "Video with sound & voice"]) {
     (await page.textContent("body"))?.includes(feature) ? ok(`landing feature: ${feature}`) : hard(`landing missing feature: ${feature}`);
   }
   const terms = await page.getAttribute('a[href="/terms"]', "href");
