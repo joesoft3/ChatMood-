@@ -7,6 +7,94 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### ❓ Landing FAQ — best questions, straight answers
+
+The landing page now answers the nine questions people actually ask, right
+above the footer (`#faq`, also in the nav's Explore menu):
+
+- "What is ChatMood?", "Is ChatMood free?", models, live web search,
+  image/video creation, memory, the mobile app, MoMo payments and privacy —
+  each a one-glance answer, no marketing fog.
+- Native `<details>` accordions: server-rendered (zero client JS), keyboard +
+  screen-reader accessible for free, styled to the home palette with an
+  animated chevron.
+- **FAQPage JSON-LD** is generated from the same `FAQ_ITEMS` source as the
+  rendered copy, so rich results can never drift from what visitors read.
+- e2e covers it: section renders, structured data present, accordion expands.
+
+---
+
+### 🎬🆓 Free video cascade — Veo + Hugging Face join the chain
+
+`VIDEO_PROVIDER` gains two free-of-charge engines alongside reel /
+pollinations / xai, with the same lean cascade semantics (first success
+wins, each hop fail-soft):
+
+- **gemini** (alias `veo`) — Google Veo via the Gemini API `predictLongRunning`
+  op, polled to done; AI Studio's free tier carries a small daily Veo quota
+  when the key's project is granted it. Over-quota/unfunded keys cascade on.
+  Reuses `GEMINI_API_KEY`; model pinned to `veo-3.1-fast-generate-preview`
+  (`GEMINI_VIDEO_MODEL` to override).
+- **huggingface** (alias `hf`) — HF Inference text-to-video (Wan2.1-T2V-1.3B
+  default, the free-credit-friendly variant) on the free `HF_API_TOKEN`, with
+  cold-model `estimated_time` wait-and-retry.
+- Both save provider bytes via the media janitor, so soundtrack mixing and
+  library archiving see a plain `/api/v1/media/files/…` URL like every clip.
+- Chain docs + examples in `.env.example`; brain status reports per-provider
+  readiness/reasons for the new engines.
+
+e.g. `VIDEO_PROVIDER=gemini,huggingface,reel` = Veo free quota first, HF
+credits second, zero-key Reel as the always-on floor.
+
+---
+
+### 🎨 Free image cascade — three more free generators
+
+`IMAGE_FALLBACK_PROVIDER` is now a comma-separated **cascade of free image
+engines**, tried left→right whenever xAI image gen fails or is unfunded
+(e.g. `gemini,huggingface,pollinations`).
+
+- **pollinations** — free FLUX, no API key at all (as before, now one hop of a chain).
+- **gemini** — Gemini image models via the native generateContent API; free daily
+  quota in AI Studio, reuses `GEMINI_API_KEY`.
+- **huggingface** — HF Inference free daily credits on a free `HF_API_TOKEN`
+  (FLUX.1-schnell default, model overridable).
+- **cloudflare** — Workers AI free 10k neurons/day; dedicated `WORKERS_AI_*`
+  pair, falling back to the existing `CLOUDFLARE_*` creds.
+
+An engine with missing credentials, an HTTP error, quota exhaustion, or an
+image-less response is skipped to the next automatically. With no `XAI_API_KEY`
+the first working entry **is** the image engine (fully-free stack). Single-value
+`pollinations` behaves exactly as before; brain/admin status surfaces report the
+chain per engine (`enabled`/`configured`).
+
+---
+
+### 🖼️ Free image fallback pinned in the Fly deploy
+
+`fly.toml` now ships `IMAGE_FALLBACK_PROVIDER=pollinations`, so image
+generation never hard-fails when xAI team credits are at $0: Grok stays
+primary and Pollinations FLUX takes over automatically — daily free images,
+no extra API key needed. (The support was in the code; it relied on a
+manually-set secret that a redeploy could lose.)
+
+---
+
+### 🔗 Production link opens the app, not a bare 404
+
+The public production URL (the GitHub repo homepage link and anything pointing
+at the API host, e.g. `moodai-alpha.vercel.app`) answered `{"detail":"Not
+Found"}` at `/`, so following it looked like the app was down.
+
+- **`GET /` now redirects** to the web app (`FRONTEND_URL`) with a 302.
+- Dev (`localhost` default) and the deploy guide's `https://pending`
+  placeholder fall back to `/docs`, so the bare API host always lands somewhere
+  useful.
+- Kept out of the OpenAPI schema (it is a human landing, not an API surface).
+- Regression-covered in `tests/test_boot.py`.
+
+---
+
 ### 🏠 ChatGPT home style
 
 The product home is now the chatgpt.com layout — not a Grok studio with Ask /

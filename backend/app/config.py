@@ -144,13 +144,30 @@ class Settings(BaseSettings):
     ROUTE_MODEL_CODING: str = ""      # e.g. gemini-2.5-pro | gpt-4o
     ROUTE_MODEL_AGENTS: str = ""
     ROUTE_MODEL_DEEPSEARCH: str = ""
-    # 🖼️ Free image stand-in / fallback while xAI image gen is unfunded. Pollinations
-    # serves real FLUX images with no key (probed live: HTTP 200, ~2s). When set to
-    # "pollinations" and no xAI key exists, it becomes the primary image engine;
-    # with an xAI key present it acts as the automatic fallback on provider errors.
+    # 🖼️ Free image engines, tried left→right when xAI image gen fails or is unfunded.
+    # Comma-separated cascade: "pollinations" or e.g. "gemini,huggingface,pollinations".
+    # With no xAI key configured, the FIRST entry becomes the primary image engine.
+    # All four are free: pollinations needs NO key at all; the others ride the
+    # provider's free daily quota on a free key you (or the operator) already have.
     IMAGE_FALLBACK_PROVIDER: str = ""
     POLLINATIONS_IMAGE_URL: str = "https://image.pollinations.ai/prompt"
     POLLINATIONS_MODEL: str = "flux"
+    # "gemini" — Gemini image models via the native generateContent API (NOT the
+    # OpenAI-compat base). AI Studio free tier carries a daily image quota; reuses
+    # GEMINI_API_KEY. Quota-0 keys simply 429 → the cascade moves on.
+    GEMINI_IMAGE_MODEL: str = "gemini-2.5-flash-image"
+    GEMINI_NATIVE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+    # "huggingface" (alias "hf") — HF Inference free daily credits on a free token.
+    HF_API_TOKEN: str = ""
+    HF_IMAGE_MODEL: str = "black-forest-labs/FLUX.1-schnell"
+    HF_VIDEO_MODEL: str = "Wan-AI/Wan2.1-T2V-1.3B"   # small Wan variant = free-credit friendly
+    HF_BASE_URL: str = "https://router.huggingface.co/hf-inference/models"
+    # "cloudflare" (alias "workers-ai") — Workers AI free tier (10k neurons/day ≈
+    # hundreds of FLUX-schnell images). Dedicated pair wins; unset → falls back to
+    # the generic CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN used for DNS/Stream.
+    WORKERS_AI_ACCOUNT_ID: str = ""
+    WORKERS_AI_API_TOKEN: str = ""
+    WORKERS_AI_IMAGE_MODEL: str = "@cf/black-forest-labs/flux-1-schnell"
     # 🖼️ Generated images: archive a durable copy to object storage (R2/local) + file it
     # in the user's library, instead of relying on provider hotlinks that can go stale.
     IMAGE_PERSIST: bool = True
@@ -239,10 +256,15 @@ class Settings(BaseSettings):
     # Video generation — comma-chain of providers, first that succeeds wins:
     #   "reel"        = zero-key ChatMood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
     #   "pollinations"= gen.pollinations.ai video models (needs POLLINATIONS_API_KEY)
+    #   "gemini"/"veo"= Google Veo long-running op — free daily Veo quota in AI Studio
+    #                   when the key's project is granted it (reuses GEMINI_API_KEY)
+    #   "huggingface"/"hf" = HF Inference text-to-video on free daily credits
+    #                   (reuses HF_API_TOKEN + HF_BASE_URL)
     #   "xai"         = Grok video when credits exist
     # Default ships "reel" so chat video works TODAY with no keys; "xai,reel" once funded.
     VIDEO_PROVIDER: str = "reel"
     MODEL_VIDEO: str = "grok-video-1"
+    GEMINI_VIDEO_MODEL: str = "veo-3.1-fast-generate-preview"  # free-tier-first Veo tier
     POLLINATIONS_API_KEY: str = ""
     POLLINATIONS_VIDEO_URL: str = "https://gen.pollinations.ai/video"
     POLLINATIONS_VIDEO_MODEL: str = "wan-fast"

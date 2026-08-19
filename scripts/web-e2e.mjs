@@ -56,6 +56,18 @@ try {
   for (const feature of ["Arena", "Deep research", "Video with sound & voice"]) {
     (await page.textContent("body"))?.includes(feature) ? ok(`landing feature: ${feature}`) : hard(`landing missing feature: ${feature}`);
   }
+  const faqText = (await page.textContent("body")) ?? "";
+  faqText.includes("Frequently asked questions") && faqText.includes("Is ChatMood free?")
+    ? ok("landing FAQ section")
+    : hard("landing missing FAQ section");
+  faqText.includes('"@type":"FAQPage"')
+    ? ok("landing FAQ JSON-LD")
+    : hard("landing missing FAQPage structured data");
+  // accordion actually opens (native details) — answer hidden until expanded
+  await page.click("text=Is ChatMood free?");
+  (await page.locator("#faq details[open] p", { hasText: "free plan" }).count()) === 1
+    ? ok("landing FAQ accordion expands")
+    : hard("landing FAQ accordion did not expand");
   const terms = await page.getAttribute('a[href="/terms"]', "href");
   terms === "/terms" ? ok("footer Terms link") : hard("footer Terms link missing");
 } catch (e) {

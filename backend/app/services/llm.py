@@ -384,35 +384,156 @@ class LLMService:
             LLM_LAT.labels(model=m, kind="search").observe(time.perf_counter() - t0)
 
     async def generate_image(self, prompt: str, **opts: Any) -> str | None:
-        # 🖼️ Free FLUX stand-in while xAI images are unfunded (xAI team credits = 0
-        # and every Gemini image model is quota-0 on this key — both verified live).
+        """Generate an image; xAI primary, free engines as an ordered cascade.
+
+        The cascade comes from IMAGE_FALLBACK_PROVIDER — a comma-separated list
+        tried left→right (e.g. "gemini,huggingface,pollinations"). Every entry is
+        a FREE engine: pollinations needs no key at all; gemini / huggingface /
+        cloudflare ride that provider's free daily quota. With no XAI_API_KEY the
+        first working entry IS the image engine (fully-free stack). A provider
+        without credentials, that errors, or that returns no image is skipped to
+        the next; None bubbles up when nothing produced an image.
+        """
         prompt = self._visual_no_text_guard(prompt)
-        fallback = (settings.IMAGE_FALLBACK_PROVIDER or "").strip().lower()
-        if fallback == "pollinations" and not settings.XAI_API_KEY:
+        chain = self._image_fallback_chain()
+        if settings.XAI_API_KEY:
+            m = settings.MODEL_IMAGE
+            LLM_COUNT.labels(model=m, kind="image").inc()
+            t0 = time.perf_counter()
+            try:
+                res = await self.client.images.generate(model=m, prompt=prompt, n=1, **opts)
+                d = res.data[0]
+                if getattr(d, "url", None):
+                    return d.url
+                b64 = getattr(d, "b64_json", None)
+                if b64:
+                    return f"data:image/png;base64,{b64}"
+                log.warning("primary image provider returned no image — trying free chain %s", chain)
+            except Exception:
+                log.warning("primary image provider failed — trying free chain %s", chain, exc_info=True)
+            finally:
+                LLM_LAT.labels(model=m, kind="image").observe(time.perf_counter() - t0)
+        for name in chain:
+            try:
+                out = await self._free_image(name, prompt)
+            except Exception:
+                log.warning("free image provider %r failed — trying next", name, exc_info=True)
+                out = None
+            if out:
+                return out
+        if not chain:
+            log.warning(
+                "no image engine available — set XAI_API_KEY and/or "
+                "IMAGE_FALLBACK_PROVIDER (e.g. 'pollinations' is free, no key)"
+            )
+        return None
+
+    @staticmethod
+    def _image_fallback_chain() -> list[str]:
+        """IMAGE_FALLBACK_PROVIDER as a clean, ordered list (single value = chain of one)."""
+        raw = settings.IMAGE_FALLBACK_PROVIDER or ""
+        return [p.strip().lower() for p in raw.split(",") if p.strip()]
+
+    async def _free_image(self, name: str, prompt: str) -> str | None:
+        """One hop of the free-image cascade. Returns a URL or data: URL, or None
+        when the engine is not configured (unknown name / missing credentials)."""
+        if name == "pollinations":
             LLM_COUNT.labels(model=settings.POLLINATIONS_MODEL, kind="image").inc()
             return self._pollinations_image_url(prompt)
-        m = settings.MODEL_IMAGE
-        LLM_COUNT.labels(model=m, kind="image").inc()
-        t0 = time.perf_counter()
-        try:
-            res = await self.client.images.generate(model=m, prompt=prompt, n=1, **opts)
-            d = res.data[0]
-            if getattr(d, "url", None):
-                return d.url
-            b64 = getattr(d, "b64_json", None)
-            if b64:
-                return f"data:image/png;base64,{b64}"
-            if fallback == "pollinations":
-                return self._pollinations_image_url(prompt)
+        if name == "gemini":
+            out = await self._gemini_image(prompt)
+        elif name in ("huggingface", "hf"):
+            out = await self._hf_image(prompt)
+        elif name in ("cloudflare", "workers-ai"):
+            out = await self._workers_ai_image(prompt)
+        else:
+            log.warning("unknown IMAGE_FALLBACK_PROVIDER entry %r — skipped", name)
             return None
-        except Exception:
-            if fallback == "pollinations":
-                log.warning("primary image provider failed — falling back to Pollinations", exc_info=True)
-                LLM_COUNT.labels(model=settings.POLLINATIONS_MODEL, kind="image").inc()
-                return self._pollinations_image_url(prompt)
-            raise
-        finally:
-            LLM_LAT.labels(model=m, kind="image").observe(time.perf_counter() - t0)
+        if out:
+            LLM_COUNT.labels(model=f"free:{name}", kind="image").inc()
+        return out
+
+    async def _gemini_image(self, prompt: str) -> str | None:
+        """Gemini image model via the native generateContent API (free daily quota in AI Studio)."""
+        if not settings.GEMINI_API_KEY:
+            return None
+        import httpx
+
+        url = f"{settings.GEMINI_NATIVE_BASE_URL}/models/{settings.GEMINI_IMAGE_MODEL}:generateContent"
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]},
+        }
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0)) as client:
+            r = await client.post(url, headers={"x-goog-api-key": settings.GEMINI_API_KEY}, json=body)
+            r.raise_for_status()
+            return self._gemini_image_b64(r.json())
+
+    @staticmethod
+    def _gemini_image_b64(payload: dict[str, Any]) -> str | None:
+        """First inline image out of a generateContent response → data: URL."""
+        import base64
+
+        for cand in payload.get("candidates") or []:
+            for part in (cand.get("content") or {}).get("parts") or []:
+                inline = part.get("inlineData") or part.get("inline_data") or {}
+                data = inline.get("data")
+                if data:
+                    base64.b64decode(data)  # raises → counts as provider failure
+                    mime = inline.get("mimeType") or inline.get("mime_type") or "image/png"
+                    return f"data:{mime};base64,{data}"
+        return None
+
+    async def _hf_image(self, prompt: str) -> str | None:
+        """Hugging Face Inference — free daily credits on a free token (FLUX-schnell default)."""
+        if not settings.HF_API_TOKEN:
+            return None
+        import base64
+
+        import httpx
+
+        url = f"{settings.HF_BASE_URL}/{settings.HF_IMAGE_MODEL}"
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:  # cold models can take ~20s
+            r = await client.post(
+                url,
+                headers={"Authorization": f"Bearer {settings.HF_API_TOKEN}"},
+                json={"inputs": prompt},
+            )
+            r.raise_for_status()
+            mime = (r.headers.get("content-type") or "image/jpeg").split(";")[0].strip()
+            if not mime.startswith("image/") or not r.content:
+                raise ValueError(f"huggingface returned non-image payload ({mime})")
+            return f"data:{mime};base64,{base64.b64encode(r.content).decode()}"
+
+    async def _workers_ai_image(self, prompt: str) -> str | None:
+        """Cloudflare Workers AI — free 10k neurons/day (FLUX.1-schnell default)."""
+        account = settings.WORKERS_AI_ACCOUNT_ID or settings.CLOUDFLARE_ACCOUNT_ID
+        token = settings.WORKERS_AI_API_TOKEN or settings.CLOUDFLARE_API_TOKEN
+        if not (account and token):
+            return None
+        import httpx
+
+        url = (
+            f"{settings.CLOUDFLARE_API_BASE_URL}/accounts/{account}"
+            f"/ai/run/{settings.WORKERS_AI_IMAGE_MODEL}"
+        )
+        async with httpx.AsyncClient(timeout=httpx.Timeout(90.0)) as client:
+            r = await client.post(url, headers={"Authorization": f"Bearer {token}"}, json={"prompt": prompt})
+            r.raise_for_status()
+            return self._workers_ai_image_b64(r.json())
+
+    @staticmethod
+    def _workers_ai_image_b64(payload: dict[str, Any]) -> str | None:
+        """Workers AI text-to-image envelope → data: URL. Raises on API-reported failure."""
+        import base64
+
+        if payload.get("success") is False:
+            raise ValueError(f"workers ai error: {payload.get('errors')}")
+        data = (payload.get("result") or {}).get("image")
+        if not data:
+            return None
+        base64.b64decode(data)  # raises → counts as provider failure
+        return f"data:image/png;base64,{data}"
 
 
 llm = LLMService()

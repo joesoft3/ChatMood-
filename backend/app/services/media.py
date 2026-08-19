@@ -13,6 +13,11 @@ Provider cascade (VIDEO_PROVIDER is a comma-chain, first success wins):
                  imageio-ffmpeg wheel covers serverless).
 - "pollinations" gen.pollinations.ai video models (wan-fast etc.) — needs
                  POLLINATIONS_API_KEY (401 without one, verified live).
+- "gemini"/"veo" Google Veo long-running op — AI Studio's free tier carries a
+                 small daily Veo quota when the key's project is granted it;
+                 over-quota/unfunded keys cascade on (uses GEMINI_API_KEY).
+- "huggingface"/"hf"  HF Inference text-to-video (Wan2.1 default) on free daily
+                 credits — needs HF_API_TOKEN (free at huggingface.co).
 - "xai"          Grok video when the key carries credits (402 → cascades on).
 """
 
@@ -297,6 +302,12 @@ class VideoService:
                         return result_url, bool(image) and used_image
                     if name == "pollinations":
                         result_url, _ = await self._pollinations(prompt, opts)
+                        return result_url, bool(image)
+                    if name in ("gemini", "veo"):
+                        result_url, _ = await self._gemini_veo(prompt, opts)
+                        return result_url, bool(image)
+                    if name in ("huggingface", "hf"):
+                        result_url, _ = await self._hf_video(prompt, opts)
                         return result_url, bool(image)
                     if name == "xai":
                         result_url, used_image = await self._xai(
@@ -599,6 +610,21 @@ class VideoService:
         base = settings.BACKEND_PUBLIC_URL.rstrip("/")
         return f"{base}/api/v1/media/files/{out_name}", False
 
+    # ------------------------------------------------------- shared byte store
+    def _save_video_bytes(self, data: bytes, prefix: str) -> str:
+        """Persist provider-returned bytes to MEDIA_DIR and hand back a URL under
+        /api/v1/media/files — downstream (soundtrack, archiving, clients) always
+        sees a plain URL, and the file obeys the media janitor like any other."""
+        if not data:
+            raise VideoGenerationError("provider returned empty video payload.")
+        os.makedirs(settings.MEDIA_DIR, exist_ok=True)
+        import uuid as _uuid
+
+        name = f"{prefix}-{_uuid.uuid4().hex}.mp4"
+        with open(os.path.join(settings.MEDIA_DIR, name), "wb") as f:
+            f.write(data)
+        return f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{name}"
+
     # ------------------------------------------------------- pollinations
     async def _pollinations(self, prompt: str, opts: VideoOptions) -> tuple[str, bool]:
         key = (settings.POLLINATIONS_API_KEY or "").strip()
@@ -622,17 +648,132 @@ class VideoService:
         if (r.headers.get("content-type") or "").startswith("video/"):
             # serve bytes via the /media/files janitor so downstream (soundtrack,
             # archiving) always sees a plain URL
-            os.makedirs(settings.MEDIA_DIR, exist_ok=True)
-            import uuid as _uuid
-
-            name = f"polli-{_uuid.uuid4().hex}.mp4"
-            with open(os.path.join(settings.MEDIA_DIR, name), "wb") as f:
-                f.write(r.content)
-            return f"{settings.BACKEND_PUBLIC_URL.rstrip('/')}/api/v1/media/files/{name}", False
+            return self._save_video_bytes(r.content, "polli"), False
         data = r.json() if r.content else {}
         if u := _dig_url(data):
             return u, False
         raise VideoGenerationError(f"Unexpected pollinations video shape: {str(data)[:160]}")
+
+    # ------------------------------------------------------- gemini (Veo)
+    async def _gemini_veo(self, prompt: str, opts: VideoOptions) -> tuple[str, bool]:
+        """Google Veo via the Gemini API (predictLongRunning op, polled to done).
+
+        AI Studio's free tier carries a small daily Veo quota when the key's
+        project is granted it — over-quota/unfunded keys cascade to the next
+        provider, so this is safe to leave in the chain ahead of "reel".
+        """
+        key = (settings.GEMINI_API_KEY or "").strip()
+        if not key:
+            raise VideoNotConfigured("Set GEMINI_API_KEY for gemini (Veo) video.")
+        base = settings.GEMINI_NATIVE_BASE_URL.rstrip("/")
+        model = settings.GEMINI_VIDEO_MODEL or "veo-3.1-fast-generate-preview"
+        compiled = compile_prompt(prompt, opts)
+        dur = max(4, min(int(opts.duration or 6), 8))  # Veo serves 4–8s clips
+        aspect = opts.aspect_ratio if opts.aspect_ratio in ("16:9", "9:16") else "16:9"
+        body = {
+            "instances": [{"prompt": compiled}],
+            "parameters": {"aspectRatio": aspect, "durationSeconds": dur, "numberOfVideos": 1},
+        }
+        headers = {"x-goog-api-key": key, "Content-Type": "application/json"}
+        r = await self._http.post(
+            f"{base}/models/{model}:predictLongRunning",
+            headers=headers, json=body, timeout=httpx.Timeout(30.0, read=60.0),
+        )
+        if r.status_code in (401, 403):
+            raise VideoNotConfigured(
+                f"Gemini rejected the key for Veo ({r.status_code}) — video access may be missing on the project."
+            )
+        if r.status_code in (402, 429):
+            raise VideoGenerationError(f"Gemini Veo free quota exhausted ({r.status_code}): {r.text[:160]}")
+        if r.status_code >= 400:
+            raise VideoGenerationError(f"Gemini Veo failed ({r.status_code}): {r.text[:200]}")
+        data = r.json()
+        if url := _dig_url(data):
+            return url, False
+        op = data.get("name")
+        if not op:
+            raise VideoGenerationError(f"Unexpected Veo response shape: {str(data)[:200]}")
+
+        waited = 0
+        budget = min(settings.VIDEO_MAX_WAIT_SECONDS, 300)
+        while waited < budget:
+            await asyncio.sleep(5)
+            waited += 5
+            g = await self._http.get(
+                f"{base}/{str(op).lstrip('/')}", headers=headers,
+                timeout=httpx.Timeout(30.0, read=60.0),
+            )
+            if g.status_code >= 400:
+                continue  # transient — keep polling until the deadline
+            payload = g.json()
+            if err := payload.get("error"):
+                raise VideoGenerationError(f"Veo operation failed: {str(err)[:200]}")
+            if not payload.get("done"):
+                continue
+            uri = self._veo_video_uri(payload)
+            if not uri:
+                raise VideoGenerationError(f"Veo done but no video uri: {str(payload)[:200]}")
+            # The uri is key-gated — fetch the bytes with the same key, then serve
+            # them from MEDIA_DIR like every other provider clip.
+            sep = "&" if "?" in uri else "?"
+            dl = await self._http.get(
+                f"{uri}{sep}alt=media", headers={"x-goog-api-key": key},
+                timeout=httpx.Timeout(30.0, read=120.0), follow_redirects=True,
+            )
+            if dl.status_code >= 400:
+                raise VideoGenerationError(f"Veo download failed ({dl.status_code}): {dl.text[:160]}")
+            if not (dl.headers.get("content-type") or "").startswith("video/"):
+                raise VideoGenerationError(
+                    f"Veo download was not video bytes ({dl.headers.get('content-type', '?')})"
+                )
+            return self._save_video_bytes(dl.content, "veo"), False
+        raise VideoGenerationError(f"Veo timed out after {budget}s")
+
+    @staticmethod
+    def _veo_video_uri(payload: dict) -> str | None:
+        """First generated-video uri out of a finished predictLongRunning op."""
+        resp = payload.get("response") or {}
+        gvr = resp.get("generateVideoResponse") or resp.get("generate_video_response") or {}
+        samples = gvr.get("generatedSamples") or gvr.get("generated_samples") or []
+        for sample in samples:
+            uri = (sample.get("video") or {}).get("uri")
+            if uri:
+                return uri
+        return None
+
+    # ------------------------------------------------------- huggingface
+    async def _hf_video(self, prompt: str, opts: VideoOptions) -> tuple[str, bool]:
+        """HF Inference text-to-video (Wan2.1 default) on free daily credits.
+
+        Handles the classic HF cold-model 503 by waiting out `estimated_time`
+        once; quota exhaustion (402/429) cascades to the next provider.
+        """
+        token = (settings.HF_API_TOKEN or "").strip()
+        if not token:
+            raise VideoNotConfigured("Set HF_API_TOKEN for huggingface video.")
+        model = settings.HF_VIDEO_MODEL or "Wan-AI/Wan2.1-T2V-1.3B"
+        url = f"{settings.HF_BASE_URL.rstrip('/')}/{model}"
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        compiled = compile_prompt(prompt, opts)
+        timeout = httpx.Timeout(30.0, read=float(settings.VIDEO_MAX_WAIT_SECONDS))
+
+        r = await self._http.post(url, headers=headers, json={"inputs": compiled}, timeout=timeout)
+        if r.status_code == 503:  # cold model — HF tells us how long to wait
+            try:
+                eta = float((r.json() or {}).get("estimated_time") or 20)
+            except Exception:
+                eta = 20
+            await asyncio.sleep(min(max(eta, 5.0), 30.0))
+            r = await self._http.post(url, headers=headers, json={"inputs": compiled}, timeout=timeout)
+        if r.status_code in (401, 403):
+            raise VideoNotConfigured(f"HF rejected the token ({r.status_code}).")
+        if r.status_code in (402, 429):
+            raise VideoGenerationError(f"HF free credits/quota exhausted: {r.text[:160]}")
+        if r.status_code >= 400:
+            raise VideoGenerationError(f"HF video failed ({r.status_code}): {r.text[:160]}")
+        if (r.headers.get("content-type") or "").startswith("video/"):
+            return self._save_video_bytes(r.content, "hfvid"), False
+        raise VideoGenerationError(f"Unexpected HF video shape: {r.text[:160]}")
 
     # -------------------------------------------------- lean-retry helper
     async def _lean_retry(

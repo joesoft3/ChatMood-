@@ -217,3 +217,72 @@ def test_image_prompt_defaults_to_no_text_visuals(monkeypatch):
     monkeypatch.setattr(settings, "XAI_API_KEY", "")
     url = asyncio.run(llm.generate_image("a cozy puppy sleeping on a cloud"))
     assert "no%20readable%20text" in url and "no%20captions" in url
+
+
+def test_free_image_cascade_falls_through_to_pollinations(monkeypatch):
+    # gemini first but has no key → skipped; pollinations (no key needed) serves.
+    monkeypatch.setattr(settings, "IMAGE_FALLBACK_PROVIDER", "gemini,pollinations")
+    monkeypatch.setattr(settings, "XAI_API_KEY", "")
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    url = asyncio.run(llm.generate_image("sunrise over labadi beach"))
+    assert url is not None and url.startswith("https://image.pollinations.ai/prompt/")
+
+
+def test_free_image_cascade_order_is_respected(monkeypatch):
+    # An earlier working engine wins; pollinations is never consulted.
+    monkeypatch.setattr(settings, "IMAGE_FALLBACK_PROVIDER", "gemini,pollinations")
+    monkeypatch.setattr(settings, "XAI_API_KEY", "")
+
+    async def _fake_gemini(_prompt: str) -> str:
+        return "data:image/png;base64,AAA="
+
+    monkeypatch.setattr(llm, "_gemini_image", _fake_gemini)
+    url = asyncio.run(llm.generate_image("paper planes over osu"))
+    assert url == "data:image/png;base64,AAA="
+
+
+def test_free_image_cascade_skips_unknown_and_failed_engines(monkeypatch):
+    monkeypatch.setattr(settings, "IMAGE_FALLBACK_PROVIDER", "madeupengine,huggingface,pollinations")
+    monkeypatch.setattr(settings, "XAI_API_KEY", "")
+
+    async def _boom(_prompt: str):
+        raise RuntimeError("hf returned 503")
+
+    monkeypatch.setattr(llm, "_hf_image", _boom)
+    url = asyncio.run(llm.generate_image("kente pattern study in gold and green"))
+    assert url is not None and url.startswith("https://image.pollinations.ai/prompt/")
+
+
+def test_free_image_keyed_engines_skip_cleanly_without_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(settings, "HF_API_TOKEN", "")
+    monkeypatch.setattr(settings, "WORKERS_AI_ACCOUNT_ID", "")
+    monkeypatch.setattr(settings, "WORKERS_AI_API_TOKEN", "")
+    monkeypatch.setattr(settings, "CLOUDFLARE_ACCOUNT_ID", "")
+    monkeypatch.setattr(settings, "CLOUDFLARE_API_TOKEN", "")
+    assert asyncio.run(llm._gemini_image("x")) is None
+    assert asyncio.run(llm._hf_image("x")) is None
+    assert asyncio.run(llm._workers_ai_image("x")) is None
+
+
+def test_free_image_response_parsers():
+    import base64
+
+    gemini_payload = {
+        "candidates": [
+            {"content": {"parts": [
+                {"text": "here you go"},
+                {"inlineData": {"mimeType": "image/png", "data": base64.b64encode(b"PNG").decode()}},
+            ]}}
+        ]
+    }
+    assert llm._gemini_image_b64(gemini_payload).startswith("data:image/png;base64,")
+    assert llm._gemini_image_b64({"candidates": [{"content": {"parts": [{"text": "no img"}]}}]}) is None
+
+    cf_ok = {"success": True, "result": {"image": base64.b64encode(b"IMG").decode()}}
+    assert llm._workers_ai_image_b64(cf_ok).startswith("data:image/png;base64,")
+    assert llm._workers_ai_image_b64({"success": True, "result": {}}) is None
+    import pytest
+
+    with pytest.raises(ValueError):
+        llm._workers_ai_image_b64({"success": False, "errors": [{"message": "quota"}]})

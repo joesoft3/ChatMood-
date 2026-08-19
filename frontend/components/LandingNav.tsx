@@ -19,6 +19,7 @@ const EXPLORE_ITEMS: ExploreItem[] = [
   { icon: "🖼️", label: "Images", hint: "Generate and iterate visuals", href: "/images" },
   { icon: "🎨", label: "Design", hint: "Brand-ready concepts in chat", href: "/design" },
   { icon: "🎤", label: "Voice", hint: "Talk naturally, hear answers back", href: "/voice" },
+  { icon: "❓", label: "FAQ", hint: "Best questions, straight answers", href: "/#faq" },
 ];
 
 export default function LandingNav() {
