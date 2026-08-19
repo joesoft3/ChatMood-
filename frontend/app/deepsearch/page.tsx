@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { StudioActionButton, StudioActionLink, StudioEmptyState, StudioHero, StudioNotice, StudioStatusPill } from "@/components/StudioChrome";
 import { apiFetch, token } from "@/lib/api";
+import { currentNextPath, signInHref } from "@/lib/auth";
 import { OPEN_CONV_KEY } from "@/lib/conversations";
 
 type ResearchItem = { id: string; title: string; updated_at: string | null };
@@ -46,7 +47,7 @@ export default function ResearchPage() {
 
   useEffect(() => {
     if (!token.get()) {
-      router.replace("/login");
+      router.replace(signInHref(currentNextPath()));
       return;
     }
     let dead = false;

@@ -126,7 +126,7 @@ export default async function FilmSharePage({ params }: { params: Promise<{ id: 
                 brains, a film with studio voice and sound. Make yours free in 30 seconds.
               </p>
               <Link
-                href="/login"
+                href="/signup"
                 className="rounded-xl bg-accent text-black font-semibold px-5 py-3 text-sm hover:brightness-110 transition shrink-0"
               >
                 🎬 Direct your own film

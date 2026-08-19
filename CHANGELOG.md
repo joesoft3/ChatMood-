@@ -7,6 +7,21 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🔐 First-class Sign up and Sign in
+
+Sign up and Sign in are now separate destinations instead of one `/login`
+toggle that always opened on “Welcome back”.
+
+- **`/signup`** creates an account. **`/login`** and **`/signin`** sign in.
+- Landing hero, nav, and footer expose both actions. “Get started” no longer
+  dumps a new visitor onto the sign-in form.
+- Switching between the two keeps `?next=` so invite and deep links survive.
+- Guests bounced from the app shell return to the page they asked for after
+  auth. `next=` rejects protocol-relative URLs (`//evil.example`).
+- After account deletion, `/login?deleted=1` confirms the wipe.
+
+---
+
 ### 🖥 Hosted preview / iframe loads (PR #46)
 
 `next dev` now accepts more preview hosts (`*.e2b.dev`, `*.arena.ai`,
