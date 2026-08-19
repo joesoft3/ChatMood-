@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  ArrowUp,
   Bot,
   Globe,
   Headphones,
+  Image as ImageIcon,
   Mic,
-  MoreHorizontal,
   Paperclip,
+  Plus,
   Puzzle,
-  SendHorizontal,
   Square,
   Telescope,
   X,
@@ -36,7 +37,7 @@ interface Props {
   setPluginMode: (v: boolean) => void;
   /** Active generation model — drives the hint under the composer. */
   model?: string;
-  /** ⚔️ arena / 🧠 thinking states for the hint line. */
+  /** Arena / thinking states for the hint line. */
   arenaMode?: boolean;
   thinkOn?: boolean;
   files: FileChip[];
@@ -44,9 +45,9 @@ interface Props {
   onUpload: (f: File) => Promise<void>;
   onSend: (text: string, search: boolean) => Promise<void>;
   onVoice: (blob: Blob) => Promise<void>;
-  /** 🎨🎬 Home actions prefill the input without sending (nonce retriggers). */
+  /** Home actions prefill the input without sending (nonce retriggers). */
   draft?: { text: string; nonce: number };
-  /** 🏠 bare = rendered inside the centered empty home. */
+  /** bare = rendered inside the centered empty home. */
   bare?: boolean;
   /** DeepSearch: "deep" (2 rounds) or "deeper" (3 rounds). */
   researchDepth?: "deep" | "deeper";
@@ -85,11 +86,7 @@ export default function Composer({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const canSend = !busy && (input.trim().length > 0 || files.length > 0);
-  const toolActive = agentMode || deepMode || pluginMode || voiceMode;
 
-  // Home actions prefill the composer (never auto-send). Wait for the
-  // controlled textarea to render before measuring it or placing the cursor;
-  // otherwise the cursor can land at the old value's position.
   useEffect(() => {
     if (!draft) return;
     setInput(draft.text);
@@ -98,22 +95,21 @@ export default function Composer({
       if (!t) return;
       t.focus();
       t.style.height = "auto";
-      t.style.height = Math.min(t.scrollHeight, 160) + "px";
+      t.style.height = Math.min(t.scrollHeight, 200) + "px";
       t.setSelectionRange(draft.text.length, draft.text.length);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [draft]);
 
-  // Close the compact tools menu when the user taps elsewhere.
   useEffect(() => {
-    if (bare || !showMore) return;
+    if (!showMore) return;
     const close = (event: PointerEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest("[data-composer-menu]")) setShowMore(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [bare, showMore]);
+  }, [showMore]);
 
   async function submit() {
     if (!canSend) return;
@@ -129,7 +125,6 @@ export default function Composer({
       await onVoice(blob);
       return;
     }
-    // Dictation mode: transcribe into the input box
     try {
       const fd = new FormData();
       fd.append("file", blob, "dictation.webm");
@@ -158,7 +153,7 @@ export default function Composer({
     setInput(e.target.value);
     const t = e.target;
     t.style.height = "auto";
-    t.style.height = Math.min(t.scrollHeight, 160) + "px";
+    t.style.height = Math.min(t.scrollHeight, 200) + "px";
   }
 
   function toggleTool(setter: (value: boolean) => void, value: boolean) {
@@ -166,64 +161,89 @@ export default function Composer({
     setShowMore(false);
   }
 
+  const placeholder = deepMode
+    ? "Ask a research question…"
+    : agentMode
+      ? "Give the agent team a goal…"
+      : arenaMode
+        ? "Pose a question for the arena…"
+        : model === "grok-code-fast-1"
+          ? "Describe code to write or a bug to fix…"
+          : thinkOn
+            ? "Ask something worth reasoning through…"
+            : "Ask anything";
+
+  const chips: { key: string; label: string; onClear: () => void }[] = [];
+  if (deepMode) chips.push({ key: "deep", label: "Deep research", onClear: () => setDeepMode(false) });
+  if (agentMode) chips.push({ key: "agent", label: "Agent", onClear: () => setAgentMode(false) });
+  if (pluginMode) chips.push({ key: "plugins", label: "Plugins", onClear: () => setPluginMode(false) });
+  if (voiceMode) chips.push({ key: "voice", label: "Voice", onClear: () => setVoiceMode(false) });
+  if (!searchOn) chips.push({ key: "search-off", label: "Search off", onClear: () => setSearchOn(true) });
+
   return (
-    <div
-      className={
-        bare
-          ? "w-full"
-          : "border-t border-white/5 bg-[#0f0f10]/90 px-2 py-2.5 backdrop-blur sm:px-3 sm:py-3 compact-v"
-      }
-    >
-      <div className="relative mx-auto max-w-3xl space-y-2.5 xl:max-w-4xl 2xl:max-w-5xl" data-composer-menu>
-        {!bare && showMore && (
-          <div className="absolute bottom-full right-1 z-30 mb-2 w-[min(22rem,calc(100vw-1.5rem))] rounded-2xl border border-white/10 bg-[#171718]/[.98] p-2 shadow-[0_18px_45px_rgb(0_0_0/0.5)] backdrop-blur-xl">
-            <div className="px-2 pb-1.5 text-[10px] uppercase tracking-[0.16em] text-gray-600">More tools</div>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => toggleTool(setAgentMode, agentMode)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition ${
-                  agentMode ? "border-accent/35 bg-accent/10 text-accent" : "border-white/8 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Bot size={15} /> Agent
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleTool(setDeepMode, deepMode)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition ${
-                  deepMode ? "border-accent/35 bg-accent/10 text-accent" : "border-white/8 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Telescope size={15} /> Deep
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleTool(setPluginMode, pluginMode)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition ${
-                  pluginMode ? "border-accent/35 bg-accent/10 text-accent" : "border-white/8 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Puzzle size={15} /> Plugins
-              </button>
-              <button
-                type="button"
-                onClick={() => toggleTool(setVoiceMode, voiceMode)}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition ${
-                  voiceMode ? "border-accent/35 bg-accent/10 text-accent" : "border-white/8 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Headphones size={15} /> Voice
-              </button>
-            </div>
+    <div className={bare ? "w-full" : "bg-base px-3 pb-3 pt-1 sm:px-4 sm:pb-4"}>
+      <div className="relative mx-auto w-full max-w-[48rem] space-y-2" data-composer-menu>
+        {showMore && (
+          <div className="absolute bottom-full left-0 z-30 mb-2 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--mood-panel))] py-1 shadow-[0_16px_40px_rgb(0_0_0/0.45)]">
+            <MenuRow
+              icon={<Paperclip size={16} />}
+              label="Add photos & files"
+              onClick={() => {
+                setShowMore(false);
+                fileRef.current?.click();
+              }}
+            />
+            <MenuRow
+              icon={<Globe size={16} />}
+              label="Web search"
+              active={searchOn}
+              onClick={() => {
+                setSearchOn(!searchOn);
+                setShowMore(false);
+              }}
+            />
+            <MenuRow
+              icon={<Telescope size={16} />}
+              label="Deep research"
+              active={deepMode}
+              onClick={() => toggleTool(setDeepMode, deepMode)}
+            />
+            <MenuRow
+              icon={<Bot size={16} />}
+              label="Agent team"
+              active={agentMode}
+              onClick={() => toggleTool(setAgentMode, agentMode)}
+            />
+            <MenuRow
+              icon={<Puzzle size={16} />}
+              label="Plugins"
+              active={pluginMode}
+              onClick={() => toggleTool(setPluginMode, pluginMode)}
+            />
+            <MenuRow
+              icon={<Headphones size={16} />}
+              label="Voice replies"
+              active={voiceMode}
+              onClick={() => toggleTool(setVoiceMode, voiceMode)}
+            />
+            <MenuRow
+              icon={<ImageIcon size={16} />}
+              label="Create image"
+              onClick={() => {
+                setInput((v) => v || "Create an image of ");
+                setShowMore(false);
+                window.requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+            />
           </div>
         )}
+
         {files.length > 0 && (
           <div className="flex flex-wrap gap-2 px-1">
             {files.map((f) => (
               <span
                 key={f.id}
-                className="flex max-w-full items-center gap-1.5 rounded-full border border-white/5 bg-white/5 px-3 py-1.5 text-xs text-gray-300"
+                className="flex max-w-full items-center gap-1.5 rounded-full bg-composer px-3 py-1.5 text-xs text-gray-300"
               >
                 <span className="max-w-[180px] truncate">{f.filename}</span>
                 <button
@@ -238,59 +258,56 @@ export default function Composer({
             ))}
           </div>
         )}
+
         {composerError && (
-          <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+          <div role="alert" className="flex items-center gap-2 rounded-xl bg-red-400/10 px-3 py-2 text-xs text-red-200">
             <span className="flex-1">{composerError}</span>
-            <button type="button" onClick={() => setComposerError("")} className="text-red-200/70 hover:text-red-100" aria-label="Dismiss composer error">✕</button>
+            <button type="button" onClick={() => setComposerError("")} className="text-red-200/70 hover:text-red-100" aria-label="Dismiss composer error">
+              ✕
+            </button>
           </div>
         )}
-        {deepMode && (
+
+        {deepMode && setResearchDepth && (
           <div className="flex justify-center gap-1.5">
-            {setResearchDepth && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setResearchDepth("deep")}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] transition ${
-                    researchDepth === "deep"
-                      ? "border-accent/25 bg-accent/10 text-accent"
-                      : "border-white/8 bg-white/5 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Deep
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setResearchDepth("deeper")}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] transition ${
-                    researchDepth === "deeper"
-                      ? "border-accent/25 bg-accent/10 text-accent"
-                      : "border-white/8 bg-white/5 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  Deeper
-                </button>
-              </>
-            )}
-            {bare && (
-              <button
-                type="button"
-                onClick={() => setDeepMode(false)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-2.5 py-1 text-[10px] text-accent transition hover:border-accent/45 hover:bg-accent/15"
-                aria-label="Turn off research mode"
-              >
-                <Telescope size={12} /> Research mode <X size={11} />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setResearchDepth("deep")}
+              className={`rounded-full px-2.5 py-1 text-[11px] transition ${
+                researchDepth === "deep" ? "bg-white/10 text-gray-100" : "text-gray-500 hover:text-white"
+              }`}
+            >
+              Deep
+            </button>
+            <button
+              type="button"
+              onClick={() => setResearchDepth("deeper")}
+              className={`rounded-full px-2.5 py-1 text-[11px] transition ${
+                researchDepth === "deeper" ? "bg-white/10 text-gray-100" : "text-gray-500 hover:text-white"
+              }`}
+            >
+              Deeper
+            </button>
           </div>
         )}
-        <div
-          className={`${
-            bare
-              ? "min-h-[4rem] rounded-[1.35rem] border border-white/10 bg-[#171718] px-2 py-1.5 shadow-[0_14px_32px_rgb(0_0_0/0.28)]"
-              : "min-h-[4.6rem] rounded-[1.8rem] border border-white/10 bg-[#171718] px-2.5 py-2.5 shadow-[0_18px_40px_rgb(0_0_0/0.38)] sm:px-3"
-          } flex items-center gap-1 focus-within:border-accent/50 focus-within:shadow-[0_18px_44px_-8px_rgb(var(--mood-accent)/0.28)] transition`}
-        >
+
+        {chips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-1">
+            {chips.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={c.onClear}
+                className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-1 text-[11px] text-gray-300 transition hover:bg-white/12"
+                aria-label={`Turn off ${c.label}`}
+              >
+                {c.label} <X size={11} />
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="flex items-end gap-1 rounded-[28px] bg-composer px-2 py-2 shadow-[0_0_0_1px_rgb(var(--mood-line))] focus-within:shadow-[0_0_0_1px_rgb(var(--mood-muted)/0.45)]">
           <input
             ref={fileRef}
             type="file"
@@ -310,12 +327,13 @@ export default function Composer({
           />
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
-            title="Attach file"
-            aria-label="Attach file"
-            className="composer-btn shrink-0 rounded-xl text-gray-400 transition hover:bg-white/5 hover:text-white"
+            onClick={() => setShowMore((v) => !v)}
+            title="Add files and tools"
+            aria-label="Add files and tools"
+            aria-expanded={showMore}
+            className={`composer-btn mb-0.5 rounded-full transition ${showMore ? "bg-white/10 text-gray-100" : "text-gray-400 hover:bg-white/8 hover:text-white"}`}
           >
-            <Paperclip size={19} />
+            <Plus size={20} />
           </button>
           <textarea
             ref={inputRef}
@@ -329,78 +347,65 @@ export default function Composer({
                 submit();
               }
             }}
-            placeholder={
-              bare
-                ? deepMode
-                  ? "Ask a research question…"
-                  : "Ask ChatMood anything…"
-                : agentMode
-                  ? "Give the agent team a goal…"
-                  : deepMode
-                    ? "Ask a complex question — deep multi-round research…"
-                    : arenaMode
-                      ? "Pose a question — 3+ AI models will debate it, Grok-4 judges…"
-                      : model === "grok-code-fast-1"
-                        ? "Describe code to write / a bug to fix (🧠 toggle for reasoning)…"
-                        : thinkOn
-                          ? "Ask something worth deep reasoning (grok-4 🧠)…"
-                          : "Ask ChatMood anything…"
-            }
-            className="composer-input min-h-[3.25rem] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-sm leading-6 outline-none placeholder-gray-600"
+            placeholder={placeholder}
+            className="composer-input min-h-[2.75rem] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[15px] leading-6 outline-none placeholder-gray-500"
           />
-          <button
-            type="button"
-            onClick={() => setSearchOn(!searchOn)}
-            title="Toggle live web search"
-            aria-label="Toggle live web search"
-            className={`composer-btn shrink-0 rounded-xl transition ${searchOn ? "bg-accent/10 text-accent" : "text-gray-600 hover:bg-white/5 hover:text-white"}`}
-          >
-            <Globe size={19} />
-          </button>
-          {!bare && (
-            <button
-              type="button"
-              onClick={() => setShowMore((v) => !v)}
-              title="More chat tools"
-              aria-label="More chat tools"
-              aria-expanded={showMore}
-              className={`composer-btn shrink-0 rounded-xl transition ${showMore || toolActive ? "bg-accent/10 text-accent" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
-            >
-              <MoreHorizontal size={20} />
-            </button>
-          )}
           <button
             type="button"
             onClick={toggleMic}
             title={recording ? "Stop recording" : voiceMode ? "Talk" : "Dictate"}
             aria-label={recording ? "Stop recording" : voiceMode ? "Talk" : "Dictate"}
-            className={`composer-btn shrink-0 rounded-xl transition ${recording ? "bg-red-400/10 text-red-400 animate-pulse" : "text-gray-400 hover:bg-white/5 hover:text-white"}`}
+            className={`composer-btn mb-0.5 rounded-full transition ${recording ? "bg-red-400/15 text-red-400 animate-pulse" : "text-gray-400 hover:bg-white/8 hover:text-white"}`}
           >
-            {recording ? <Square size={19} /> : <Mic size={19} />}
+            {recording ? <Square size={16} /> : <Mic size={18} />}
           </button>
           {busy ? (
             <button
               type="button"
               onClick={onStop}
               title="Stop generating"
-              className="composer-btn shrink-0 rounded-2xl bg-red-400/90 text-black shadow-[0_8px_24px_rgb(248_113_113/0.35)] transition hover:bg-red-400"
+              className="composer-btn composer-send mb-0.5 rounded-full transition hover:opacity-90"
               aria-label="Stop generating"
             >
-              <Square size={17} />
+              <Square size={14} />
             </button>
           ) : (
             <button
               type="button"
               onClick={submit}
               disabled={!canSend}
-              className="composer-btn shrink-0 rounded-2xl bg-accent text-black shadow-[0_8px_24px_rgb(var(--mood-accent)/0.35)] transition hover:brightness-110 disabled:opacity-30"
+              className="composer-btn composer-send mb-0.5 rounded-full transition hover:opacity-90 disabled:opacity-30"
               aria-label="Send"
             >
-              <SendHorizontal size={19} />
+              <ArrowUp size={18} strokeWidth={2.4} />
             </button>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition hover:bg-white/5 ${active ? "text-gray-100" : "text-gray-300"}`}
+    >
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/5 text-gray-300">{icon}</span>
+      <span className="flex-1">{label}</span>
+      {active && <span className="text-[11px] text-gray-500">On</span>}
+    </button>
   );
 }

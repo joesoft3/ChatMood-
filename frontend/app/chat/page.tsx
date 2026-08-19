@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, CopyPlus, Download, FileText, Image as ImageIcon, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
+import { CopyPlus, Download, FileText, Image as ImageIcon, Link2Off, ListChecks, PenLine, Share2, Sparkles, Telescope } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { copyText } from "@/lib/clipboard";
 import { streamChat } from "@/lib/stream";
@@ -700,8 +700,7 @@ export default function ChatPage() {
 
   const emptyHome = msgs.length === 0;
 
-  const pickerEl = (bare: boolean) =>
-    !deepMode && (
+  const pickerEl = (
       <ModelPicker
         model={model}
         setModel={setModel}
@@ -741,7 +740,6 @@ export default function ChatPage() {
           setGptLabel("");
           setGptStarters([]);
         }}
-        bare={bare}
       />
     );
 
@@ -776,33 +774,25 @@ export default function ChatPage() {
    *  composer AND the button's accessible name, so the two can't drift apart. */
   const homeActions = [
     {
-      icon: Sparkles,
+      icon: ImageIcon,
+      label: "Create image",
+      prompt: "Create an image of ",
+      onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
+    },
+    {
+      icon: PenLine,
       label: "Help me write",
       prompt: "Help me write ",
       onClick: () => setDraft({ text: "Help me write ", nonce: Date.now() }),
     },
     {
       icon: Telescope,
-      label: "Research a topic",
+      label: "Research",
       prompt: "Research ",
-      // Also flips deep-research mode on — the composer shows a dismissible
-      // "Research mode" pill in bare mode so the state is never invisible.
       onClick: () => {
         setDeepMode(true);
         setDraft({ text: "Research ", nonce: Date.now() });
       },
-    },
-    {
-      icon: ImageIcon,
-      label: "Create an image",
-      prompt: "Create an image of ",
-      onClick: () => setDraft({ text: "Create an image of ", nonce: Date.now() }),
-    },
-    {
-      icon: PenLine,
-      label: "Brainstorm ideas",
-      prompt: "Brainstorm ideas for ",
-      onClick: () => setDraft({ text: "Brainstorm ideas for ", nonce: Date.now() }),
     },
     {
       icon: ListChecks,
@@ -811,93 +801,58 @@ export default function ChatPage() {
       onClick: () => setDraft({ text: "Make a plan for ", nonce: Date.now() }),
     },
     {
+      icon: Sparkles,
+      label: "Brainstorm",
+      prompt: "Brainstorm ideas for ",
+      onClick: () => setDraft({ text: "Brainstorm ideas for ", nonce: Date.now() }),
+    },
+    {
       icon: FileText,
-      label: "Summarize text",
+      label: "Summarize",
       prompt: "Summarize the following: ",
       onClick: () => setDraft({ text: "Summarize the following: ", nonce: Date.now() }),
     },
-    {
-      icon: Bot,
-      label: "Explore GPTs",
-      prompt: "Open the GPT store",
-      onClick: () => router.push("/gpts"),
-    },
   ] as const;
 
-  const chatTabs = (
-    <div className="flex items-center justify-center gap-7 h-full">
-      <span className="py-1 text-sm font-semibold text-white">Ask</span>
-      <button onClick={() => router.push("/images")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Imagine</button>
-      {/* 📺 Creator Reel — the shared feed creators post their videos to */}
-      <button onClick={() => router.push("/reel")} className="py-1 text-sm text-gray-500 transition hover:text-gray-200">Reel</button>
+  const headerActions = !emptyHome ? (
+    <div className="flex items-center gap-0.5 shrink-0">
+      {wsId && (
+        <button
+          onClick={() => {
+            const next = !showTeam;
+            setShowTeam(next);
+            if (next)
+              apiFetch<{ conversations: any[] }>(`/workspaces/${wsId}/conversations`)
+                .then((c) => setTeamConvs(c.conversations))
+                .catch(() => {});
+          }}
+          className="rounded-lg px-2 py-1.5 text-xs text-gray-400 hover:bg-white/5 hover:text-white"
+          title="Team workspace conversations"
+        >
+          Team
+        </button>
+      )}
+      <button onClick={shareChat} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-300 hover:bg-white/5" title="Create a public read-only link">
+        <Share2 size={16} /> <span className="hidden sm:inline">Share</span>
+      </button>
+      {shared && (
+        <button onClick={revokeShare} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-gray-400 hover:bg-white/5 hover:text-red-400" title="Revoke the public link">
+          <Link2Off size={15} />
+        </button>
+      )}
+      <button onClick={exportChat} className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white" title="Export">
+        <Download size={16} />
+      </button>
+      {activeId && (
+        <button onClick={() => void duplicateChat()} className="rounded-lg p-2 text-gray-400 hover:bg-white/5 hover:text-white" title="Duplicate this chat">
+          <CopyPlus size={16} />
+        </button>
+      )}
     </div>
-  );
+  ) : undefined;
 
   return (
-    <AppShell title={activeTitle || "ChatMood Chat"} headerCenter={emptyHome ? chatTabs : undefined}>
-      {emptyHome && <div className="hidden lg:flex h-12 items-center border-b border-white/5 bg-[#0f1011]/88 px-6 backdrop-blur">{chatTabs}</div>}
-      {!emptyHome && (
-        <>
-      {/* conversation toolbar — cleaner and closer to ChatGPT, with live workspace status */}
-      <div className="border-b border-white/5 px-3 sm:px-4 py-3 shrink-0 compact-v bg-[#0f1011]/88 backdrop-blur space-y-2.5">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] p-1 shrink-0 shadow-[0_10px_24px_rgb(0_0_0/0.18)]">
-            <span className="rounded-full bg-white text-black px-3 py-1.5 text-xs font-semibold">Ask</span>
-            <button onClick={() => router.push("/images")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
-              Imagine
-            </button>
-            {/* 📺 Creator Reel — keeps the feed reachable from inside a conversation,
-                not just the empty-chat home (the tab row there vanishes once chat starts). */}
-            <button onClick={() => router.push("/reel")} className="rounded-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 transition">
-              Reel
-            </button>
-          </div>
-          <div className="min-w-0 flex-1 hidden sm:block">
-            <p className="truncate text-sm font-medium text-gray-200">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "New chat")}</p>
-          </div>
-          {msgs.length > 0 && (
-            <div className="ml-auto flex items-center gap-1.5 shrink-0">
-              <button onClick={shareChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition" title="Create a public read-only link">
-                <Share2 size={13} /> <span className="hidden sm:inline">Share</span>
-              </button>
-              {shared && (
-                <button onClick={revokeShare} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-red-400 transition" title="Revoke the public link">
-                  <Link2Off size={13} /> <span className="hidden sm:inline">Revoke</span>
-                </button>
-              )}
-              <button onClick={exportChat} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition">
-                <Download size={13} /> <span className="hidden sm:inline">Export</span>
-              </button>
-              {activeId && (
-                <button onClick={() => void duplicateChat()} className="inline-flex items-center gap-1 rounded-full border border-white/8 bg-[#141415] px-3 py-1.5 hover:text-gray-300 transition" title="Duplicate this chat">
-                  <CopyPlus size={13} /> <span className="hidden sm:inline">Duplicate</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="sm:hidden flex items-center gap-2 min-w-0">
-          <span className="truncate text-sm text-gray-300 flex-1">{activeTitle || (wsId ? `👥 ${wsName || "Team"} — new chat` : "New chat")}</span>
-          {wsId && (
-            <button
-              onClick={() => {
-                const next = !showTeam;
-                setShowTeam(next);
-                if (next)
-                  apiFetch<{ conversations: any[] }>(`/workspaces/${wsId}/conversations`)
-                    .then((c) => setTeamConvs(c.conversations))
-                    .catch(() => {});
-              }}
-              className="rounded-full border border-white/8 bg-[#141415] px-2.5 py-1 text-[10px] text-gray-400 hover:text-white transition shrink-0"
-              title="Team workspace conversations"
-            >
-              👥 Team
-            </button>
-          )}
-        </div>
-      </div>
-        </>
-      )}
+    <AppShell title={activeTitle || "ChatMood"} headerLeft={pickerEl} headerRight={headerActions}>
       {/* 🗂 Project mode — the standing brief is applied server-side; say so plainly
           so the user knows why answers differ from a loose chat. */}
       {gptId && (
@@ -958,6 +913,11 @@ export default function ChatPage() {
           )}
         </div>
       )}
+      {shareMsg && (
+        <div role="status" className="shrink-0 px-3 py-2 text-center text-xs text-gray-400">
+          {shareMsg}
+        </div>
+      )}
       {transportError && (
         <div role="alert" className="border-b border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200 flex items-center gap-2 shrink-0">
           <span className="flex-1">{transportError}</span>
@@ -990,78 +950,44 @@ export default function ChatPage() {
           block can center against the REAL remaining space (flex-1) instead of a
           hardcoded viewport calc. In a conversation it stays a plain scroll box. */}
       <div
-        className={`flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-5 sm:py-6 compact-v bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.08),transparent_34%)] ${
+        className={`flex-1 min-h-0 overflow-y-auto scrollbar-thin px-3 sm:px-4 py-4 sm:py-6 ${
           emptyHome ? "flex flex-col" : ""
         }`}
       >
         <div
-          className={`max-w-3xl xl:max-w-[50rem] 2xl:max-w-[52rem] mx-auto space-y-5 sm:space-y-6 mood-fade-up ${
+          className={`mx-auto max-w-[48rem] space-y-6 mood-fade-up ${
             emptyHome ? "flex w-full flex-1 flex-col" : ""
           }`}
         >
           {emptyHome && (
-            /* 🏠 ChatGPT-style home: greeting → composer → model row → starters.
-               Centering uses flex-1 against the scroll container rather than a
-               hardcoded `min-h-[calc(100dvh-11rem)]`. That 11rem could only ever
-               be right for one breakpoint: this block sits INSIDE a flex column
-               that has already subtracted the mobile header, the bottom tab bar
-               and its own padding, so on a phone with safe-area insets the old
-               min-height exceeded the available box and the "centered" column
-               overflowed into a scroll. `flex-1` measures the real remaining
-               space at every size instead. */
-            <div className="flex flex-1 flex-col items-center justify-center gap-6 py-6 sm:gap-7 sm:py-8">
-              <div className="flex flex-col items-center gap-3 text-center select-none">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#141415] border border-white/8 shadow-[0_0_55px_-16px_rgb(var(--mood-accent)/0.65)]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icon.png" alt="" className="h-6 w-6 rounded-lg" />
-                </span>
-                {/* h1, not h2: on the empty home `headerCenter` replaces AppShell's
-                    mobile <h1>, so this was the only heading on the page and it
-                    started at level 2 — a skipped level with no h1 for screen
-                    readers to anchor to. */}
-                <h1 className="text-center text-[clamp(1.85rem,4.6vw,2.6rem)] font-semibold tracking-tight text-white">
-                  What can I help with?
-                </h1>
-              </div>
-              {/* Composer, model row and starters share ONE width token so the
-                  stack reads as a single column. The starters used to be max-w-2xl
-                  against a max-w-xl composer — visibly wider than the input they
-                  feed. max-w-2xl matches the conversation composer's first step
-                  (max-w-3xl is its inner cap) far more closely, so sending the
-                  first message no longer snaps the input ~33% wider. */}
-              <div className="w-full max-w-2xl">{composerEl(true)}</div>
-              <div className="flex w-full max-w-2xl justify-center">{pickerEl(true)}</div>
-              <div className="w-full max-w-2xl px-2">
-                {/* nav, not a bare div: this is a set of controls, and the label
-                    was previously on a plain <div> where it announced nothing. */}
-                <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="Conversation starters">
-                  {gptStarters.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => setDraft({ text: s, nonce: Date.now() })}
-                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-4 py-2.5 text-xs text-accent transition hover:border-accent/45 hover:bg-accent/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                  {homeActions.map(({ icon: Icon, label, onClick, prompt }) => (
-                    <button
-                      key={label}
-                      onClick={onClick}
-                      /* The visible label is a short verb ("Help me write"), but
-                         what the button DOES is prefill a specific prompt. Spell
-                         that out for screen readers instead of leaving them to
-                         guess that a nav button types into an input. */
-                      aria-label={`${label} — prefills the message box with “${prompt.trim()}”`}
-                      className="touch-manipulation inline-flex items-center gap-2 rounded-full border border-white/8 bg-[#141415] px-4 py-2.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-                    >
-                      <Icon size={15} className="text-accent" aria-hidden="true" />
-                      {label}
-                    </button>
-                  ))}
-                </nav>
-              </div>
+            <div className="flex flex-1 flex-col items-center justify-center gap-7 py-8">
+              <h1 className="select-none text-center text-[32px] font-semibold tracking-tight text-gray-100">
+                What can I help with?
+              </h1>
+              <div className="w-full max-w-[48rem]">{composerEl(true)}</div>
+              <nav className="flex flex-wrap items-center justify-center gap-2 px-2" aria-label="Conversation starters">
+                {gptStarters.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setDraft({ text: s, nonce: Date.now() })}
+                    className="inline-flex items-center rounded-full bg-composer px-4 py-2 text-sm text-gray-200 transition hover:bg-white/10"
+                  >
+                    {s}
+                  </button>
+                ))}
+                {homeActions.map(({ icon: Icon, label, onClick, prompt }) => (
+                  <button
+                    key={label}
+                    onClick={onClick}
+                    aria-label={`${label} — prefills the message box with “${prompt.trim()}”`}
+                    className="inline-flex items-center gap-2 rounded-full bg-composer px-4 py-2 text-sm text-gray-200 transition hover:bg-white/10"
+                  >
+                    <Icon size={15} className="text-gray-400" aria-hidden="true" />
+                    {label}
+                  </button>
+                ))}
+              </nav>
             </div>
           )}
           {msgs.map((m, i) => (
@@ -1106,9 +1032,9 @@ export default function ChatPage() {
       {!emptyHome && (
         <>
           {suggestions.length > 0 && !busy && (
-            <div className="shrink-0 border-t border-white/5 bg-[#0f0f10]/80 px-3 py-2 sm:px-4">
+            <div className="shrink-0 px-3 py-2 sm:px-4">
               <nav
-                className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2 xl:max-w-4xl"
+                className="mx-auto flex max-w-[48rem] flex-wrap items-center justify-center gap-2"
                 aria-label="Suggested follow-ups"
               >
                 {suggestions.map((s) => (
@@ -1116,7 +1042,7 @@ export default function ChatPage() {
                     key={s}
                     type="button"
                     onClick={() => void send(s, true)}
-                    className="touch-manipulation inline-flex max-w-full items-center rounded-full border border-white/8 bg-[#141415] px-3.5 py-1.5 text-xs text-gray-300 transition hover:border-white/15 hover:bg-white/[0.045] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                    className="inline-flex max-w-full items-center rounded-full bg-composer px-3.5 py-1.5 text-xs text-gray-300 transition hover:bg-white/10 hover:text-white"
                   >
                     <span className="truncate">{s}</span>
                   </button>
@@ -1124,7 +1050,6 @@ export default function ChatPage() {
               </nav>
             </div>
           )}
-          {pickerEl(false)}
           {composerEl(false)}
         </>
       )}

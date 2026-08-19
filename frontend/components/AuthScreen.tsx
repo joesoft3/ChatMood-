@@ -9,7 +9,7 @@ import { BrandMark, useBrand } from "@/lib/brand";
 import { safeNextPath, signInHref, signUpHref } from "@/lib/auth";
 
 const inputCls =
-  "w-full rounded-2xl bg-[#111214] border border-white/8 px-4 py-3 text-sm text-gray-100 outline-none focus:border-accent/50 placeholder-gray-600 transition";
+  "w-full rounded-2xl bg-composer px-4 py-3 text-sm text-gray-100 outline-none placeholder-gray-600 transition";
 
 const PERKS = [
   {
@@ -95,11 +95,11 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
        "Sign up" toggle, Terms links) below the fold on first paint. The rest of
        the app already avoids raw vh via .app-height / --app-h (globals.css);
        this page bypasses AppShell, so it opts into dvh directly. */
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,rgba(124,155,255,0.14),transparent_34%)] px-4 py-8 sm:px-6">
+    <div className="min-h-[100dvh] bg-base px-4 py-8 sm:px-6">
       <div className="mx-auto grid min-h-[calc(100dvh-4rem)] w-full max-w-6xl items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="hidden lg:flex flex-col gap-6 pr-6">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-gray-500">
+            <div className="inline-flex items-center gap-2 rounded-full bg-composer px-3 py-1 text-[11px] text-gray-500">
               <BrandMark brand={brand} /> {brand?.brand_name ?? "ChatMood"}
             </div>
             {/* Deliberately not an <h1>: this whole section is `hidden lg:flex`,
@@ -117,7 +117,7 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             {PERKS.map(({ icon: Icon, title, text }) => (
-              <div key={title} className="rounded-2xl border border-white/8 bg-[#141415] p-4 shadow-[0_12px_28px_rgb(0_0_0/0.16)]">
+              <div key={title} className="rounded-2xl bg-composer p-4">
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-200">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-accent/10 text-accent">
                     <Icon size={15} />
@@ -130,9 +130,9 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
           </div>
         </section>
 
-        <div className="w-full max-w-sm justify-self-center bg-[#141415] border border-white/8 rounded-3xl p-8 space-y-6 shadow-[0_18px_48px_rgb(0_0_0/0.24)]">
+        <div className="w-full max-w-sm justify-self-center rounded-3xl bg-composer p-8 space-y-6">
           <div className="text-center space-y-2">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 border border-white/8">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5">
               <BrandMark brand={brand} />
             </div>
             {/* The page's single <h1>. The marketing headline in the left panel
@@ -222,7 +222,7 @@ export default function AuthScreen({ mode }: { mode: "login" | "register" }) {
             )}
             <button
               disabled={busy}
-              className="w-full rounded-2xl bg-accent text-black font-semibold py-3 disabled:opacity-40 hover:brightness-110 transition shadow-[0_10px_24px_rgb(var(--mood-accent)/0.3)]"
+              className="w-full rounded-full bg-white py-3 font-semibold text-black transition hover:opacity-90 disabled:opacity-40"
             >
               {busy ? "Working…" : mode === "login" ? "Sign in" : "Sign up"}
             </button>

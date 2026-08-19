@@ -11,7 +11,6 @@ interface ExploreItem {
   href: string;
 }
 
-/** Studios surfaced in the landing "Explore" dropdown. */
 const EXPLORE_ITEMS: ExploreItem[] = [
   { icon: "💬", label: "Chat", hint: "Streaming answers with memory", href: "/chat" },
   { icon: "📺", label: "Reel", hint: "The creator feed — watch & post videos", href: "/reel" },
@@ -22,18 +21,11 @@ const EXPLORE_ITEMS: ExploreItem[] = [
   { icon: "🎤", label: "Voice", hint: "Talk naturally, hear answers back", href: "/voice" },
 ];
 
-/**
- * 🧭 Landing navigation — sticky, glassy bar with the brand, an accessible
- * Explore dropdown (button + arrow/Escape/outside-click handling), and the
- * Sign in / Sign up actions. Keyboard: ↑/↓ move through items, Esc
- * closes and refocuses the trigger, Tab follows natural focus order.
- */
 export default function LandingNav() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Close on any outside pointer press.
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: PointerEvent) => {
@@ -60,12 +52,12 @@ export default function LandingNav() {
   };
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-white/8 bg-[#161614]/75 backdrop-blur-md">
-      <nav aria-label="Landing" className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
+    <header className="fixed inset-x-0 top-0 z-40 bg-base/80 backdrop-blur-md">
+      <nav aria-label="Landing" className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.png" alt="" className="h-7 w-7 rounded-lg" />
-          <span className="text-sm font-semibold tracking-wide">ChatMood</span>
+          <span className="text-sm font-semibold tracking-tight">ChatMood</span>
         </Link>
 
         <div ref={rootRef} className="relative" onKeyDown={onMenuKeyDown}>
@@ -75,17 +67,17 @@ export default function LandingNav() {
             aria-haspopup="menu"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/[0.07] hover:text-white"
+            className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm text-gray-300 transition hover:bg-white/5 hover:text-white"
           >
-            Explore
+            Features
             <ChevronDown size={13} className={`transition-transform ${open ? "rotate-180" : ""}`} />
           </button>
 
           {open && (
             <div
               role="menu"
-              aria-label="Explore the studios"
-              className="absolute left-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#171715]/97 p-1.5 shadow-[0_24px_48px_rgb(0_0_0/0.45)] backdrop-blur-xl"
+              aria-label="Explore the product"
+              className="absolute left-0 top-full mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[rgb(var(--mood-panel))] p-1.5 shadow-[0_16px_40px_rgb(0_0_0/0.4)]"
             >
               {EXPLORE_ITEMS.map((item) => (
                 <Link
@@ -93,7 +85,7 @@ export default function LandingNav() {
                   role="menuitem"
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition hover:bg-white/[0.06] focus:bg-white/[0.06] focus:outline-none"
+                  className="flex items-start gap-3 rounded-xl px-3 py-2.5 transition hover:bg-white/5 focus:bg-white/5 focus:outline-none"
                 >
                   <span className="mt-0.5 text-base leading-none">{item.icon}</span>
                   <span className="min-w-0">
@@ -106,24 +98,16 @@ export default function LandingNav() {
           )}
         </div>
 
-        {/* 📺 Creator Reel — a first-class destination, not buried in Explore */}
-        <Link
-          href="/reel"
-          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/[0.07] hover:text-white"
-        >
-          📺 Reel
-        </Link>
-
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           <Link
             href="/login"
-            className="hidden rounded-full px-3.5 py-1.5 text-xs font-medium text-gray-300 transition hover:text-white sm:block"
+            className="hidden rounded-lg px-3.5 py-1.5 text-sm text-gray-300 transition hover:bg-white/5 hover:text-white sm:block"
           >
-            Sign in
+            Log in
           </Link>
           <Link
             href="/signup"
-            className="rounded-full bg-accent px-4 py-1.5 text-xs font-semibold text-black transition hover:brightness-110"
+            className="rounded-full bg-white px-4 py-1.5 text-sm font-semibold text-black transition hover:opacity-90"
           >
             Sign up
           </Link>
