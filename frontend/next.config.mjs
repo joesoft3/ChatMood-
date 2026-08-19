@@ -20,7 +20,26 @@ const nextConfig = {
   // `next dev` behind a hosted preview/tunnel (sandbox URLs, ngrok, Codespaces)
   // is served on a different host than localhost; without this Next.js refuses
   // the cross-origin /_next/* requests and the page loads without its JS.
-  allowedDevOrigins: ["*.e2b.app", "*.app.github.dev", "*.ngrok-free.app", "*.trycloudflare.com"],
+  allowedDevOrigins: [
+    "*.e2b.app",
+    "*.e2b.dev",
+    "*.arena.ai",
+    "*.app.github.dev",
+    "*.ngrok-free.app",
+    "*.trycloudflare.com",
+    "*.loca.lt",
+  ],
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          // Arena (and other hosted previews) load the app inside an iframe.
+          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+        ],
+      },
+    ];
+  },
   async rewrites() {
     if (!PROXY_API) return [];
     return [{ source: "/api/v1/:path*", destination: `${BACKEND_ORIGIN}/api/v1/:path*` }];
