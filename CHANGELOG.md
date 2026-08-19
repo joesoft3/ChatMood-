@@ -7,7 +7,7 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
-### 🖥 Hosted preview / iframe loads
+### 🖥 Hosted preview / iframe loads (PR #46)
 
 `next dev` now accepts more preview hosts (`*.e2b.dev`, `*.arena.ai`,
 `*.loca.lt` plus the existing tunnel origins) and sends
