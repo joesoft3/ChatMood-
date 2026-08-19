@@ -46,23 +46,51 @@ def text_brain_status() -> dict[str, Any]:
 
 
 def image_brain_status() -> dict[str, Any]:
-    fallback = (settings.IMAGE_FALLBACK_PROVIDER or "").strip().lower()
-    mode = "pollinations" if fallback == "pollinations" else "xai"
+    # IMAGE_FALLBACK_PROVIDER is a comma-separated cascade of FREE engines
+    # (pollinations needs no key; gemini/huggingface/cloudflare ride free daily
+    # quotas). With no xAI key the first entry is the primary image engine.
+    chain = [p.strip().lower() for p in (settings.IMAGE_FALLBACK_PROVIDER or "").split(",") if p.strip()]
+    free_primary = bool(chain) and not settings.XAI_API_KEY
+    mode = chain[0] if free_primary else "xai"
+    primary_models = {
+        "pollinations": settings.POLLINATIONS_MODEL,
+        "gemini": settings.GEMINI_IMAGE_MODEL,
+        "huggingface": settings.HF_IMAGE_MODEL,
+        "hf": settings.HF_IMAGE_MODEL,
+        "cloudflare": settings.WORKERS_AI_IMAGE_MODEL,
+        "workers-ai": settings.WORKERS_AI_IMAGE_MODEL,
+    }
+    cf_id = settings.WORKERS_AI_ACCOUNT_ID or settings.CLOUDFLARE_ACCOUNT_ID
+    cf_token = settings.WORKERS_AI_API_TOKEN or settings.CLOUDFLARE_API_TOKEN
     return {
         "mode": mode,
         "primary": {
             "provider": mode,
-            "model": settings.POLLINATIONS_MODEL if mode == "pollinations" else settings.MODEL_IMAGE,
+            "model": primary_models.get(mode, settings.MODEL_IMAGE),
         },
         "xai_configured": bool(settings.XAI_API_KEY),
-        "fallback_provider": fallback or None,
+        "fallback_provider": (settings.IMAGE_FALLBACK_PROVIDER or "").strip().lower() or None,
+        "fallback_chain": chain,
         "pollinations": {
-            "enabled": fallback == "pollinations",
+            "enabled": "pollinations" in chain,
             "model": settings.POLLINATIONS_MODEL,
             "url": settings.POLLINATIONS_IMAGE_URL,
         },
+        "free_engines": {
+            "gemini": {"enabled": "gemini" in chain, "configured": bool(settings.GEMINI_API_KEY), "model": settings.GEMINI_IMAGE_MODEL},
+            "huggingface": {
+                "enabled": "huggingface" in chain or "hf" in chain,
+                "configured": bool(settings.HF_API_TOKEN),
+                "model": settings.HF_IMAGE_MODEL,
+            },
+            "cloudflare": {
+                "enabled": "cloudflare" in chain or "workers-ai" in chain,
+                "configured": bool(cf_id and cf_token),
+                "model": settings.WORKERS_AI_IMAGE_MODEL,
+            },
+        },
         "persist": bool(settings.IMAGE_PERSIST),
-        "ready": bool((mode == "pollinations") or settings.XAI_API_KEY),
+        "ready": bool(free_primary or settings.XAI_API_KEY),
     }
 
 

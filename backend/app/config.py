@@ -144,13 +144,29 @@ class Settings(BaseSettings):
     ROUTE_MODEL_CODING: str = ""      # e.g. gemini-2.5-pro | gpt-4o
     ROUTE_MODEL_AGENTS: str = ""
     ROUTE_MODEL_DEEPSEARCH: str = ""
-    # 🖼️ Free image stand-in / fallback while xAI image gen is unfunded. Pollinations
-    # serves real FLUX images with no key (probed live: HTTP 200, ~2s). When set to
-    # "pollinations" and no xAI key exists, it becomes the primary image engine;
-    # with an xAI key present it acts as the automatic fallback on provider errors.
+    # 🖼️ Free image engines, tried left→right when xAI image gen fails or is unfunded.
+    # Comma-separated cascade: "pollinations" or e.g. "gemini,huggingface,pollinations".
+    # With no xAI key configured, the FIRST entry becomes the primary image engine.
+    # All four are free: pollinations needs NO key at all; the others ride the
+    # provider's free daily quota on a free key you (or the operator) already have.
     IMAGE_FALLBACK_PROVIDER: str = ""
     POLLINATIONS_IMAGE_URL: str = "https://image.pollinations.ai/prompt"
     POLLINATIONS_MODEL: str = "flux"
+    # "gemini" — Gemini image models via the native generateContent API (NOT the
+    # OpenAI-compat base). AI Studio free tier carries a daily image quota; reuses
+    # GEMINI_API_KEY. Quota-0 keys simply 429 → the cascade moves on.
+    GEMINI_IMAGE_MODEL: str = "gemini-2.5-flash-image"
+    GEMINI_NATIVE_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
+    # "huggingface" (alias "hf") — HF Inference free daily credits on a free token.
+    HF_API_TOKEN: str = ""
+    HF_IMAGE_MODEL: str = "black-forest-labs/FLUX.1-schnell"
+    HF_IMAGE_BASE_URL: str = "https://router.huggingface.co/hf-inference/models"
+    # "cloudflare" (alias "workers-ai") — Workers AI free tier (10k neurons/day ≈
+    # hundreds of FLUX-schnell images). Dedicated pair wins; unset → falls back to
+    # the generic CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN used for DNS/Stream.
+    WORKERS_AI_ACCOUNT_ID: str = ""
+    WORKERS_AI_API_TOKEN: str = ""
+    WORKERS_AI_IMAGE_MODEL: str = "@cf/black-forest-labs/flux-1-schnell"
     # 🖼️ Generated images: archive a durable copy to object storage (R2/local) + file it
     # in the user's library, instead of relying on provider hotlinks that can go stale.
     IMAGE_PERSIST: bool = True

@@ -7,6 +7,28 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🎨 Free image cascade — three more free generators
+
+`IMAGE_FALLBACK_PROVIDER` is now a comma-separated **cascade of free image
+engines**, tried left→right whenever xAI image gen fails or is unfunded
+(e.g. `gemini,huggingface,pollinations`).
+
+- **pollinations** — free FLUX, no API key at all (as before, now one hop of a chain).
+- **gemini** — Gemini image models via the native generateContent API; free daily
+  quota in AI Studio, reuses `GEMINI_API_KEY`.
+- **huggingface** — HF Inference free daily credits on a free `HF_API_TOKEN`
+  (FLUX.1-schnell default, model overridable).
+- **cloudflare** — Workers AI free 10k neurons/day; dedicated `WORKERS_AI_*`
+  pair, falling back to the existing `CLOUDFLARE_*` creds.
+
+An engine with missing credentials, an HTTP error, quota exhaustion, or an
+image-less response is skipped to the next automatically. With no `XAI_API_KEY`
+the first working entry **is** the image engine (fully-free stack). Single-value
+`pollinations` behaves exactly as before; brain/admin status surfaces report the
+chain per engine (`enabled`/`configured`).
+
+---
+
 ### 🖼️ Free image fallback pinned in the Fly deploy
 
 `fly.toml` now ships `IMAGE_FALLBACK_PROVIDER=pollinations`, so image

@@ -15,6 +15,10 @@ primary_region = "jnb"          # Johannesburg — closest to 🇬🇭 Accra
   # 🖼️ Free daily image generation with zero API key: Pollinations FLUX.
   # xAI (grok-2-image) stays primary; any failure — e.g. $0 team credits —
   # auto-falls back to the free engine instead of erroring to the user.
+  # More free engines can be chained left→right here once their keys exist, e.g.
+  #   "gemini,pollinations"          (GEMINI_API_KEY already set • free daily quota)
+  #   "huggingface,pollinations"     (HF_API_TOKEN • free daily credits)
+  #   "cloudflare,pollinations"      (WORKERS_AI_* / CLOUDFLARE_* • 10k neurons/day)
   IMAGE_FALLBACK_PROVIDER = "pollinations"
 
 

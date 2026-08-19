@@ -90,7 +90,9 @@ async def admin_overview(db: AsyncSession = Depends(get_db), admin: User = Depen
             "vercel_attach": bool(settings.VERCEL_API_TOKEN and settings.VERCEL_PROJECT_ID),
             "platform_cname": settings.PLATFORM_CNAME_TARGET,
             "platform_ip": settings.PLATFORM_A_RECORD_IP,
-            "pollinations_image": (settings.IMAGE_FALLBACK_PROVIDER or "").strip().lower() == "pollinations",
+            "pollinations_image": "pollinations" in [
+                p.strip().lower() for p in (settings.IMAGE_FALLBACK_PROVIDER or "").split(",") if p.strip()
+            ],
             "pollinations_video": bool(settings.POLLINATIONS_API_KEY),
             "image_fallback_provider": (settings.IMAGE_FALLBACK_PROVIDER or "").strip().lower(),
             "video_provider_chain": [p.strip().lower() for p in (settings.VIDEO_PROVIDER or "").split(",") if p.strip()],
