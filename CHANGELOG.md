@@ -5,6 +5,17 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ---
 
+## 2026-08-19
+
+### 🖥 Hosted preview / iframe loads (PR #46)
+
+`next dev` now accepts more preview hosts (`*.e2b.dev`, `*.arena.ai`,
+`*.loca.lt` plus the existing tunnel origins) and sends
+`Content-Security-Policy: frame-ancestors *` so Arena and other hosted
+previews can load ChatMood inside an iframe instead of a blank frame.
+
+---
+
 ## 2026-08-18
 
 ### 🌍 Global refresh + dependency error pass
