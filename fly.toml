@@ -12,6 +12,10 @@ primary_region = "jnb"          # Johannesburg — closest to 🇬🇭 Accra
   #  deploy time; R2 is the designed durable store, so we skip volume babysitting.)
   UPLOAD_DIR = "/data/storage"
   MEDIA_DIR = "/data/media"
+  # 🖼️ Free daily image generation with zero API key: Pollinations FLUX.
+  # xAI (grok-2-image) stays primary; any failure — e.g. $0 team credits —
+  # auto-falls back to the free engine instead of erroring to the user.
+  IMAGE_FALLBACK_PROVIDER = "pollinations"
 
 
 [http_service]

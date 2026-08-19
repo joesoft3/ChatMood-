@@ -7,6 +7,16 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🖼️ Free image fallback pinned in the Fly deploy
+
+`fly.toml` now ships `IMAGE_FALLBACK_PROVIDER=pollinations`, so image
+generation never hard-fails when xAI team credits are at $0: Grok stays
+primary and Pollinations FLUX takes over automatically — daily free images,
+no extra API key needed. (The support was in the code; it relied on a
+manually-set secret that a redeploy could lose.)
+
+---
+
 ### 🔗 Production link opens the app, not a bare 404
 
 The public production URL (the GitHub repo homepage link and anything pointing
