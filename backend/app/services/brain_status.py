@@ -105,6 +105,12 @@ def video_brain_status() -> dict[str, Any]:
         elif name == "pollinations":
             ready = bool(settings.POLLINATIONS_API_KEY)
             reason = "API key set" if ready else "needs POLLINATIONS_API_KEY"
+        elif name in ("gemini", "veo"):
+            ready = bool(settings.GEMINI_API_KEY)
+            reason = "GEMINI_API_KEY set" if ready else "needs GEMINI_API_KEY (free AI Studio key)"
+        elif name in ("huggingface", "hf"):
+            ready = bool(settings.HF_API_TOKEN)
+            reason = "HF_API_TOKEN set" if ready else "needs HF_API_TOKEN (free HF token)"
         elif name == "xai":
             ready = bool(settings.XAI_API_KEY)
             reason = "xAI key set" if ready else "needs XAI_API_KEY"

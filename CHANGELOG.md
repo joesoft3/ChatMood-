@@ -7,6 +7,30 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-19
 
+### 🎬🆓 Free video cascade — Veo + Hugging Face join the chain
+
+`VIDEO_PROVIDER` gains two free-of-charge engines alongside reel /
+pollinations / xai, with the same lean cascade semantics (first success
+wins, each hop fail-soft):
+
+- **gemini** (alias `veo`) — Google Veo via the Gemini API `predictLongRunning`
+  op, polled to done; AI Studio's free tier carries a small daily Veo quota
+  when the key's project is granted it. Over-quota/unfunded keys cascade on.
+  Reuses `GEMINI_API_KEY`; model pinned to `veo-3.1-fast-generate-preview`
+  (`GEMINI_VIDEO_MODEL` to override).
+- **huggingface** (alias `hf`) — HF Inference text-to-video (Wan2.1-T2V-1.3B
+  default, the free-credit-friendly variant) on the free `HF_API_TOKEN`, with
+  cold-model `estimated_time` wait-and-retry.
+- Both save provider bytes via the media janitor, so soundtrack mixing and
+  library archiving see a plain `/api/v1/media/files/…` URL like every clip.
+- Chain docs + examples in `.env.example`; brain status reports per-provider
+  readiness/reasons for the new engines.
+
+e.g. `VIDEO_PROVIDER=gemini,huggingface,reel` = Veo free quota first, HF
+credits second, zero-key Reel as the always-on floor.
+
+---
+
 ### 🎨 Free image cascade — three more free generators
 
 `IMAGE_FALLBACK_PROVIDER` is now a comma-separated **cascade of free image

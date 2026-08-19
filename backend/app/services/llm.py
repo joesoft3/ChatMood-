@@ -492,7 +492,7 @@ class LLMService:
 
         import httpx
 
-        url = f"{settings.HF_IMAGE_BASE_URL}/{settings.HF_IMAGE_MODEL}"
+        url = f"{settings.HF_BASE_URL}/{settings.HF_IMAGE_MODEL}"
         async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:  # cold models can take ~20s
             r = await client.post(
                 url,

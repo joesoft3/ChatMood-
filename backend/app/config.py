@@ -160,7 +160,8 @@ class Settings(BaseSettings):
     # "huggingface" (alias "hf") — HF Inference free daily credits on a free token.
     HF_API_TOKEN: str = ""
     HF_IMAGE_MODEL: str = "black-forest-labs/FLUX.1-schnell"
-    HF_IMAGE_BASE_URL: str = "https://router.huggingface.co/hf-inference/models"
+    HF_VIDEO_MODEL: str = "Wan-AI/Wan2.1-T2V-1.3B"   # small Wan variant = free-credit friendly
+    HF_BASE_URL: str = "https://router.huggingface.co/hf-inference/models"
     # "cloudflare" (alias "workers-ai") — Workers AI free tier (10k neurons/day ≈
     # hundreds of FLUX-schnell images). Dedicated pair wins; unset → falls back to
     # the generic CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN used for DNS/Stream.
@@ -255,10 +256,15 @@ class Settings(BaseSettings):
     # Video generation — comma-chain of providers, first that succeeds wins:
     #   "reel"        = zero-key ChatMood Reel (FLUX scene stills → ffmpeg Ken Burns mp4)
     #   "pollinations"= gen.pollinations.ai video models (needs POLLINATIONS_API_KEY)
+    #   "gemini"/"veo"= Google Veo long-running op — free daily Veo quota in AI Studio
+    #                   when the key's project is granted it (reuses GEMINI_API_KEY)
+    #   "huggingface"/"hf" = HF Inference text-to-video on free daily credits
+    #                   (reuses HF_API_TOKEN + HF_BASE_URL)
     #   "xai"         = Grok video when credits exist
     # Default ships "reel" so chat video works TODAY with no keys; "xai,reel" once funded.
     VIDEO_PROVIDER: str = "reel"
     MODEL_VIDEO: str = "grok-video-1"
+    GEMINI_VIDEO_MODEL: str = "veo-3.1-fast-generate-preview"  # free-tier-first Veo tier
     POLLINATIONS_API_KEY: str = ""
     POLLINATIONS_VIDEO_URL: str = "https://gen.pollinations.ai/video"
     POLLINATIONS_VIDEO_MODEL: str = "wan-fast"
