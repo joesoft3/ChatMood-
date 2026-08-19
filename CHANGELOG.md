@@ -7,6 +7,26 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-18
 
+### 🌍 Global refresh + dependency error pass
+
+The app shell now gets a subtle global surface refresh from the theme tokens:
+ambient background gradients, consistent focus-visible rings, selection color,
+mobile tap handling and native accent coloring apply across every route without
+per-page patches. The web dependency lockfile was also refreshed to Next
+`15.5.23` and PostCSS `8.5.26`, clearing the npm audit errors without taking a
+breaking Next 16 upgrade.
+
+### 🔐 Fix — sign-up works on access-code protected deployments
+
+The email sign-up screen now includes the owner-provided **app access code**
+field and sends it as `app_password` to `/auth/register`. Before this, any
+deployment that enabled the sign-up gate could only return “requires an access
+code” because the web and Flutter clients had no place to enter one.
+
+Also tightened Flutter auth validation so the 8-character rule only blocks new
+account creation, not sign-in to an existing account. Backend signup-gate tests
+now cover missing, wrong, correct and closed-signup cases. Mobile `1.9.10+26`.
+
 ### 🩹 Fix — opening the deployed link showed a blank page
 
 Two independent bugs, both of which produced an empty screen in a real browser

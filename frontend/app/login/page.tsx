@@ -39,6 +39,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [accessCode, setAccessCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -55,6 +56,7 @@ export default function LoginPage() {
                 email,
                 password,
                 display_name: name || undefined,
+                app_password: accessCode.trim() || undefined,
               }
             : { email, password }
         ),
@@ -179,6 +181,25 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+            {mode === "register" && (
+              <>
+                <label htmlFor="login-access-code" className="sr-only">
+                  App access code
+                </label>
+                <input
+                  id="login-access-code"
+                  className={inputCls}
+                  type="password"
+                  autoComplete="one-time-code"
+                  placeholder="App access code (if required)"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value)}
+                />
+                <p className="px-1 text-[11px] leading-relaxed text-gray-600">
+                  Some deployments require an owner-provided code before new accounts can be created.
+                </p>
+              </>
+            )}
             {/* role="alert": a failed sign-in was rendered silently, so a screen
                 reader user got no feedback that anything had gone wrong. */}
             {error && (
@@ -196,7 +217,14 @@ export default function LoginPage() {
 
           <p className="text-xs text-center text-gray-500">
             {mode === "login" ? "No account? " : "Have an account? "}
-            <button type="button" onClick={() => setMode(mode === "login" ? "register" : "login")} className="inline-flex min-h-[44px] items-center px-1 text-accent underline">
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "login" ? "register" : "login");
+                setError("");
+              }}
+              className="inline-flex min-h-[44px] items-center px-1 text-accent underline"
+            >
               {mode === "login" ? "Sign up" : "Sign in"}
             </button>
           </p>
