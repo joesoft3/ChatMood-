@@ -9,13 +9,17 @@ ChatMood auto-deploys from `main` via GitHub Actions (see `.github/workflows/`):
 
 | Surface | Host       | Trigger                  | Config                       |
 | ------- | ---------- | ------------------------ | ---------------------------- |
+| Web     | Vercel     | push to `main`           | `frontend/vercel.json`, `deploy-vercel-web.yml` |
 | Web     | Netlify    | push to `main`           | `netlify.toml`, `deploy-netlify.yml` |
 | API     | Vercel     | push to `main`           | `deploy-vercel.yml`          |
 | API     | Fly.io     | `fly deploy`             | `fly.toml`, `Dockerfile.fly`, `deploy-fly.yml` |
 | Backend | Render     | Blueprint `autoDeploy`   | `render.yaml`                |
 
 So the canonical "go live" step is: **merge to `main`**, which triggers the
-Netlify + Vercel production deploys.
+connected production deploys. Use **https://moodai-app.vercel.app** until the
+planned `chatmood.net` domain is registered; then follow
+[docs/CHATMOOD-NET-CUTOVER.md](docs/CHATMOOD-NET-CUTOVER.md) before retiring the
+Vercel URL.
 
 ## The pre-merge gate
 

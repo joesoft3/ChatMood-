@@ -3,6 +3,9 @@
 ChatMood is a full-stack AI super-app scaffold that delivers Grok-style capabilities by
 **orchestrating existing frontier models and tools** instead of training anything from scratch.
 
+- **Live web app:** [https://moodai-app.vercel.app](https://moodai-app.vercel.app)
+- **Planned custom domain:** [https://chatmood.net](https://chatmood.net)
+
 - 💬 Streaming AI chat (Grok models via the xAI API) — **😄 Fun mode**, **📚 Study mode**, **👻 temporary chats**, **🖊 Canvas**, **∑ KaTeX math**, **🤖 Custom GPTs**
 - 🌐 Real-time web/X/news search grounding (xAI Live Search)
 - 🧠 Long-term memory (semantic, per-user, stored in Qdrant) **+ cross-chat recall — ChatMood remembers what your previous conversations were about**
