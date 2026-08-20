@@ -39,40 +39,90 @@ def price_with_markup(cost_cents: int) -> int:
 
 
 # --------------------------------------------------------------------- DNS checks
-def _sync_txt_records(name: str) -> list[str]:
+_DOH_URL = "https://cloudflare-dns.com/dns-query"
+_DOH_TYPE = {"A": 1, "AAAA": 28, "CNAME": 5, "TXT": 16}
+
+
+def _strip_txt(value: str) -> str:
+    v = value.strip()
+    if len(v) >= 2 and v[0] == v[-1] == '"':
+        v = v[1:-1]
+    return v.replace('" "', "")
+
+
+def _doh_records(name: str, rtype: str) -> list[str]:
+    """Ask 1.1.1.1 directly. System resolvers often cache NXDOMAIN for minutes
+    after we just created a Cloudflare record, which made Verify / on-demand TLS
+    look like Cloudflare was down."""
+    import json
+    import urllib.parse
+    import urllib.request
+
+    qtype = _DOH_TYPE.get(rtype.upper())
+    if not qtype:
+        return []
+    url = f"{_DOH_URL}?{urllib.parse.urlencode({'name': name, 'type': rtype})}"
+    req = urllib.request.Request(url, headers={"accept": "application/dns-json"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode() or "{}")
+    except Exception:
+        return []
+    out: list[str] = []
+    for ans in data.get("Answer") or []:
+        if ans.get("type") != qtype:
+            continue
+        raw = str(ans.get("data") or "").strip()
+        if rtype.upper() == "TXT":
+            raw = _strip_txt(raw)
+        elif rtype.upper() == "CNAME":
+            raw = raw.rstrip(".").lower()
+        if raw:
+            out.append(raw)
+    return out
+
+
+def _resolver_records(name: str, rtype: str) -> list[str]:
     import dns.resolver
 
     try:
-        answers = dns.resolver.resolve(name, "TXT", lifetime=6)
-        out = []
-        for r in answers:
-            try:
-                out.append("".join(s.decode() if isinstance(s, bytes) else str(s) for s in r.strings))
-            except AttributeError:
-                out.append(str(r).strip('"'))
-        return out
+        answers = dns.resolver.resolve(name, rtype, lifetime=6)
     except Exception:
         return []
+    out: list[str] = []
+    for r in answers:
+        try:
+            if rtype == "TXT":
+                try:
+                    out.append("".join(s.decode() if isinstance(s, bytes) else str(s) for s in r.strings))
+                except AttributeError:
+                    out.append(_strip_txt(str(r)))
+            elif rtype == "CNAME":
+                out.append(str(r.target).rstrip(".").lower())
+            elif rtype in {"A", "AAAA"}:
+                out.append(str(r.address).strip())
+            else:
+                out.append(str(r).rstrip("."))
+        except Exception:
+            continue
+    return out
+
+
+def _lookup(name: str, rtype: str) -> list[str]:
+    got = _resolver_records(name, rtype)
+    return got if got else _doh_records(name, rtype)
+
+
+def _sync_txt_records(name: str) -> list[str]:
+    return _lookup(name, "TXT")
 
 
 def _sync_cname_records(name: str) -> list[str]:
-    import dns.resolver
-
-    try:
-        answers = dns.resolver.resolve(name, "CNAME", lifetime=6)
-        return [str(r.target).rstrip(".").lower() for r in answers]
-    except Exception:
-        return []
+    return _lookup(name, "CNAME")
 
 
 def _sync_a_records(name: str) -> list[str]:
-    import dns.resolver
-
-    try:
-        answers = dns.resolver.resolve(name, "A", lifetime=6)
-        return [str(r.address).strip() for r in answers]
-    except Exception:
-        return []
+    return _lookup(name, "A")
 
 
 async def verify_txt(domain: str, token: str) -> bool:
@@ -81,11 +131,30 @@ async def verify_txt(domain: str, token: str) -> bool:
     return any(token in r for r in records)
 
 
+def _sets_alias(host_as: list[str], target_as: list[str]) -> bool:
+    """True when flattened CNAME / CF orange-cloud A records match the target."""
+    host, tgt = set(host_as), set(target_as)
+    return bool(host and tgt and (tgt <= host or host <= tgt))
+
+
 async def cname_points(domain: str, target: str) -> bool:
-    """Does <domain> (or www.<domain> for apex) CNAME to the platform target?"""
+    """Does <domain> (or www.<domain> for apex) CNAME to the platform target?
+
+    Cloudflare orange-cloud / CNAME flattening hides the CNAME at the public
+    DNS layer and publishes A records instead. Treat matching A sets as the
+    same proof — otherwise Verify never flips to live and the edge (Caddy)
+    refuses TLS, which surfaces as Cloudflare Error 522 (origin unreachable).
+    """
     target = target.rstrip(".").lower()
-    for name in (domain, f"www.{domain}"):
+    names = (domain, f"www.{domain}")
+    for name in names:
         if target in await asyncio.to_thread(_sync_cname_records, name):
+            return True
+    target_as = await asyncio.to_thread(_sync_a_records, target)
+    if not target_as:
+        return False
+    for name in names:
+        if _sets_alias(await asyncio.to_thread(_sync_a_records, name), target_as):
             return True
     return False
 
@@ -138,7 +207,14 @@ class CloudflareClient:
         return settings.CLOUDFLARE_API_BASE_URL.rstrip("/")
 
     async def _api(self, method: str, path: str, **kwargs) -> Any:
-        r = await self._http.request(method, f"{self._base}{path}", headers=self._headers(), **kwargs)
+        url = f"{self._base}{path}"
+        try:
+            r = await self._http.request(method, url, headers=self._headers(), **kwargs)
+        except httpx.RequestError as e:
+            raise DomainError(
+                f"Can't reach the Cloudflare API at {self._base} ({e.__class__.__name__}: {e}). "
+                "Check CLOUDFLARE_API_TOKEN / CLOUDFLARE_API_BASE_URL and that this host can open https://api.cloudflare.com."
+            ) from e
         if r.status_code >= 400:
             raise DomainError(f"Cloudflare API failed ({r.status_code}): {r.text[:240]}")
         data = r.json() if r.content else {}
@@ -148,12 +224,24 @@ class CloudflareClient:
         return data
 
     async def find_zone(self, domain: str) -> dict[str, str]:
+        account = (settings.CLOUDFLARE_ACCOUNT_ID or "").strip()
         for cand in zone_candidates(domain):
-            data = await self._api("GET", "/zones", params={"name": cand, "per_page": 1, "status": "active"})
-            rows = data.get("result") or []
-            if rows:
-                z = rows[0]
-                return {"id": str(z.get("id") or ""), "name": str(z.get("name") or cand)}
+            # Active zones first (nameservers already at Cloudflare). Pending is
+            # a fallback so we can still write records, but callers must not
+            # treat pending as publicly reachable.
+            for status in ("active", "pending"):
+                params: dict[str, Any] = {"name": cand, "per_page": 1, "status": status}
+                if account:
+                    params["account.id"] = account
+                data = await self._api("GET", "/zones", params=params)
+                rows = data.get("result") or []
+                if rows:
+                    z = rows[0]
+                    return {
+                        "id": str(z.get("id") or ""),
+                        "name": str(z.get("name") or cand),
+                        "status": str(z.get("status") or status),
+                    }
         raise DomainError(
             f"No accessible Cloudflare zone found for {domain}. Make sure the domain is in this Cloudflare account."
         )
@@ -170,17 +258,99 @@ class CloudflareClient:
             raise DomainError(f"{fqdn} does not belong to Cloudflare zone {zone_name}")
         return fqdn[: -len(suffix)]
 
-    async def upsert_record(self, zone_id: str, *, type: str, name: str, content: str, proxied: bool = False, ttl: int = 300) -> None:
-        q = await self._api("GET", f"/zones/{zone_id}/dns_records", params={"type": type, "name": name, "per_page": 1})
-        rows = q.get("result") or []
-        payload: dict[str, Any] = {"type": type, "name": name, "content": content, "ttl": ttl}
+    @staticmethod
+    def _fqdn(name: str, zone_name: str) -> str:
+        """Cloudflare's list filter requires the fully-qualified name, not `@` / a relative label."""
+        zone_name = clean_domain(zone_name)
+        n = (name or "").strip().lower().rstrip(".")
+        n = re.sub(r"^https?://", "", n).split("/")[0]
+        if n in {"", "@", zone_name}:
+            return zone_name
+        if n.endswith(f".{zone_name}"):
+            return n
+        return f"{n}.{zone_name}"
+
+    async def list_records(self, zone_id: str, *, name: str | None = None, type: str | None = None) -> list[dict]:
+        params: dict[str, Any] = {"per_page": 100}
+        if name:
+            params["name"] = name.strip().lower().rstrip(".")
+        if type:
+            params["type"] = type
+        data = await self._api("GET", f"/zones/{zone_id}/dns_records", params=params)
+        return list(data.get("result") or [])
+
+    async def upsert_record(
+        self,
+        zone_id: str,
+        *,
+        type: str,
+        name: str,
+        content: str,
+        proxied: bool = False,
+        ttl: int = 300,
+        zone_name: str | None = None,
+    ) -> None:
+        """Create or replace a record. Lookup is by FQDN so retries actually update.
+
+        Traffic records stay DNS-only (`proxied=False`) unless the caller opts in.
+        Orange-cloud proxying this hostname makes Cloudflare the HTTPS client of
+        our origin — and when the origin cert/SNI doesn't match (Fly/Caddy
+        on-demand TLS), Cloudflare returns Error 522/526: origin unreachable.
+        """
+        fqdn = self._fqdn(name, zone_name) if zone_name else name.strip().lower().rstrip(".")
+        payload: dict[str, Any] = {
+            "type": type,
+            "name": fqdn,
+            "content": content,
+            "ttl": 1 if proxied else ttl,
+        }
         if type in {"A", "AAAA", "CNAME"}:
             payload["proxied"] = proxied
-        if rows:
-            rid = rows[0].get("id")
+
+        rows = await self.list_records(zone_id, name=fqdn)
+        same = [r for r in rows if (r.get("type") or "") == type]
+        if type in {"A", "AAAA", "CNAME"}:
+            for r in rows:
+                rtype = r.get("type") or ""
+                rid = r.get("id")
+                if rid and rtype in {"A", "AAAA", "CNAME"} and rtype != type:
+                    # Apex/subdomain cannot hold both a CNAME and A/AAAA.
+                    await self._api("DELETE", f"/zones/{zone_id}/dns_records/{rid}")
+
+        if same:
+            rid = same[0].get("id")
             await self._api("PUT", f"/zones/{zone_id}/dns_records/{rid}", json=payload)
-        else:
-            await self._api("POST", f"/zones/{zone_id}/dns_records", json=payload)
+            for extra in same[1:]:
+                eid = extra.get("id")
+                if eid:
+                    await self._api("DELETE", f"/zones/{zone_id}/dns_records/{eid}")
+            return
+        await self._api("POST", f"/zones/{zone_id}/dns_records", json=payload)
+
+    async def records_match(self, domain: str, verification_token: str) -> dict[str, Any]:
+        """Authoritative check against the Cloudflare API (not public DNS)."""
+        zone = await self.find_zone(domain)
+        fqdn = clean_domain(domain)
+        txt_fqdn = f"_mood-verify.{fqdn}"
+        txt_rows = await self.list_records(zone["id"], name=txt_fqdn, type="TXT")
+        traffic = await self.list_records(zone["id"], name=fqdn)
+        want_cname = (settings.PLATFORM_CNAME_TARGET or "").rstrip(".").lower()
+        want_ip = (settings.PLATFORM_A_RECORD_IP or "").strip()
+        txt_ok = any(verification_token in _strip_txt(str(r.get("content") or "")) for r in txt_rows)
+        cname_ok = any(
+            (r.get("type") == "CNAME")
+            and want_cname
+            and want_cname == str(r.get("content") or "").rstrip(".").lower()
+            for r in traffic
+        )
+        a_ok = any((r.get("type") == "A") and want_ip and want_ip == str(r.get("content") or "").strip() for r in traffic)
+        return {
+            "zone": zone.get("name"),
+            "zone_status": zone.get("status") or "active",
+            "txt_verified": txt_ok,
+            "cname_points": cname_ok,
+            "a_record_points": a_ok,
+        }
 
     async def provision_connected_domain(self, domain: str, verification_token: str) -> dict[str, str]:
         zone = await self.find_zone(domain)
@@ -189,35 +359,71 @@ class CloudflareClient:
 
         txt_fqdn = f"_mood-verify.{clean_domain(domain)}"
         txt_name = self._relative_name(txt_fqdn, zone_name)
-        await self.upsert_record(zone_id, type="TXT", name=txt_name, content=verification_token)
+        await self.upsert_record(
+            zone_id, type="TXT", name=txt_name, content=verification_token, zone_name=zone_name
+        )
 
         traffic_type = ""
         traffic_name = ""
         traffic_value = ""
+        # Always DNS-only so Cloudflare does not try (and fail) to reach our origin.
         if clean_domain(domain) == zone_name and settings.PLATFORM_A_RECORD_IP:
             traffic_type = "A"
             traffic_name = self._relative_name(domain, zone_name)
             traffic_value = settings.PLATFORM_A_RECORD_IP.strip()
-            await self.upsert_record(zone_id, type="A", name=traffic_name, content=traffic_value)
+            await self.upsert_record(
+                zone_id, type="A", name=traffic_name, content=traffic_value, proxied=False, zone_name=zone_name
+            )
         elif settings.PLATFORM_CNAME_TARGET:
             traffic_type = "CNAME"
             traffic_name = self._relative_name(domain, zone_name)
             traffic_value = settings.PLATFORM_CNAME_TARGET.rstrip(".")
-            await self.upsert_record(zone_id, type="CNAME", name=traffic_name, content=traffic_value)
+            await self.upsert_record(
+                zone_id, type="CNAME", name=traffic_name, content=traffic_value, proxied=False, zone_name=zone_name
+            )
         elif settings.PLATFORM_A_RECORD_IP:
             traffic_type = "A"
             traffic_name = self._relative_name(domain, zone_name)
             traffic_value = settings.PLATFORM_A_RECORD_IP.strip()
-            await self.upsert_record(zone_id, type="A", name=traffic_name, content=traffic_value)
+            await self.upsert_record(
+                zone_id, type="A", name=traffic_name, content=traffic_value, proxied=False, zone_name=zone_name
+            )
         else:
             raise DomainError("Platform traffic target is not configured — set PLATFORM_CNAME_TARGET or PLATFORM_A_RECORD_IP.")
 
+        # Apex visitors often type www. — grey-cloud it too so Cloudflare isn't
+        # the HTTPS client of a host Caddy/Fly have no cert for.
+        if clean_domain(domain) == zone_name:
+            try:
+                if settings.PLATFORM_CNAME_TARGET:
+                    await self.upsert_record(
+                        zone_id,
+                        type="CNAME",
+                        name="www",
+                        content=settings.PLATFORM_CNAME_TARGET.rstrip("."),
+                        proxied=False,
+                        zone_name=zone_name,
+                    )
+                elif traffic_type == "A" and traffic_value:
+                    await self.upsert_record(
+                        zone_id,
+                        type="A",
+                        name="www",
+                        content=traffic_value,
+                        proxied=False,
+                        zone_name=zone_name,
+                    )
+            except DomainError as e:
+                log.warning("cloudflare www record for %s skipped: %s", domain, e)
+
         return {
             "zone": zone_name,
+            "zone_status": zone.get("status") or "active",
             "txt_name": txt_fqdn,
             "record_type": traffic_type,
             "record_name": domain,
             "record_value": traffic_value,
+            "proxied": "false",
         }
 
 

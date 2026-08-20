@@ -6,11 +6,11 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
 
 from .api.deps import get_redis
+from .core.cors import ChatMoodCORS, refresh_cors_hosts_from_db
 from .api.routes import admin, admin_payments, agents, apikeys, auth, billing, chat, conversations, deepsearch, designer, devices, domains, files, gpts, media, memory, payments, plugins, projects, public_api, reels, share, tasks, usage, voice, voice_ws, workspaces
 from .config import settings
 from .core.metrics import REQ_COUNT, REQ_LAT, metrics_response
@@ -49,6 +49,12 @@ async def lifespan(app: FastAPI):
 
     start_payment_sweep()  # 💳 downgrade manual plans whose paid period lapsed
     try:
+        n = await refresh_cors_hosts_from_db()
+        if n:
+            log.info("CORS allow-list loaded %d custom-domain host alias(es)", n)
+    except Exception as e:
+        log.warning("CORS host refresh at boot failed: %s", e)
+    try:
         yield
     finally:
         watchdog.cancel()
@@ -60,7 +66,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ChatMood API", version="1.9.9", lifespan=lifespan)
 
 app.add_middleware(
-    CORSMiddleware,
+    ChatMoodCORS,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],

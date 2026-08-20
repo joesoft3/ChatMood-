@@ -5,6 +5,40 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ---
 
+## 2026-08-20
+
+### ☁️ Fix — Cloudflare custom domains never reached the origin (522) (PR #52)
+
+Connecting a domain through Cloudflare looked set up, then the browser could not
+reach ChatMood. Three bugs stacked:
+
+- **Record upsert looked up a relative name** (`chat`, `@`) while Cloudflare's
+  list API matches on the FQDN. Retries never found the existing row, POST
+  collided, and leftover **orange-cloud A records** kept pointing at a dead
+  origin — Cloudflare Error **522 / 526**.
+- **Verify only asked public DNS for a CNAME.** Orange-cloud / CNAME flattening
+  hides that CNAME, so the domain stayed `pending_dns`, Caddy
+  `/domains/allowed` 403'd, and on-demand TLS never issued.
+- **System resolvers cached NXDOMAIN** for minutes after we wrote the records.
+
+Now upsert matches by FQDN, replaces conflicting A/AAAA/CNAME, and **forces
+DNS-only (grey cloud)** so Cloudflare is not the HTTPS client of Fly/Caddy.
+Verify accepts flattened A records, falls back to 1.1.1.1 DoH, and treats the
+Cloudflare API as authoritative on active zones. Unreachable `api.cloudflare.com`
+is a clear `DomainError` instead of a raw connect failure.
+
+Follow-up so the browser actually talks to the API after DNS is right:
+
+- **CORS** now allows `FRONTEND_URL` (and its www twin) plus every **active
+  custom domain**, so a white-label / Cloudflare host no longer dies as
+  `Failed to fetch` → “Can't reach the ChatMood server”.
+- Apex provision also writes a grey-cloud **www** record; Caddy `/domains/allowed`
+  and `/domains/by-host` treat `www.` as the same site.
+
+Tests: `test_domains_cloudflare.py`, `test_cors_domains.py`.
+
+---
+
 ## 2026-08-19
 
 ### 🔐 Fix — chat always said "Invalid or expired token"

@@ -31,6 +31,7 @@ from ...services.domains import (
     vercel_attach,
     verify_txt,
 )
+from ...core.cors import forget_cors_host, remember_cors_host
 from ..deps import enforce_rate_limit, get_current_user
 from .workspaces import membership_of
 
@@ -89,6 +90,20 @@ async def _dns_checks(d: Domain) -> dict[str, bool]:
     txt_ok = await verify_txt(d.domain, d.verification_token)
     cname_ok = bool(settings.PLATFORM_CNAME_TARGET) and await cname_points(d.domain, settings.PLATFORM_CNAME_TARGET)
     a_ok = bool(settings.PLATFORM_A_RECORD_IP) and await a_points(d.domain, settings.PLATFORM_A_RECORD_IP)
+    # Cloudflare API is authoritative for zones we just wrote. Public resolvers
+    # (and even 1.1.1.1 after an NXDOMAIN cache) can lag; without this fallback
+    # the domain stays pending_dns, Caddy /domains/allowed 403s, and visitors
+    # see Cloudflare 522 "origin is unreachable".
+    if cloudflare.configured and d.verification_token and not (txt_ok and (cname_ok or a_ok)):
+        try:
+            api = await cloudflare.records_match(d.domain, d.verification_token)
+        except Exception as e:
+            log.warning("cloudflare API verify for %s failed: %s", d.domain, e)
+            api = {}
+        if (api.get("zone_status") or "active") == "active":
+            txt_ok = txt_ok or bool(api.get("txt_verified"))
+            cname_ok = cname_ok or bool(api.get("cname_points"))
+            a_ok = a_ok or bool(api.get("a_record_points"))
     return {"txt_verified": txt_ok, "cname_points": cname_ok, "a_record_points": a_ok}
 
 
@@ -101,6 +116,20 @@ def _dns_ready(checks: dict[str, bool]) -> bool:
             or (not settings.PLATFORM_CNAME_TARGET and not settings.PLATFORM_A_RECORD_IP)
         )
     )
+
+
+def _mark_active(d: Domain) -> None:
+    d.status = "active"
+    remember_cors_host(d.domain)
+
+
+async def _active_by_host(db: AsyncSession, host: str) -> Domain | None:
+    d = await db.scalar(select(Domain).where(Domain.domain == host, Domain.status == "active"))
+    if d:
+        return d
+    if host.startswith("www."):
+        return await db.scalar(select(Domain).where(Domain.domain == host[4:], Domain.status == "active"))
+    return await db.scalar(select(Domain).where(Domain.domain == f"www.{host}", Domain.status == "active"))
 
 
 # ---------------------------------------------------------------- capabilities
@@ -204,7 +233,7 @@ async def connect_domain(
 
     checks = await _dns_checks(d)
     if _dns_ready(checks):
-        d.status = "active"
+        _mark_active(d)
         await db.commit()
         if await vercel_attach(d.domain):
             log.info("domain %s attached to Vercel project", d.domain)
@@ -232,7 +261,7 @@ async def cloudflare_setup_domain(did: str, db: AsyncSession = Depends(get_db), 
 
     checks = await _dns_checks(d)
     if _dns_ready(checks):
-        d.status = "active"
+        _mark_active(d)
         await db.commit()
         if await vercel_attach(d.domain):
             log.info("domain %s attached to Vercel project", d.domain)
@@ -246,7 +275,7 @@ async def verify_domain(did: str, db: AsyncSession = Depends(get_db), user: User
         return _out(d)
     checks = await _dns_checks(d)
     if _dns_ready(checks):
-        d.status = "active"
+        _mark_active(d)
         await db.commit()
         if await vercel_attach(d.domain):
             log.info("domain %s attached to Vercel project", d.domain)
@@ -275,6 +304,7 @@ async def verify_domain(did: str, db: AsyncSession = Depends(get_db), user: User
 @router.delete("/{did}")
 async def delete_domain(did: str, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     d = await _owned(db, user, did)
+    forget_cors_host(d.domain)
     await db.delete(d)
     await db.commit()
     return {"deleted": d.domain}
@@ -560,6 +590,7 @@ async def fulfill_domain_purchase(domain_id: str) -> None:
             except Exception:
                 pass
             d.status = "active"  # purchased domains are authoritative — no TXT check needed
+            remember_cors_host(d.domain)
             await s.commit()
             log.info("domain purchased & activated: %s (order %s)", d.domain, d.registrar_order_id)
             await vercel_attach(d.domain)
@@ -580,7 +611,7 @@ async def brand_by_host(host: str = Query(..., max_length=253), db: AsyncSession
         domain = clean_domain(host.split(":")[0]) if host else ""
     except DomainError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no brand")
-    d = await db.scalar(select(Domain).where(Domain.domain == domain, Domain.status == "active"))
+    d = await _active_by_host(db, domain)
     if not d:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no brand")
     return {

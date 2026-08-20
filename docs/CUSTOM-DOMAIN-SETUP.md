@@ -18,6 +18,12 @@ Prereq: your app already runs ([GO-LIVE-CLICKSHEET](GO-LIVE-CLICKSHEET.md) done)
 > `CLOUDFLARE_API_TOKEN` with `Zone:Read` + `DNS:Edit`, Settings → Domains now
 > tries Cloudflare DNS setup automatically during **Connect**, and also shows a
 > **☁️ Cloudflare setup** button to retry/create the TXT + traffic records on demand.
+>
+> **Keep the traffic record DNS-only (grey cloud).** ChatMood writes it that way
+> on purpose. Orange-cloud proxying makes Cloudflare the HTTPS client of your
+> origin; Fly/Caddy on-demand certs then fail SNI and visitors see
+> **Error 522 / 526 — Cloudflare could not reach the origin**. Grey-cloud CNAMEs
+> (or an apex A to `PLATFORM_A_RECORD_IP`) let the host terminate TLS.
 
    | Type | Host/Name | Value |
    |---|---|---|

@@ -29,8 +29,16 @@ def test_other_schemes_untouched():
 
 
 def test_cors_origin_list_parses_csv_and_strips():
-    s = _s(CORS_ORIGINS="https://app.mood.ai, https://mood-ai.netlify.app , *")
+    s = _s(
+        CORS_ORIGINS="https://app.mood.ai, https://mood-ai.netlify.app , *",
+        FRONTEND_URL="https://app.mood.ai",
+    )
     assert s.cors_origin_list == ["https://app.mood.ai", "https://mood-ai.netlify.app", "*"]
+
+
+def test_cors_origin_list_includes_frontend_url():
+    s = _s(CORS_ORIGINS="http://localhost:3000", FRONTEND_URL="https://5boost.me")
+    assert "https://5boost.me" in s.cors_origin_list
 
 
 def test_cors_default_is_not_empty():

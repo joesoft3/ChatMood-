@@ -383,7 +383,11 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        origins = [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+        fe = (self.FRONTEND_URL or "").rstrip("/")
+        if fe and fe not in origins:
+            origins.append(fe)
+        return origins
 
     @property
     def readiness_required_set(self) -> set[str]:

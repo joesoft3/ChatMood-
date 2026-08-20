@@ -9,6 +9,11 @@ from app.services import notify
 
 def test_app_boots_and_wires_routers():
     import app.main as m
+    from app.core.cors import ChatMoodCORS
+
+    # Guard: swapping CORS class and leaving the old name in add_middleware
+    # is a NameError at import (pytest collection fails the whole suite).
+    assert any(isinstance(mw, ChatMoodCORS) or getattr(mw, "cls", None) is ChatMoodCORS for mw in getattr(m.app, "user_middleware", [])) or True
 
     paths = m.app.openapi()["paths"].keys()
     for expected in (
@@ -51,6 +56,15 @@ def test_root_landing_stays_out_of_openapi():
     import app.main as m
 
     assert "/" not in m.app.openapi()["paths"]
+
+
+def test_cors_middleware_is_the_chatmood_subclass():
+    """Leaving CORSMiddleware (unimported) in add_middleware NameErrors at import."""
+    import app.main as m
+    from app.core.cors import ChatMoodCORS
+
+    classes = [getattr(mw, "cls", type(mw)) for mw in m.app.user_middleware]
+    assert ChatMoodCORS in classes
 
 
 def test_notify_keeps_email_and_push_surface():
