@@ -7,7 +7,7 @@ Each entry links the pull request it landed in. Dates are UTC.
 
 ## 2026-08-20
 
-### ☁️ Fix — Cloudflare custom domains never reached the origin (522)
+### ☁️ Fix — Cloudflare custom domains never reached the origin (522) (PR #52)
 
 Connecting a domain through Cloudflare looked set up, then the browser could not
 reach ChatMood. Three bugs stacked:
