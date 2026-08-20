@@ -391,6 +391,31 @@ class CloudflareClient:
         else:
             raise DomainError("Platform traffic target is not configured — set PLATFORM_CNAME_TARGET or PLATFORM_A_RECORD_IP.")
 
+        # Apex visitors often type www. — grey-cloud it too so Cloudflare isn't
+        # the HTTPS client of a host Caddy/Fly have no cert for.
+        if clean_domain(domain) == zone_name:
+            try:
+                if settings.PLATFORM_CNAME_TARGET:
+                    await self.upsert_record(
+                        zone_id,
+                        type="CNAME",
+                        name="www",
+                        content=settings.PLATFORM_CNAME_TARGET.rstrip("."),
+                        proxied=False,
+                        zone_name=zone_name,
+                    )
+                elif traffic_type == "A" and traffic_value:
+                    await self.upsert_record(
+                        zone_id,
+                        type="A",
+                        name="www",
+                        content=traffic_value,
+                        proxied=False,
+                        zone_name=zone_name,
+                    )
+            except DomainError as e:
+                log.warning("cloudflare www record for %s skipped: %s", domain, e)
+
         return {
             "zone": zone_name,
             "zone_status": zone.get("status") or "active",

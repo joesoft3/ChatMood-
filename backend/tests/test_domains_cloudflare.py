@@ -105,7 +105,7 @@ def test_cloudflare_provision_apex_prefers_a_record_when_platform_ip_exists(monk
     assert out["record_name"] == "example.com"
     assert out["record_value"] == "203.0.113.10"
     assert out["proxied"] == "false"
-    assert calls[-1] == {
+    assert {
         "zone_id": "zone-1",
         "type": "A",
         "name": "@",
@@ -113,7 +113,8 @@ def test_cloudflare_provision_apex_prefers_a_record_when_platform_ip_exists(monk
         "proxied": False,
         "ttl": 300,
         "zone_name": "example.com",
-    }
+    } in calls
+    assert any(c["name"] == "www" and c["proxied"] is False for c in calls)
 
 
 def test_cloudflare_fqdn_normalizes_at_and_relative():

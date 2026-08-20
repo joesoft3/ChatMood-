@@ -25,8 +25,17 @@ Now upsert matches by FQDN, replaces conflicting A/AAAA/CNAME, and **forces
 DNS-only (grey cloud)** so Cloudflare is not the HTTPS client of Fly/Caddy.
 Verify accepts flattened A records, falls back to 1.1.1.1 DoH, and treats the
 Cloudflare API as authoritative on active zones. Unreachable `api.cloudflare.com`
-is a clear `DomainError` instead of a raw connect failure. Tests:
-`test_domains_cloudflare.py`.
+is a clear `DomainError` instead of a raw connect failure.
+
+Follow-up so the browser actually talks to the API after DNS is right:
+
+- **CORS** now allows `FRONTEND_URL` (and its www twin) plus every **active
+  custom domain**, so a white-label / Cloudflare host no longer dies as
+  `Failed to fetch` → “Can't reach the ChatMood server”.
+- Apex provision also writes a grey-cloud **www** record; Caddy `/domains/allowed`
+  and `/domains/by-host` treat `www.` as the same site.
+
+Tests: `test_domains_cloudflare.py`, `test_cors_domains.py`.
 
 ---
 
