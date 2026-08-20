@@ -38,6 +38,7 @@ deploy path that matches your host.
 | Guide | What it covers |
 | --- | --- |
 | [CUSTOM-DOMAIN-SETUP.md](CUSTOM-DOMAIN-SETUP.md) | Wiring `app.` (web) and `api.` (API) subdomains. |
+| [CHATMOOD-NET-CUTOVER.md](CHATMOOD-NET-CUTOVER.md) | Production cutover from the Vercel URL to `chatmood.net`. |
 | [CUSTOM-DOMAIN-SALES-PAGE.md](CUSTOM-DOMAIN-SALES-PAGE.md) | Custom domain + white-label arena quickstart. |
 | [5BOOST-ME-CUTOVER.md](5BOOST-ME-CUTOVER.md) | The 5boost.me cutover plan. |
 
