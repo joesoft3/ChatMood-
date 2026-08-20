@@ -89,6 +89,20 @@ async def _dns_checks(d: Domain) -> dict[str, bool]:
     txt_ok = await verify_txt(d.domain, d.verification_token)
     cname_ok = bool(settings.PLATFORM_CNAME_TARGET) and await cname_points(d.domain, settings.PLATFORM_CNAME_TARGET)
     a_ok = bool(settings.PLATFORM_A_RECORD_IP) and await a_points(d.domain, settings.PLATFORM_A_RECORD_IP)
+    # Cloudflare API is authoritative for zones we just wrote. Public resolvers
+    # (and even 1.1.1.1 after an NXDOMAIN cache) can lag; without this fallback
+    # the domain stays pending_dns, Caddy /domains/allowed 403s, and visitors
+    # see Cloudflare 522 "origin is unreachable".
+    if cloudflare.configured and d.verification_token and not (txt_ok and (cname_ok or a_ok)):
+        try:
+            api = await cloudflare.records_match(d.domain, d.verification_token)
+        except Exception as e:
+            log.warning("cloudflare API verify for %s failed: %s", d.domain, e)
+            api = {}
+        if (api.get("zone_status") or "active") == "active":
+            txt_ok = txt_ok or bool(api.get("txt_verified"))
+            cname_ok = cname_ok or bool(api.get("cname_points"))
+            a_ok = a_ok or bool(api.get("a_record_points"))
     return {"txt_verified": txt_ok, "cname_points": cname_ok, "a_record_points": a_ok}
 
 
