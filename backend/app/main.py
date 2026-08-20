@@ -66,7 +66,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ChatMood API", version="1.9.9", lifespan=lifespan)
 
 app.add_middleware(
-    CORSMiddleware,
+    ChatMoodCORS,
     allow_origins=settings.cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
